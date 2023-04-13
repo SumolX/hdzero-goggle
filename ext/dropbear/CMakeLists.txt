@@ -13,8 +13,21 @@ if(DEFINED CMAKE_TOOLCHAIN_FILE)
 	get_filename_component(COMPILER_NAME ${CMAKE_C_COMPILER} NAME)
 	get_filename_component(COMPILER_PATH ${CMAKE_C_COMPILER} PATH)
 	string(REGEX REPLACE "(.*)-gcc" "\\1" TARGET_PLATFORM "${COMPILER_NAME}")
-
-	set(TARGET_OPTIONS "CFLAGS=${CMAKE_C_FLAGS};CC=${COMPILER_PATH}/${TARGET_PLATFORM}-gcc;AR=${COMPILER_PATH}/${TARGET_PLATFORM}-ar;LD=${COMPILER_PATH}/${TARGET_PLATFORM}-ld;RANLIB=${COMPILER_PATH}/${TARGET_PLATFORM}-ranlib;NM=${COMPILER_PATH}/${TARGET_PLATFORM}-nm;AS=${COMPILER_PATH}/${TARGET_PLATFORM}-as;OBJDUMP=${COMPILER_PATH}/${TARGET_PLATFORM}-objdump;OBJCOPY=${COMPILER_PATH}/${TARGET_PLATFORM}-objcopy;STRIP=${COMPILER_PATH}/${TARGET_PLATFORM}-strip;STRINGS=${COMPILER_PATH}/${TARGET_PLATFORM}-strings;SIZE=${COMPILER_PATH}/${TARGET_PLATFORM}-size")
+	set(TARGET_OPTIONS
+		"CFLAGS=${CMAKE_C_FLAGS}"
+		"CC=${COMPILER_PATH}/${TARGET_PLATFORM}-gcc"
+		"AR=${COMPILER_PATH}/${TARGET_PLATFORM}-ar"
+		"LD=${COMPILER_PATH}/${TARGET_PLATFORM}-ld"
+		"RANLIB=${COMPILER_PATH}/${TARGET_PLATFORM}-ranlib"
+		"NM=${COMPILER_PATH}/${TARGET_PLATFORM}-nm"
+		"AS=${COMPILER_PATH}/${TARGET_PLATFORM}-as"
+		"OBJDUMP=${COMPILER_PATH}/${TARGET_PLATFORM}-objdump"
+		"OBJCOPY=${COMPILER_PATH}/${TARGET_PLATFORM}-objcopy"
+		"STRIP=${COMPILER_PATH}/${TARGET_PLATFORM}-strip"
+		"STRINGS=${COMPILER_PATH}/${TARGET_PLATFORM}-strings"
+		"SIZE=${COMPILER_PATH}/${TARGET_PLATFORM}-size"
+	)
+	set(ENV ${TARGET_OPTIONS})
 endif()
 
 include(FetchContent)
@@ -24,21 +37,19 @@ FetchContent_Declare(
 	GIT_REPOSITORY "https://github.com/mkj/dropbear.git"
 	GIT_TAG        "DROPBEAR_2022.83"
 	SOURCE_DIR     "src"
-	BINARY_DIR     "bin"
+	BINARY_DIR     "out"
 )
 FetchContent_MakeAvailable(${PROJECT_NAME})
 
-add_custom_command(
-	OUTPUT DROPBEARMULTI
-	COMMAND cd ${dropbear_SOURCE_DIR} && ${TARGET_OPTIONS} ./configure --host=${TARGET_PLATFORM} --disable-zlib --enable-static
-	COMMAND cd ${dropbear_SOURCE_DIR} && ${TARGET_OPTIONS} make PROGRAMS='dropbear dbclient dropbearkey dropbearconvert scp' MULTI=1 SCPPROGRESS=1
-	COMMAND cp ${dropbear_SOURCE_DIR}/dropbearmulti ${dropbear_BINARY_DIR}
-	COMMAND cd ${dropbear_BINARY_DIR} && ln -s dropbearmulti dropbear
-	COMMAND cd ${dropbear_BINARY_DIR} && ln -s dropbearmulti scp
-	COMMAND cd ${dropbear_BINARY_DIR} && ln -s dropbearmulti ssh
-	COMMAND cd ${dropbear_BINARY_DIR} && ln -s dropbearmulti dropbearkey
-	COMMAND cd ${dropbear_BINARY_DIR} && ln -s dropbearmulti dropbearconvert
+execute_process(
+	COMMAND ./configure --host=${TARGET_PLATFORM} --disable-zlib --enable-static
+	WORKING_DIRECTORY ${dropbear_SOURCE_DIR}
 )
 
-add_custom_target(dropbearmulti ALL DEPENDS DROPBEARMULTI)
+add_custom_command(
+	OUTPUT dropbear_build
+	COMMAND cd ${dropbear_SOURCE_DIR} && make PROGRAMS='dropbear dbclient dropbearkey dropbearconvert scp' MULTI=1 SCPPROGRESS=1
+	COMMAND cp ${dropbear_SOURCE_DIR}/dropbearmulti ${dropbear_BINARY_DIR}
+)
 
+add_custom_target(dropbearmulti ALL DEPENDS dropbear_build)
