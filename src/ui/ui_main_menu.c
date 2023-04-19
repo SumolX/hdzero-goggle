@@ -278,7 +278,7 @@ void main_menu_init(void) {
     main_menu_create_entry(menu, section, "Scan Now", &pp_scannow);
     main_menu_create_entry(menu, section, "Source", &pp_source);
     main_menu_create_entry(menu, section, "Image Settings", &pp_imagesettings);
-    main_menu_create_entry(menu, section, "Goggle OSD", &pp_osd);
+    main_menu_create_entry(menu, section, "OSD", &pp_osd);
     main_menu_create_entry(menu, section, "Power", &pp_power);
     main_menu_create_entry(menu, section, "Fans", &pp_fans);
     main_menu_create_entry(menu, section, "Record Options", &pp_record);

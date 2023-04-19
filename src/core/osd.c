@@ -22,6 +22,7 @@
 #include "core/elrs.h"
 #include "core/msp_displayport.h"
 #include "core/settings.h"
+#include "core/app_state.h"
 #include "driver/dm5680.h"
 #include "driver/fans.h"
 #include "driver/fbtools.h"
@@ -294,6 +295,141 @@ bool fhd_change() {
     return false;
 }
 
+void osd_show_all_elements(){
+    if (g_setting.osd.elements.topfan_speed.show)
+        lv_obj_clear_flag(g_osd_hdzero.topfan_speed[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.topfan_speed[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.battery_low.show)
+        lv_obj_clear_flag(g_osd_hdzero.battery_low[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.battery_low[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.vtx_temp.show)
+        lv_obj_clear_flag(g_osd_hdzero.vtx_temp[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.vtx_temp[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.vrx_temp.show)
+        lv_obj_clear_flag(g_osd_hdzero.vrx_temp[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.vrx_temp[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.latency_lock.show)
+        lv_obj_clear_flag(g_osd_hdzero.latency_lock[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.latency_lock[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.channel.show)
+        lv_obj_clear_flag(g_osd_hdzero.channel[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.channel[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.sd_rec.show)
+        lv_obj_clear_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.vlq.show)
+        lv_obj_clear_flag(g_osd_hdzero.vlq[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.vlq[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.ant0.show)
+        lv_obj_clear_flag(g_osd_hdzero.ant0[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.ant0[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.ant1.show)
+        lv_obj_clear_flag(g_osd_hdzero.ant1[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.ant1[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.ant2.show)
+        lv_obj_clear_flag(g_osd_hdzero.ant2[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.ant2[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    
+    if (g_setting.osd.elements.ant3.show)
+        lv_obj_clear_flag(g_osd_hdzero.ant3[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.ant3[is_fhd], LV_OBJ_FLAG_HIDDEN);
+
+    if (!g_test_en)
+        return;
+
+    if (g_setting.osd.elements.osd_tempe[0].show)
+        lv_obj_clear_flag(g_osd_hdzero.osd_tempe[is_fhd][0], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.osd_tempe[is_fhd][0], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.osd_tempe[1].show)
+        lv_obj_clear_flag(g_osd_hdzero.osd_tempe[is_fhd][1], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.osd_tempe[is_fhd][1], LV_OBJ_FLAG_HIDDEN);
+
+    if (g_setting.osd.elements.osd_tempe[2].show)
+        lv_obj_clear_flag(g_osd_hdzero.osd_tempe[is_fhd][2], LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(g_osd_hdzero.osd_tempe[is_fhd][2], LV_OBJ_FLAG_HIDDEN);
+}
+
+void osd_elements_set_dummy_sources(){
+    char buf[128];
+
+    if (is_fhd){
+        sprintf(buf, "%sFHD/VtxTemp1.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.vtx_temp[is_fhd], buf);
+
+        sprintf(buf, "%sFHD/ant2.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant0[is_fhd], buf);
+
+        sprintf(buf, "%sFHD/ant3.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant1[is_fhd], buf);
+
+        sprintf(buf, "%sFHD/ant4.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant2[is_fhd], buf);
+
+        sprintf(buf, "%sFHD/ant5.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant3[is_fhd], buf);
+
+        sprintf(buf, "%sFHD/%s", RESOURCE_PATH, recording_bmp);
+        lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
+
+        sprintf(buf, "%sFHD/VLQ9.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.vlq[is_fhd], buf);
+
+        sprintf(buf, "%sFHD/fan5.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.topfan_speed[is_fhd], buf);
+    } else {
+        sprintf(buf, "%sVtxTemp1.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.vtx_temp[is_fhd], buf);
+
+        sprintf(buf, "%sant2.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant0[is_fhd], buf);
+
+        sprintf(buf, "%sant3.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant1[is_fhd], buf);
+
+        sprintf(buf, "%sant4.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant2[is_fhd], buf);
+
+        sprintf(buf, "%sant5.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.ant3[is_fhd], buf);
+
+        sprintf(buf, "%s%s", RESOURCE_PATH, recording_bmp);
+        lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
+
+        sprintf(buf, "%sVLQ9.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.vlq[is_fhd], buf);
+
+        sprintf(buf, "%sfan5.bmp", RESOURCE_PATH);
+        lv_img_set_src(g_osd_hdzero.topfan_speed[is_fhd], buf);
+    }
+
+}
+
 #define FC_OSD_CHECK_PERIOD 200 // 25ms
 void osd_hdzero_update(void) {
     char buf[128], i;
@@ -307,6 +443,14 @@ void osd_hdzero_update(void) {
 
     if (fhd_change())
         return;
+
+    // if the user is in the osd element position settings, show all elements
+    if (g_app_state == APP_STATE_OSD_ELEMENT_PREV){
+        // some elements might not be visible, set dummy sources to show them
+        osd_elements_set_dummy_sources();
+        osd_show_all_elements();
+        return;
+    }
 
     bool showRXOSD = g_showRXOSD && (g_source_info.source == SOURCE_HDZERO);
 
@@ -497,6 +641,7 @@ void osd_update_mode() {
     osd_object_set_pos(is_fhd, g_osd_hdzero.latency_lock[is_fhd], &g_setting.osd.elements.latency_lock.position);
     osd_object_set_pos(is_fhd, g_osd_hdzero.sd_rec[is_fhd], &g_setting.osd.elements.sd_rec.position);
     osd_object_set_pos(is_fhd, g_osd_hdzero.vlq[is_fhd], &g_setting.osd.elements.vlq.position);
+    osd_object_set_pos(is_fhd, g_osd_hdzero.channel[is_fhd], &g_setting.osd.elements.channel.position);
     osd_object_set_pos(is_fhd, g_osd_hdzero.ant0[is_fhd], &g_setting.osd.elements.ant0.position);
     osd_object_set_pos(is_fhd, g_osd_hdzero.ant1[is_fhd], &g_setting.osd.elements.ant1.position);
     osd_object_set_pos(is_fhd, g_osd_hdzero.ant2[is_fhd], &g_setting.osd.elements.ant2.position);
