@@ -16,13 +16,13 @@
 #include <lvgl/lvgl.h>
 #include <minIni.h>
 
+#include "core/app_state.h"
 #include "core/battery.h"
 #include "core/common.hh"
 #include "core/dvr.h"
 #include "core/elrs.h"
 #include "core/msp_displayport.h"
 #include "core/settings.h"
-#include "core/app_state.h"
 #include "driver/dm5680.h"
 #include "driver/fans.h"
 #include "driver/fbtools.h"
@@ -320,7 +320,7 @@ bool fhd_change() {
     return false;
 }
 
-void osd_show_all_elements(){
+void osd_show_all_elements() {
     if (g_setting.osd.elements.topfan_speed.show)
         lv_obj_clear_flag(g_osd_hdzero.topfan_speed[is_fhd], LV_OBJ_FLAG_HIDDEN);
     else
@@ -375,7 +375,7 @@ void osd_show_all_elements(){
         lv_obj_clear_flag(g_osd_hdzero.ant2[is_fhd], LV_OBJ_FLAG_HIDDEN);
     else
         lv_obj_add_flag(g_osd_hdzero.ant2[is_fhd], LV_OBJ_FLAG_HIDDEN);
-    
+
     if (g_setting.osd.elements.ant3.show)
         lv_obj_clear_flag(g_osd_hdzero.ant3[is_fhd], LV_OBJ_FLAG_HIDDEN);
     else
@@ -400,10 +400,10 @@ void osd_show_all_elements(){
         lv_obj_add_flag(g_osd_hdzero.osd_tempe[is_fhd][2], LV_OBJ_FLAG_HIDDEN);
 }
 
-void osd_elements_set_dummy_sources(){
+void osd_elements_set_dummy_sources() {
     char buf[128];
 
-    if (is_fhd){
+    if (is_fhd) {
         sprintf(buf, "%sFHD/VtxTemp1.bmp", RESOURCE_PATH);
         lv_img_set_src(g_osd_hdzero.vtx_temp[is_fhd], buf);
 
@@ -452,7 +452,6 @@ void osd_elements_set_dummy_sources(){
         sprintf(buf, "%sfan5.bmp", RESOURCE_PATH);
         lv_img_set_src(g_osd_hdzero.topfan_speed[is_fhd], buf);
     }
-
 }
 
 #define FC_OSD_CHECK_PERIOD 200 // 25ms
@@ -470,7 +469,7 @@ void osd_hdzero_update(void) {
         return;
 
     // if the user is in the osd element position settings, show all elements
-    if (g_app_state == APP_STATE_OSD_ELEMENT_PREV){
+    if (g_app_state == APP_STATE_OSD_ELEMENT_PREV) {
         // some elements might not be visible, set dummy sources to show them
         osd_elements_set_dummy_sources();
         osd_show_all_elements();
