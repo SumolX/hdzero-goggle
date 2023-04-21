@@ -403,55 +403,29 @@ void osd_show_all_elements() {
 void osd_elements_set_dummy_sources() {
     char buf[128];
 
-    if (is_fhd) {
-        sprintf(buf, "%sFHD/VtxTemp1.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.vtx_temp[is_fhd], buf);
+    osd_resource_path(buf, "%s", is_fhd, VtxTemp1_bmp);
+    lv_img_set_src(g_osd_hdzero.vtx_temp[is_fhd], buf);
 
-        sprintf(buf, "%sFHD/ant2.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant0[is_fhd], buf);
+    osd_resource_path(buf, "%s", is_fhd, ant2_bmp);
+    lv_img_set_src(g_osd_hdzero.ant0[is_fhd], buf);
 
-        sprintf(buf, "%sFHD/ant3.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant1[is_fhd], buf);
+    osd_resource_path(buf, "%s", is_fhd, ant3_bmp);
+    lv_img_set_src(g_osd_hdzero.ant1[is_fhd], buf);
 
-        sprintf(buf, "%sFHD/ant4.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant2[is_fhd], buf);
+    osd_resource_path(buf, "%s", is_fhd, ant4_bmp);
+    lv_img_set_src(g_osd_hdzero.ant2[is_fhd], buf);
 
-        sprintf(buf, "%sFHD/ant5.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant3[is_fhd], buf);
+    osd_resource_path(buf, "%s", is_fhd, ant5_bmp);
+    lv_img_set_src(g_osd_hdzero.ant3[is_fhd], buf);
 
-        sprintf(buf, "%sFHD/%s", RESOURCE_PATH, recording_bmp);
-        lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
+    osd_resource_path(buf, "%s", is_fhd, recording_bmp);
+    lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
 
-        sprintf(buf, "%sFHD/VLQ9.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.vlq[is_fhd], buf);
+    osd_resource_path(buf, "%s", is_fhd, VLQ9_bmp);
+    lv_img_set_src(g_osd_hdzero.vlq[is_fhd], buf);
 
-        sprintf(buf, "%sFHD/fan5.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.topfan_speed[is_fhd], buf);
-    } else {
-        sprintf(buf, "%sVtxTemp1.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.vtx_temp[is_fhd], buf);
-
-        sprintf(buf, "%sant2.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant0[is_fhd], buf);
-
-        sprintf(buf, "%sant3.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant1[is_fhd], buf);
-
-        sprintf(buf, "%sant4.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant2[is_fhd], buf);
-
-        sprintf(buf, "%sant5.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.ant3[is_fhd], buf);
-
-        sprintf(buf, "%s%s", RESOURCE_PATH, recording_bmp);
-        lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
-
-        sprintf(buf, "%sVLQ9.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.vlq[is_fhd], buf);
-
-        sprintf(buf, "%sfan5.bmp", RESOURCE_PATH);
-        lv_img_set_src(g_osd_hdzero.topfan_speed[is_fhd], buf);
-    }
+    osd_resource_path(buf, "%s", is_fhd, fan5_bmp);
+    lv_img_set_src(g_osd_hdzero.topfan_speed[is_fhd], buf);
 }
 
 #define FC_OSD_CHECK_PERIOD 200 // 25ms
