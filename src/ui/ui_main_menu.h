@@ -14,6 +14,7 @@ typedef enum {
     PAGE_FANS,
     PAGE_HEADTRACKER,
     PAGE_IMAGE_SETTINGS,
+    PAGE_OSD,
     PAGE_PLAYBACK,
     PAGE_POWER,
     PAGE_RECORD,
@@ -57,6 +58,7 @@ void menu_nav(uint8_t key);
 void submenu_enter();
 void submenu_exit();
 void submenu_roller(uint8_t key);
+void submenu_roller_no_selection_change(uint8_t key);
 void submenu_click(void);
 void submenu_right_button(bool is_short);
 void progress_bar_update();
