@@ -475,6 +475,7 @@ int AV_in_detect() // return = 1: vtmg to V536 changed
     return ret;
 }
 
+//this needs to be improved!
 void HDMI_in_detect() {
     static int vtmg_last = -1;
     static int cs_last = -1;
@@ -499,8 +500,8 @@ void HDMI_in_detect() {
                     I2C_Write(ADDR_FPGA, 0x8C, 0x00);
 
                     if (vtmg == 1) {
-                        system("dispw -s vdpo 1080p50");
-                        g_hw_stat.vdpo_tmg = HW_VDPO_1080P50;
+                        system("dispw -s vdpo 1080p60");
+                        g_hw_stat.vdpo_tmg = HW_VDPO_1080P60;
                         // I2C_Write(ADDR_FPGA, 0x8d, 0x10);
                         I2C_Write(ADDR_FPGA, 0x8e, 0x00);
                         I2C_Write(ADDR_AL, 0x14, 0x00);
