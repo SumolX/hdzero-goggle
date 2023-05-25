@@ -222,15 +222,13 @@ static void btn_click(void) // short press enter key
         LOGI("level = 1");
         app_state_push(APP_STATE_SUBMENU);
         submenu_enter();
-    } else if ((g_app_state == APP_STATE_SUBMENU) || (g_app_state == APP_STATE_PLAYBACK)) {
-        submenu_click();
-    } else if (g_app_state == PAGE_FAN_SLIDE) {
-        submenu_click();
-    } else if (g_app_state == PAGE_ANGLE_SLIDE) {
-        submenu_click();
-    } else if (g_app_state == PAGE_POWER_SLIDE_CELL_COUNT) {
-        submenu_click();
-    } else if (g_app_state == PAGE_POWER_SLIDE_CELL_VOLTAGE) {
+    } else if (g_app_state == APP_STATE_SUBMENU ||
+               g_app_state == APP_STATE_PLAYBACK ||
+               g_app_state == APP_STATE_WIFI ||
+               g_app_state == PAGE_FAN_SLIDE ||
+               g_app_state == PAGE_ANGLE_SLIDE ||
+               g_app_state == PAGE_POWER_SLIDE_CELL_COUNT ||
+               g_app_state == PAGE_POWER_SLIDE_CELL_VOLTAGE) {
         submenu_click();
     }
     pthread_mutex_unlock(&lvgl_mutex);
@@ -245,12 +243,13 @@ void rbtn_click(right_button_t click_type) {
 
     switch (g_app_state) {
     case APP_STATE_SUBMENU:
-		pthread_mutex_lock(&lvgl_mutex);
+    case APP_STATE_WIFI:
+        pthread_mutex_lock(&lvgl_mutex);
         if (click_type == RIGHT_CLICK)
             submenu_right_button(true);
         else if (click_type == RIGHT_LONG_PRESS)
             submenu_right_button(false);
-		pthread_mutex_unlock(&lvgl_mutex);
+        pthread_mutex_unlock(&lvgl_mutex);
         break;
     case APP_STATE_VIDEO:
         if (click_type == RIGHT_CLICK) {
@@ -281,7 +280,9 @@ static void roller_up(void) {
     if (g_app_state == APP_STATE_MAINMENU) // main menu
     {
         menu_nav(DIAL_KEY_UP);
-    } else if ((g_app_state == APP_STATE_SUBMENU) || (g_app_state == APP_STATE_PLAYBACK)) {
+    } else if (g_app_state == APP_STATE_SUBMENU ||
+               g_app_state == APP_STATE_PLAYBACK ||
+               g_app_state == APP_STATE_WIFI) {
         submenu_roller(DIAL_KEY_UP);
     } else if (g_app_state == APP_STATE_VIDEO) {
         if (g_source_info.source == SOURCE_HDZERO)
@@ -316,7 +317,9 @@ static void roller_down(void) {
     autoscan_exit();
     if (g_app_state == APP_STATE_MAINMENU) {
         menu_nav(DIAL_KEY_DOWN);
-    } else if ((g_app_state == APP_STATE_SUBMENU) || (g_app_state == APP_STATE_PLAYBACK)) {
+    } else if (g_app_state == APP_STATE_SUBMENU ||
+               g_app_state == APP_STATE_PLAYBACK ||
+               g_app_state == APP_STATE_WIFI) {
         submenu_roller(DIAL_KEY_DOWN);
     } else if (g_app_state == APP_STATE_VIDEO) {
         if (g_source_info.source == SOURCE_HDZERO)
