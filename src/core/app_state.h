@@ -16,9 +16,10 @@ typedef enum {
 
     // the preview for image settings
     APP_STATE_IMS = 11,
-    // the preview for osd element positioning settings
-    APP_STATE_OSD_ELEMENT_PREV = 12,
+    APP_STATE_WIFI = 12,
 
+    // the preview for osd element positioning settings
+    APP_STATE_OSD_ELEMENT_PREV = 13,
     APP_STATE_USER_INPUT_DISABLED = 20,
 
     // TODO pages should set the on_roller callback and handle the input themselves
