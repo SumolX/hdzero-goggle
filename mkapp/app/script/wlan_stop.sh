@@ -1,6 +1,7 @@
 #!/bin/sh
 /mnt/app/app/record/gogglecmd -live quit
 sleep 1
+killall hlsProxy
 killall rtspLive
 killall hostapd
 killall udhcpd

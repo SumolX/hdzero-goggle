@@ -135,6 +135,9 @@ static void page_wifi_update_services() {
         fprintf(fp, "udhcpd /tmp/udhcpd.conf&\n");
         fprintf(fp, "route add default gw %s\n", g_setting.wifi.gateway);
         fprintf(fp, "/mnt/app/app/record/rtspLive&\n");
+        fprintf(fp, "mkdir -p /tmp/www\n");
+        fprintf(fp, "cd /tmp/www && sleep 2\n");
+        fprintf(fp, "/mnt/app/app/record/hlsProxy rtsp://localhost:8554/hdzero hdzero > /tmp/hlsProxy.log 2>&1\n");
         fclose(fp);
         system_exec("chmod +x " WIFI_AP_ON);
     }
@@ -163,6 +166,9 @@ static void page_wifi_update_services() {
         }
 
         fprintf(fp, "/mnt/app/app/record/rtspLive&\n");
+        fprintf(fp, "mkdir -p /tmp/www\n");
+        fprintf(fp, "cd /tmp/www && sleep 2\n");
+        fprintf(fp, "/mnt/app/app/record/hlsProxy rtsp://localhost:8554/hdzero hdzero > /tmp/hlsProxy.log 2>&1\n");
 
         fclose(fp);
         system_exec("chmod +x " WIFI_STA_ON);
