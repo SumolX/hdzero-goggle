@@ -21,9 +21,9 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 #include "BasicUsageEnvironment.hh"
 #include "liveMedia.hh"
 
-#define RTSP_CLIENT_VERBOSITY_LEVEL   0  // set to 1 for more verbose output from the "RTSPClient"
-#define OUR_HLS_SEGMENTATION_DURATION 6  /*seconds*/
-#define OUR_HLS_REWIND_DURATION       60 /*seconds: How far back in time a browser can seek*/
+#define RTSP_CLIENT_VERBOSITY_LEVEL   0 // set to 1 for more verbose output from the "RTSPClient"
+#define OUR_HLS_SEGMENTATION_DURATION 1 /*seconds*/
+#define OUR_HLS_REWIND_DURATION       3 /*seconds: How far back in time a browser can seek*/
 
 UsageEnvironment *env;
 char const *programName;

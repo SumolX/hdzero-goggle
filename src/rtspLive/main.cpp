@@ -208,10 +208,9 @@ static void announceStream(RTSPServer* rtspServer, char const* streamName)//æ˜¾ç
   env << "See http://www.live555.com/mediaServer/ for additional documentation.\n";
 
   // Also, attempt to create a HTTP server for RTSP-over-HTTP tunneling.
-  // Try first with the default HTTP port (80), and then with the alternative HTTP
-  // port numbers (8000 and 8080).
+  // Try first with the alternative HTTP port numbers (8000 and 8080).
 
-  if (rtspServer->setUpTunnelingOverHTTP(80) || rtspServer->setUpTunnelingOverHTTP(8000) || rtspServer->setUpTunnelingOverHTTP(8080)) {
+  if (rtspServer->setUpTunnelingOverHTTP(8000) || rtspServer->setUpTunnelingOverHTTP(8080)) {
     env << "(We use port " << rtspServer->httpServerPortNum() << " for optional RTSP-over-HTTP tunneling).)\n";
   } else {
     env << "(RTSP-over-HTTP tunneling is not available.)\n";
