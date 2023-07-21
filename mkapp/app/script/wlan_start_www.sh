@@ -6,11 +6,12 @@
     sleep 1
     rm -rf /tmp/www
     cp -a /mnt/app/services/www /tmp/ && \
-    cd /tmp/www
+    cd /tmp/www && \
+    ln -s /mnt/extsd/movies movies
 
     if [ $? -eq 0 ]; then
         /mnt/app/app/record/hlsProxy -T 8000 rtsp://127.0.0.1:8554/hdzero hdz_live > /tmp/hlsProxy.log 2>&1 &
-        httpd -p 80 > /tmp/httpd.log 2>&1 &
+        httpd -v -p 80 > /tmp/httpd.log 2>&1 &
     fi
 
     # Monitor Services
