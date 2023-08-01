@@ -19,6 +19,7 @@ along with this library; if not, write to the Free Software Foundation, Inc.,
 // main program
 
 #include "BasicUsageEnvironment.hh"
+#include "HLSSegmenterMP4.hh"
 #include "liveMedia.hh"
 
 #define RTSP_CLIENT_VERBOSITY_LEVEL   0 // set to 1 for more verbose output from the "RTSPClient"
@@ -395,7 +396,7 @@ void startPlayingSession(RTSPClient *rtspClient) {
     // (This will prepare the data sink to receive data; the actual flow of data from the client won't start happening until later,
     // after we've sent a RTSP "PLAY" command.)
 
-    MediaSink *sink = HLSSegmenter::createNew(*env, OUR_HLS_SEGMENTATION_DURATION, hlsPrefix, segmentationCallback);
+    MediaSink *sink = HLSSegmenterMP4::createNew(*env, OUR_HLS_SEGMENTATION_DURATION, hlsPrefix, segmentationCallback);
 
     // Start playing the sink object:
     *env << "Beginning to read...\n";
