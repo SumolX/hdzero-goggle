@@ -7,7 +7,7 @@
     rm -rf /tmp/www
     mkdir -p /tmp/www/live
     mkdir -p /tmp/www/dvr    
-    cp -a /mnt/app/services/www/* /tmp/ && \
+    cp -a /mnt/app/services/www/* /tmp/www/ && \
     cd /tmp/www && \
     ln -s /mnt/extsd/movies movies
 
