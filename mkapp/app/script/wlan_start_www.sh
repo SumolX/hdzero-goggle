@@ -5,10 +5,10 @@
     # Setup Environment
     sleep 1
     rm -rf /tmp/www
-    cp -a /mnt/app/services/www /tmp/ && \
+    mkdir -p /tmp/www/live
+    mkdir -p /tmp/www/dvr    
+    cp -a /mnt/app/services/www/* /tmp/ && \
     cd /tmp/www && \
-    mkdir live && \
-    mkdir dvr && \
     ln -s /mnt/extsd/movies movies
 
     # Invoke Services
