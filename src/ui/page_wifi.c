@@ -90,6 +90,8 @@ typedef struct {
 typedef struct {
     root_pw_t root_pw;
     button_t ssh;
+    button_t www;
+    button_t h265;
     lv_obj_t *note;
     int row_count;
 } page_3_t;
@@ -262,6 +264,8 @@ static void page_wifi_update_settings() {
     g_setting.wifi.mode = btn_group_get_sel(&page_wifi.page_1.mode.button);
     g_setting.wifi.dhcp = btn_group_get_sel(&page_wifi.page_2.dhcp.button) == 0;
     g_setting.wifi.ssh = btn_group_get_sel(&page_wifi.page_3.ssh.button) == 0;
+    g_setting.wifi.www = btn_group_get_sel(&page_wifi.page_3.www.button) == 0;
+    g_setting.wifi.h265 = btn_group_get_sel(&page_wifi.page_3.h265.button);
 
     snprintf(g_setting.wifi.ssid[g_setting.wifi.mode], WIFI_SSID_MAX, "%s", page_wifi.page_1.ssid.text[g_setting.wifi.mode]);
     snprintf(g_setting.wifi.passwd[g_setting.wifi.mode], WIFI_PASSWD_MAX, "%s", page_wifi.page_1.passwd.text[g_setting.wifi.mode]);
@@ -292,6 +296,8 @@ static void page_wifi_update_settings() {
     ini_putl("wifi", "rf_channel", g_setting.wifi.rf_channel, SETTING_INI);
     ini_puts("wifi", "root_pw", g_setting.wifi.root_pw, SETTING_INI);
     settings_put_bool("wifi", "ssh", g_setting.wifi.ssh);
+    settings_put_bool("wifi", "www", g_setting.wifi.www);
+    ini_putl("venc_live", "h265", g_setting.wifi.h265, REC_CONF);
 
     // Prepare WiFi interfaces
     system_script(WIFI_OFF);
@@ -310,7 +316,9 @@ static void page_wifi_update_settings() {
             system_exec("dropbear");
         }
 
-        system_script(WIFI_WWW_ON);
+        if (g_setting.wifi.www) {
+            system_script(WIFI_WWW_ON);
+        }
     }
 }
 
@@ -437,6 +445,8 @@ static void page_wifi_update_current_page(int which) {
     lv_obj_add_flag(page_wifi.page_3.root_pw.input, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(page_wifi.page_3.root_pw.status, LV_OBJ_FLAG_HIDDEN);
     btn_group_show(&page_wifi.page_3.ssh.button, false);
+    btn_group_show(&page_wifi.page_3.www.button, false);
+    btn_group_show(&page_wifi.page_3.h265.button, false);
     lv_obj_add_flag(page_wifi.page_3.note, LV_OBJ_FLAG_HIDDEN);
 
     switch (which) {
@@ -473,6 +483,8 @@ static void page_wifi_update_current_page(int which) {
         lv_obj_clear_flag(page_wifi.page_3.root_pw.input, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(page_wifi.page_3.root_pw.status, LV_OBJ_FLAG_HIDDEN);
         btn_group_show(&page_wifi.page_3.ssh.button, true);
+        btn_group_show(&page_wifi.page_3.www.button, true);
+        btn_group_show(&page_wifi.page_3.h265.button, true);
         lv_obj_clear_flag(page_wifi.page_3.note, LV_OBJ_FLAG_HIDDEN);
         page_wifi_update_page_3_notes();
         break;
@@ -503,7 +515,9 @@ static void page_wifi_dirty_flag_reset() {
                                         page_wifi.page_2.dns.dirty =
                                             page_wifi.page_2.rf_channel.dirty =
                                                 page_wifi.page_3.root_pw.dirty =
-                                                    page_wifi.page_3.ssh.dirty = false;
+                                                    page_wifi.page_3.ssh.dirty =
+                                                        page_wifi.page_3.www.dirty =
+                                                            page_wifi.page_3.h265.dirty = false;
 }
 
 /**
@@ -560,7 +574,9 @@ static void page_wifi_update_dirty_flag() {
         page_wifi.page_2.dns.dirty ||
         page_wifi.page_2.rf_channel.dirty ||
         page_wifi.page_3.root_pw.dirty ||
-        page_wifi.page_3.ssh.dirty;
+        page_wifi.page_3.ssh.dirty ||
+        page_wifi.page_3.www.dirty ||
+        page_wifi.page_3.h265.dirty;
 
     if (page_wifi.dirty) {
         if (!page_wifi_apply_settings_pending_timer) {
@@ -641,6 +657,12 @@ static void page_wifi_create_page_3(lv_obj_t *parent) {
     create_btn_group_item(&page_wifi.page_3.ssh.button, parent, 2, "SSH", "On", "Off", "", "", 2);
     btn_group_set_sel(&page_wifi.page_3.ssh.button, !g_setting.wifi.ssh);
 
+    create_btn_group_item(&page_wifi.page_3.www.button, parent, 2, "Web", "On", "Off", "", "", 3);
+    btn_group_set_sel(&page_wifi.page_3.www.button, !g_setting.wifi.www);
+
+    create_btn_group_item(&page_wifi.page_3.h265.button, parent, 2, "Live Video", "H264", "H265", "", "", 4);
+    btn_group_set_sel(&page_wifi.page_3.h265.button, g_setting.wifi.h265);
+
     page_wifi.page_3.note = lv_label_create(parent);
     lv_obj_set_style_text_font(page_wifi.page_3.note, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_align(page_wifi.page_3.note, LV_TEXT_ALIGN_LEFT, 0);
@@ -650,7 +672,7 @@ static void page_wifi_create_page_3(lv_obj_t *parent) {
     lv_obj_set_grid_cell(page_wifi.page_3.note, LV_GRID_ALIGN_START, 1, 4, LV_GRID_ALIGN_START, 7, 2);
     page_wifi_update_page_3_notes();
 
-    page_wifi.page_3.row_count = 3;
+    page_wifi.page_3.row_count = 5;
 }
 
 /**
@@ -848,6 +870,11 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
+        case 2:
+            btn_group_toggle_sel(&page_wifi.page_3.www.button);
+            page_wifi.page_3.www.dirty =
+                (btn_group_get_sel(&page_wifi.page_3.www.button) != !g_setting.wifi.www);
+            break;
         }
         break;
     case 4:
@@ -868,6 +895,11 @@ static void page_wifi_on_click(uint8_t key, int sel) {
             } else {
                 keyboard_press();
             }
+            break;
+        case 2:
+            btn_group_toggle_sel(&page_wifi.page_3.h265.button);
+            page_wifi.page_3.h265.dirty =
+                (btn_group_get_sel(&page_wifi.page_3.h265.button) != g_setting.wifi.h265);
             break;
         }
         break;

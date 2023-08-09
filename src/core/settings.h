@@ -69,6 +69,7 @@ typedef enum {
 typedef struct {
     bool mode_manual;
     bool format_ts;
+    uint8_t h265;
     bool osd;
     bool audio;
     setting_record_audio_source_t audio_source;
@@ -187,6 +188,8 @@ typedef struct {
     uint8_t rf_channel;
     char root_pw[WIFI_SSID_MAX];
     bool ssh;
+    bool www;
+    uint8_t h265;
 } wifi_t;
 
 typedef struct {

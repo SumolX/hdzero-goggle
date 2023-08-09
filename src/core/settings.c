@@ -43,6 +43,7 @@ const setting_t g_setting_defaults = {
     .record = {
         .mode_manual = false,
         .format_ts = true,
+        .h265 = 1,
         .osd = true,
         .audio = true,
         .audio_source = SETTING_RECORD_AUDIO_SOURCE_MIC,
@@ -180,6 +181,8 @@ const setting_t g_setting_defaults = {
         .rf_channel = 6,
         .root_pw = "divimath",
         .ssh = false,
+        .www = false,
+        .h265 = 0,
     },
     .storage = {
         .logging = false,
@@ -349,6 +352,7 @@ void settings_load(void) {
     // record
     g_setting.record.mode_manual = settings_get_bool("record", "mode_manual", g_setting_defaults.record.mode_manual);
     g_setting.record.format_ts = settings_get_bool("record", "format_ts", g_setting_defaults.record.format_ts);
+    g_setting.record.h265 = ini_getl("venc", "h265", g_setting_defaults.record.h265, REC_CONF);
     g_setting.record.osd = settings_get_bool("record", "osd", g_setting_defaults.record.osd);
     g_setting.record.audio = settings_get_bool("record", "audio", g_setting_defaults.record.audio);
     g_setting.record.audio_source = ini_getl("record", "audio_source", g_setting_defaults.record.audio_source, SETTING_INI);
@@ -398,6 +402,8 @@ void settings_load(void) {
     g_setting.wifi.rf_channel = ini_getl("wifi", "rf_channel", g_setting_defaults.wifi.rf_channel, SETTING_INI);
     ini_gets("wifi", "root_pw", g_setting_defaults.wifi.root_pw, g_setting.wifi.root_pw, WIFI_PASSWD_MAX, SETTING_INI);
     g_setting.wifi.ssh = settings_get_bool("wifi", "ssh", g_setting_defaults.wifi.ssh);
+    g_setting.wifi.www = settings_get_bool("wifi", "www", g_setting_defaults.wifi.www);
+    g_setting.wifi.h265 = ini_getl("venc_live", "h265", g_setting_defaults.wifi.h265, REC_CONF);
 
     //  no dial under video mode
     g_setting.ease.no_dial = file_exists(NO_DIAL_FILE);
