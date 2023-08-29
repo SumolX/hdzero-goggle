@@ -18,8 +18,18 @@
 
 typedef enum {
     OSD_RESOURCE_720 = 0,
-    OSD_RESOURCE_1080
+    OSD_RESOURCE_1080,
+
+    OSD_RESOURCE_TOTAL
 } osd_resource_t;
+
+typedef enum {
+    OSD_CLOCK_DATE = 0,
+    OSD_CLOCK_TIME,
+    OSD_CLOCK_FORMAT,
+
+    OSD_CLOCK_TOTAL
+} osd_clock_t;
 
 typedef struct {
     lv_obj_t *topfan_speed[2];
@@ -36,6 +46,7 @@ typedef struct {
     lv_obj_t *ant2[2];
     lv_obj_t *ant3[2];
     lv_obj_t *osd_tempe[2][3]; // top,left,bot
+    lv_obj_t *clock[2][OSD_CLOCK_TOTAL];
 } osd_hdzero_t;
 
 typedef struct
@@ -82,7 +93,7 @@ void osd_hdzero_update(void);
 void osd_rec_update(bool enable);
 void osd_show(bool show);
 void osd_update_element_positions();
-char *channel2str(uint8_t channel);
+char *channel2str(uint8_t band, uint8_t channel);
 void load_fc_osd_font(uint8_t);
 void *thread_osd(void *ptr);
 void osd_resource_path(char *buf, const char *fmt, osd_resource_t osd_resource_type, ...);

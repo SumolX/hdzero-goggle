@@ -9,7 +9,7 @@
 
 #include "core/self_test.h"
 #include "ui/page_common.h"
-#include "util/file.h"
+#include "util/filesystem.h"
 #include "util/system.h"
 
 #define SETTINGS_INI_VERSION_UNKNOWN 0
@@ -106,6 +106,16 @@ const setting_t g_setting_defaults = {
                 .show = true,
                 .position = {.mode_4_3 = {.x = 360, .y = 0}, .mode_16_9 = {.x = 200, .y = 0}},
             },
+            // OSD_GOGGLE_CLOCK_DATE
+            {
+                .show = false,
+                .position = {.mode_4_3 = {.x = 360, .y = 24}, .mode_16_9 = {.x = 200, .y = 24}},
+            },
+            // OSD_GOGGLE_CLOCK_TIME
+            {
+                .show = false,
+                .position = {.mode_4_3 = {.x = 580, .y = 24}, .mode_16_9 = {.x = 420, .y = 24}},
+            },
             // OSD_GOGGLE_CHANNEL
             {
                 .show = true,
@@ -187,6 +197,11 @@ const setting_t g_setting_defaults = {
     .storage = {
         .logging = false,
         .selftest = false,
+    },
+    .source = {
+        .analog_format = SETTING_SOURCES_ANALOG_FORMAT_NTSC,
+        .hdzero_band = SETTING_SOURCES_HDZERO_BAND_RACEBAND,
+        .hdzero_bw = SETTING_SOURCES_HDZERO_BW_WIDE,
     },
 };
 
@@ -274,7 +289,7 @@ void settings_reset(void) {
 
 void settings_init(void) {
     // check if backup of old settings file exists after goggle update
-    if (file_exists("/mnt/UDISK/setting.ini")) {
+    if (fs_file_exists("/mnt/UDISK/setting.ini")) {
         char buf[256];
         sprintf(buf, "cp -f /mnt/UDISK/setting.ini %s", SETTING_INI);
         system_exec(buf);
@@ -299,6 +314,8 @@ void settings_load(void) {
 
     // source
     g_setting.source.analog_format = ini_getl("source", "analog_format", g_setting_defaults.source.analog_format, SETTING_INI);
+    g_setting.source.hdzero_band = ini_getl("source", "hdzero_band", g_setting_defaults.source.hdzero_band, SETTING_INI);
+    g_setting.source.hdzero_bw = ini_getl("source", "hdzero_bw", g_setting_defaults.source.hdzero_bw, SETTING_INI);
 
     // autoscan
     g_setting.autoscan.status = ini_getl("autoscan", "status", g_setting_defaults.autoscan.status, SETTING_INI);
@@ -330,6 +347,8 @@ void settings_load(void) {
     settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_VRX_TEMP], "vrx_temp", &g_setting_defaults.osd.element[OSD_GOGGLE_VRX_TEMP]);
     settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_BATTERY_LOW], "battery_low", &g_setting_defaults.osd.element[OSD_GOGGLE_BATTERY_LOW]);
     settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_BATTERY_VOLTAGE], "battery_voltage", &g_setting_defaults.osd.element[OSD_GOGGLE_BATTERY_VOLTAGE]);
+    settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_CLOCK_DATE], "clock_date", &g_setting_defaults.osd.element[OSD_GOGGLE_CLOCK_DATE]);
+    settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_CLOCK_TIME], "clock_time", &g_setting_defaults.osd.element[OSD_GOGGLE_CLOCK_TIME]);
     settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_CHANNEL], "channel", &g_setting_defaults.osd.element[OSD_GOGGLE_CHANNEL]);
     settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_SD_REC], "sd_rec", &g_setting_defaults.osd.element[OSD_GOGGLE_SD_REC]);
     settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_VLQ], "vlq", &g_setting_defaults.osd.element[OSD_GOGGLE_VLQ]);
@@ -406,13 +425,13 @@ void settings_load(void) {
     g_setting.wifi.h265 = ini_getl("venc_live", "h265", g_setting_defaults.wifi.h265, REC_CONF);
 
     //  no dial under video mode
-    g_setting.ease.no_dial = file_exists(NO_DIAL_FILE);
+    g_setting.ease.no_dial = fs_file_exists(NO_DIAL_FILE);
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);
 
     // Check
-    if (file_exists(SELF_TEST_FILE)) {
+    if (fs_file_exists(SELF_TEST_FILE)) {
         unlink(SELF_TEST_FILE);
         if (log_file_open(SELF_TEST_FILE)) {
             g_setting.storage.logging = true;
