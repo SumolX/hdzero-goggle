@@ -1,7 +1,13 @@
 #!/bin/sh
 
+if [ -z "$(readlink /bin/arch | grep "busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /bin/arch
+fi
 if [ -z "$(readlink /bin/ash | grep "busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /bin/ash
+fi
+if [ -z "$(readlink /bin/base32 | grep "busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /bin/base32
 fi
 if [ -z "$(readlink /bin/base64 | grep "busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /bin/base64
@@ -132,9 +138,6 @@ fi
 if [ -z "$(readlink /bin/lzop | grep "busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /bin/lzop
 fi
-if [ -z "$(readlink /bin/makemime | grep "busybox")" ]; then
-    ln -sfn /mnt/app/services/busybox/busybox /bin/makemime
-fi
 if [ -z "$(readlink /bin/mkdir | grep "busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /bin/mkdir
 fi
@@ -189,8 +192,8 @@ fi
 if [ -z "$(readlink /bin/pwd | grep "busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /bin/pwd
 fi
-if [ -z "$(readlink /bin/reformime | grep "busybox")" ]; then
-    ln -sfn /mnt/app/services/busybox/busybox /bin/reformime
+if [ -z "$(readlink /bin/resume | grep "busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /bin/resume
 fi
 if [ -z "$(readlink /bin/rev | grep "busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /bin/rev
@@ -429,6 +432,9 @@ fi
 if [ -z "$(readlink /sbin/route | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /sbin/route
 fi
+if [ -z "$(readlink /sbin/run-init | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /sbin/run-init
+fi
 if [ -z "$(readlink /sbin/runlevel | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /sbin/runlevel
 fi
@@ -459,8 +465,14 @@ fi
 if [ -z "$(readlink /sbin/syslogd | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /sbin/syslogd
 fi
+if [ -z "$(readlink /sbin/tc | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /sbin/tc
+fi
 if [ -z "$(readlink /sbin/tunctl | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /sbin/tunctl
+fi
+if [ -z "$(readlink /sbin/tune2fs | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /sbin/tune2fs
 fi
 if [ -z "$(readlink /sbin/udhcpc | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /sbin/udhcpc
@@ -483,11 +495,17 @@ fi
 if [ -z "$(readlink /usr/bin/[[ | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/[[
 fi
+if [ -z "$(readlink /usr/bin/ascii | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/ascii
+fi
 if [ -z "$(readlink /usr/bin/awk | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/awk
 fi
 if [ -z "$(readlink /usr/bin/basename | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/basename
+fi
+if [ -z "$(readlink /usr/bin/bc | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/bc
 fi
 if [ -z "$(readlink /usr/bin/beep | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/beep
@@ -527,6 +545,9 @@ if [ -z "$(readlink /usr/bin/cmp | grep "bin/busybox")" ]; then
 fi
 if [ -z "$(readlink /usr/bin/comm | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/comm
+fi
+if [ -z "$(readlink /usr/bin/crc32 | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/crc32
 fi
 if [ -z "$(readlink /usr/bin/crontab | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/crontab
@@ -624,6 +645,9 @@ fi
 if [ -z "$(readlink /usr/bin/hexdump | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/hexdump
 fi
+if [ -z "$(readlink /usr/bin/hexedit | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/hexedit
+fi
 if [ -z "$(readlink /usr/bin/hostid | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/hostid
 fi
@@ -653,12 +677,6 @@ if [ -z "$(readlink /usr/bin/logger | grep "bin/busybox")" ]; then
 fi
 if [ -z "$(readlink /usr/bin/logname | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/logname
-fi
-if [ -z "$(readlink /usr/bin/lpq | grep "bin/busybox")" ]; then
-    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/lpq
-fi
-if [ -z "$(readlink /usr/bin/lpr | grep "bin/busybox")" ]; then
-    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/lpr
 fi
 if [ -z "$(readlink /usr/bin/lsof | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/lsof
@@ -786,6 +804,9 @@ fi
 if [ -z "$(readlink /usr/bin/seq | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/seq
 fi
+if [ -z "$(readlink /usr/bin/setfattr | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/setfattr
+fi
 if [ -z "$(readlink /usr/bin/setkeycodes | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/setkeycodes
 fi
@@ -843,6 +864,9 @@ fi
 if [ -z "$(readlink /usr/bin/svc | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/svc
 fi
+if [ -z "$(readlink /usr/bin/svok | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/svok
+fi
 if [ -z "$(readlink /usr/bin/tac | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/tac
 fi
@@ -885,14 +909,26 @@ fi
 if [ -z "$(readlink /usr/bin/traceroute6 | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/traceroute6
 fi
+if [ -z "$(readlink /usr/bin/tree | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/tree
+fi
 if [ -z "$(readlink /usr/bin/truncate | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/truncate
+fi
+if [ -z "$(readlink /usr/bin/ts | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/ts
+fi
+if [ -z "$(readlink /usr/bin/tsort | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/tsort
 fi
 if [ -z "$(readlink /usr/bin/tty | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/tty
 fi
 if [ -z "$(readlink /usr/bin/ttysize | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/ttysize
+fi
+if [ -z "$(readlink /usr/bin/udhcpc6 | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/bin/udhcpc6
 fi
 if [ -z "$(readlink /usr/bin/udpsvd | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/bin/udpsvd
@@ -1050,6 +1086,9 @@ fi
 if [ -z "$(readlink /usr/sbin/i2cset | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/i2cset
 fi
+if [ -z "$(readlink /usr/sbin/i2ctransfer | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/i2ctransfer
+fi
 if [ -z "$(readlink /usr/sbin/ifplugd | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/ifplugd
 fi
@@ -1062,8 +1101,8 @@ fi
 if [ -z "$(readlink /usr/sbin/loadfont | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/loadfont
 fi
-if [ -z "$(readlink /usr/sbin/lpd | grep "bin/busybox")" ]; then
-    ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/lpd
+if [ -z "$(readlink /usr/sbin/mim | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/mim
 fi
 if [ -z "$(readlink /usr/sbin/nanddump | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/nanddump
@@ -1074,14 +1113,14 @@ fi
 if [ -z "$(readlink /usr/sbin/nbd-client | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/nbd-client
 fi
+if [ -z "$(readlink /usr/sbin/nologin | grep "bin/busybox")" ]; then
+    ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/nologin
+fi
 if [ -z "$(readlink /usr/sbin/ntpd | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/ntpd
 fi
 if [ -z "$(readlink /usr/sbin/partprobe | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/partprobe
-fi
-if [ -z "$(readlink /usr/sbin/popmaildir | grep "bin/busybox")" ]; then
-    ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/popmaildir
 fi
 if [ -z "$(readlink /usr/sbin/powertop | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/powertop
@@ -1103,9 +1142,6 @@ if [ -z "$(readlink /usr/sbin/remove-shell | grep "bin/busybox")" ]; then
 fi
 if [ -z "$(readlink /usr/sbin/rtcwake | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/rtcwake
-fi
-if [ -z "$(readlink /usr/sbin/sendmail | grep "bin/busybox")" ]; then
-    ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/sendmail
 fi
 if [ -z "$(readlink /usr/sbin/setfont | grep "bin/busybox")" ]; then
     ln -sfn /mnt/app/services/busybox/busybox /usr/sbin/setfont
