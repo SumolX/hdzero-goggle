@@ -21,9 +21,9 @@ static lv_coord_t col_dsc[] = {160, 200, 200, 160, 120, 120, LV_GRID_TEMPLATE_LA
 static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
 
 static void update_visibility() {
-    btn_group_enable(&btn_group4, btn_group3.current == 0);
+    btn_group_enable(&btn_group_audio_source, btn_group_record_audio.current == 0);
 
-    if (btn_group3.current == 0) {
+    if (btn_group_record_audio.current == 0) {
         lv_obj_add_flag(pp_record.p_arr.panel[4], FLAG_SELECTABLE);
     } else {
         lv_obj_clear_flag(pp_record.p_arr.panel[4], FLAG_SELECTABLE);
