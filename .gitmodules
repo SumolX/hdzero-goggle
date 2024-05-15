@@ -1,0 +1,3 @@
+[submodule "hdzero-vtx"]
+	path = hdzero-vtx
+	url = https://github.com/SumolX/hdzero-vtx

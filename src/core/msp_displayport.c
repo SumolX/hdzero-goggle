@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "osd.h"
+#include "fault.h"
 #include "util/time.h"
 
 uint8_t crc8tab[256] = {
@@ -37,9 +38,10 @@ uint8_t vtxTempInfo = 0;     // bit[7]: temp enbale
                              // bit[6:0]: temp(0~9)
 
 uint8_t fontType = 0; // bit[7:0]: ASCII ('0'~'9' & 'A'~'Z')
-uint8_t vtxVersion = 0;
-uint8_t vtxType = 0;
 uint8_t vtxFcLock = 0;
+uint8_t vtxVersion[3] = {0};
+uint8_t vtxFaults[MAX_FAULTS] = {0};
+
 // bit[0] msp_displayport_is_OK
 // bit[1] VTX_serial_is_OK
 // bit[3] Unlocked VTX
@@ -236,8 +238,9 @@ void camTypeDetect(uint8_t rData) {
         cur_cam = VR_1080P30;
         break;
     }
-    if (cur_cam == last_cam)
+    if (cur_cam == last_cam) {
         CAM_MODE = cur_cam;
+    }
     else if (cur_cam == VR_1080P30 || last_cam == VR_1080P30) {
         // LOGI("Cam_mode changed:%d", cur_cam);
         load_fc_osd_font(cur_cam == VR_1080P30);
@@ -248,12 +251,14 @@ void fcTypeDetect(uint8_t *rData) {
     uint8_t i;
     char fc_variant_rcv[5] = "    ";
 
-    for (i = 0; i < 4; i++)
+    for (i = 0; i < 4; i++) {
         fc_variant_rcv[i] = rData[i];
+    }
 
     if (strcmp(fc_variant_rcv, fc_variant)) {
-        for (i = 0; i < 4; i++)
+        for (i = 0; i < 4; i++) {
             fc_variant[i] = fc_variant_rcv[i];
+        }
 
         // LOGI("fc_variant changed:%s", fc_variant_rcv);
         load_fc_osd_font(cur_cam == VR_1080P30);
@@ -307,14 +312,6 @@ void fontTypeDetect(uint8_t rData) {
     // LOGI("font:%bx",fontType);
 }
 
-void vtxVersionDetect(uint8_t rData) {
-    vtxVersion = rData;
-}
-
-void vtxTypeDetect(uint8_t rData) {
-    vtxType = rData;
-}
-
 void vtxFcLockDetect(uint8_t rData) {
     vtxFcLock = rData;
 }
@@ -326,14 +323,190 @@ void vtxCamRatioDetect(uint8_t rData) {
         cam_4_3 = 0;
 }
 
+void vtxExtractVersion(uint8_t* rData) {
+    vtxVersion[0] = rData[0];
+    vtxVersion[1] = rData[1];
+    vtxVersion[2] = rData[2];
+}
+
+void vtxReportFault(const char* msg) {
+    // TODO: Add to OSD
+    LOGI("%s", msg);
+}
+
+void vtxDecFltCamera(fault_dt_e dt, uint8_t data) {
+    static char buffer[256];
+    int bytes = 0;
+    if (dt == FLT_DT_TABLE) {
+        if (data < FLT_TBL_CAMERA_TOTAL) {
+            bytes = snprintf(buffer, sizeof(buffer), "%s", FLT_TBL_CAMERA[data]);
+        } else {
+            bytes = snprintf(buffer, sizeof(buffer), "Camera Fault Unknown Table Entry %d", data);
+        }
+    } else if (dt == FLT_DT_VALUE) {
+        bytes = snprintf(buffer, sizeof(buffer), "Camera Fault Value %d", data);
+    }
+    if (bytes > 0) {
+        vtxReportFault(buffer);
+    }
+}
+
+void vtxDecFltEEPROM(fault_dt_e dt, uint8_t data) {
+    static char buffer[256];
+    int bytes = 0;
+    if (dt == FLT_DT_TABLE) {
+        if (data < FLT_TBL_EEPROM_TOTAL) {
+            bytes = snprintf(buffer, sizeof(buffer), "%s", FLT_TBL_EEPROM[data]);
+        } else {
+            bytes = snprintf(buffer, sizeof(buffer), "EEPROM Fault Unknown Table Entry %d", data);
+        }
+    } else if (dt == FLT_DT_VALUE) {
+        bytes = snprintf(buffer, sizeof(buffer), "EEPROM Fault Value %d", data);
+    }
+    if (bytes > 0) {
+        vtxReportFault(buffer);
+    }
+}
+
+void vtxDecFltDM6300(fault_dt_e dt, uint8_t data) {
+    static char buffer[256];
+    int bytes = 0;
+    if (dt == FLT_DT_TABLE) {
+        if (data < FLT_TBL_DM6300_TOTAL) {
+            bytes = snprintf(buffer, sizeof(buffer), "%s", FLT_TBL_DM6300[data]);
+        } else {
+            bytes = snprintf(buffer, sizeof(buffer), "DM6300 Fault Unknown Table Entry %d", data);
+        }
+    } else if (dt == FLT_DT_VALUE) {
+        bytes = snprintf(buffer, sizeof(buffer), "DM6300 Fault Value %d", data);
+    }
+    if (bytes > 0) {
+        vtxReportFault(buffer);
+    }
+}
+
+void vtxDecFltUART(fault_dt_e dt, uint8_t data) {
+    static char buffer[256];
+    int bytes = 0;
+    if (dt == FLT_DT_TABLE) {
+        if (data < FLT_TBL_UART_TOTAL) {
+            bytes = snprintf(buffer, sizeof(buffer), "%s", FLT_TBL_UART[data]);
+        } else {
+            bytes = snprintf(buffer, sizeof(buffer), "UART Fault Unknown Table Entry %d", data);
+        }
+    } else if (dt == FLT_DT_VALUE) {
+        bytes = snprintf(buffer, sizeof(buffer), "UART Fault Value %d", data);
+    }
+    if (bytes > 0) {
+        vtxReportFault(buffer);
+    }
+}
+
+void vtxDecFltVTX(fault_dt_e dt, uint8_t data) {
+    static char buffer[256];
+    int bytes = 0;
+    if (dt == FLT_DT_TABLE) {
+        if (data < FLT_TBL_VTX_TOTAL) {
+            bytes = snprintf(buffer, sizeof(buffer), "%s", FLT_TBL_VTX[data]);
+        } else {
+            bytes = snprintf(buffer, sizeof(buffer), "VTX Fault Unknown Table Entry %d", data);
+        }
+    } else if (dt == FLT_DT_VALUE) {
+        bytes = snprintf(buffer, sizeof(buffer), "VTX Fault Value %d", data);
+    }
+    if (bytes > 0) {
+        vtxReportFault(buffer);
+    }
+}
+
+void vtxDecFltI2C(fault_dt_e dt, uint8_t data) {
+    static char buffer[256];
+    int bytes = 0;
+    if (dt == FLT_DT_TABLE) {
+        if (data < FLT_TBL_I2C_TOTAL) {
+            bytes = snprintf(buffer, sizeof(buffer), "%s", FLT_TBL_I2C[data]);
+        } else {
+            bytes = snprintf(buffer, sizeof(buffer), "I2C Fault Unknown Table Entry %d", data);
+        }
+    } else if (dt == FLT_DT_VALUE) {
+        bytes = snprintf(buffer, sizeof(buffer), "I2C Fault Value %d", data);
+    }
+    if (bytes > 0) {
+        vtxReportFault(buffer);
+    }
+}
+
+void vtxDecFltSPI(fault_dt_e dt, uint8_t data) {
+    static char buffer[256];
+    int bytes = 0;
+    if (dt == FLT_DT_TABLE) {
+        if (data < FLT_TBL_SPI_TOTAL) {
+            bytes = snprintf(buffer, sizeof(buffer), "%s", FLT_TBL_SPI[data]);
+        } else {
+            bytes = snprintf(buffer, sizeof(buffer), "SPI Fault Unknown Table Entry %d", data);
+        }
+    } else if (dt == FLT_DT_VALUE) {
+        bytes = snprintf(buffer, sizeof(buffer), "SPI Fault Value %d", data);
+    }
+    if (bytes > 0) {
+        vtxReportFault(buffer);
+    }
+}
+
+void vtxExtractFault(uint8_t* rData) {
+    if (vtxVersion[0] >= 1 && vtxVersion[1] >= 7) {
+        fault_msg_t msg;
+        fault_id_t id;
+        fault_et_e et;
+        fault_dt_e dt;
+        uint8_t data;
+        dec_fault_msg(rData, &msg);
+        extract_fault_msg(&msg, &id, &et, &dt, &data);
+
+        // Report new faults only!
+        if (vtxFaults[id]) {
+            return;
+        }
+        vtxFaults[id] = 1;
+
+        switch (et) {
+            case FLT_ET_NONE:
+                break;
+            case FLT_ET_CAMERA:
+                vtxDecFltCamera(dt, data);
+                break;
+            case FLT_ET_EEPROM:
+                vtxDecFltEEPROM(dt, data);
+                break;
+            case FLT_ET_DM6300:
+                vtxDecFltDM6300(dt, data);
+                break;
+            case FLT_ET_UART:
+                vtxDecFltUART(dt, data);
+                break;
+            case FLT_ET_VTX:
+                vtxDecFltVTX(dt, data);
+                break;
+            case FLT_ET_I2C:
+                vtxDecFltI2C(dt, data);
+                break;
+            case FLT_ET_SPI:
+                vtxDecFltSPI(dt, data);
+                break;
+        }
+    }
+}
+
 void parser_config(uint8_t *rx_buf) {
+    // Always extract version info first
+    vtxExtractVersion(rx_buf + 13);
+
     camTypeDetect(rx_buf[1]);
     fcTypeDetect(rx_buf + 2);
     lqDetect(rx_buf[6]);
     vtxTempDetect(rx_buf[7]);
     fontTypeDetect(rx_buf[8]);
-    vtxVersionDetect(rx_buf[9]);
-    vtxTypeDetect(rx_buf[10]);
+    vtxExtractFault(rx_buf + 9);
     vtxFcLockDetect(rx_buf[11]);
     vtxCamRatioDetect(rx_buf[12]);
 }
