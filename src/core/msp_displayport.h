@@ -1,5 +1,8 @@
-#ifndef __MSP_DISPLAYPORT_H
-#define __MSP_DISPLAYPORT_H
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdint.h>
 
@@ -30,7 +33,9 @@ typedef enum {
     VR_540P60 = 4,
     VR_960x720P60 = 5,
     VR_540P90_CROP = 6,
-    VR_1080P30 = 7
+    VR_1080P30 = 7,
+    VR_1080P50 = 8,
+    VR_1080P60 = 9
 } video_resolution_t;
 
 typedef enum {
@@ -76,4 +81,6 @@ extern uint8_t osd_page_buf[HD_VMAX][7];
 extern uint16_t last_rcv_seconds0;
 extern uint16_t last_rcv_seconds1;
 
+#ifdef __cplusplus
+}
 #endif

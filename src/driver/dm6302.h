@@ -1,12 +1,15 @@
-#ifndef __DM6302_H_
-#define __DM6302_H_
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdbool.h>
 #include <stdint.h>
 
 // #define _DEBUG_DM6300
+#define BASE_CH_NUM 12
 
-#define FREQ_NUM 18
 typedef enum {
     DM5680_L = 0,
     DM5680_R,
@@ -36,4 +39,6 @@ void DM6302_get_gain(uint8_t *gain);
 void DM6302_Init0(uint8_t sel);
 void SPI_Read(uint8_t page, uint16_t addr, uint32_t *dat0, uint32_t *dat1);
 
-#endif // __DM6302_H_
+#ifdef __cplusplus
+}
+#endif

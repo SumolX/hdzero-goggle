@@ -23,6 +23,7 @@
 #include "driver/i2c.h"
 #include "driver/oled.h"
 #include "driver/uart.h"
+#include "lang/language.h"
 #include "ui/page_common.h"
 #include "ui/ui_main_menu.h"
 #include "ui/ui_porting.h"
@@ -59,11 +60,11 @@ typedef struct {
     lv_obj_t *img1;
 } channel_t;
 
-channel_t channel_tb[10];
-channel_status_t channel_status_tb[10];
+channel_t channel_tb[BASE_CH_NUM];
+channel_status_t channel_status_tb[BASE_CH_NUM];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-int valid_channel_tb[10];
+int valid_channel_tb[BASE_CH_NUM];
 int user_select_index = 0;
 
 // local
@@ -77,7 +78,7 @@ static lv_coord_t col_dsc2[] = {120, 80, 80, 180, 100, 80, 80, 180, LV_GRID_TEMP
 static lv_coord_t row_dsc2[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
 
 static void select_signal(channel_t *channel) {
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < BASE_CH_NUM; i++) {
         if (channel_status_tb[i].is_valid) {
             lv_img_set_src(channel_tb[i].img0, &img_signal_status2);
         } else {
@@ -156,35 +157,32 @@ static void create_channel_switch(lv_obj_t *parent, int col, int row, channel_t 
 }
 
 void page_scannow_set_channel_label(void) {
-    static const char *race_band_channel_str[] = {"R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"};
-    static const char *fatshark_band_channel_str[] = {"F2", "F4"};
+    static const char *race_band_channel_str[] = {"R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "E1", "F1", "F2", "F4"};
     static const char *low_band_channel_str[] = {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"};
     uint8_t i;
 
     // set channel label
     if (g_setting.source.hdzero_band == RACE_BAND) {
-        for (i = 0; i < 8; i++) {
+        // race band
+        for (i = 0; i < BASE_CH_NUM; i++) {
             lv_label_set_text(channel_tb[i].label, race_band_channel_str[i]);
         }
-        lv_label_set_text(channel_tb[8].label, fatshark_band_channel_str[0]);
-        lv_label_set_text(channel_tb[9].label, fatshark_band_channel_str[1]);
 
-        lv_obj_clear_flag(channel_tb[8].img0, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(channel_tb[8].label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(channel_tb[8].img1, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(channel_tb[9].img0, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(channel_tb[9].label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(channel_tb[9].img1, LV_OBJ_FLAG_HIDDEN);
+        for (i = 8; i < BASE_CH_NUM; i++) {
+            lv_obj_clear_flag(channel_tb[i].img0, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(channel_tb[i].label, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(channel_tb[i].img1, LV_OBJ_FLAG_HIDDEN);
+        }
     } else {
+        // lowband
         for (i = 0; i < 8; i++) {
             lv_label_set_text(channel_tb[i].label, low_band_channel_str[i]);
         }
-        lv_obj_add_flag(channel_tb[8].img0, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(channel_tb[8].label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(channel_tb[8].img1, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(channel_tb[9].img0, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(channel_tb[9].label, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(channel_tb[9].img1, LV_OBJ_FLAG_HIDDEN);
+        for (i = 8; i < BASE_CH_NUM; i++) {
+            lv_obj_add_flag(channel_tb[i].img0, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(channel_tb[i].label, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(channel_tb[i].img1, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 }
 
@@ -195,6 +193,8 @@ void page_scannow_set_channel_label(void) {
 // 1420-256
 // 1164
 static lv_obj_t *page_scannow_create(lv_obj_t *parent, panel_arr_t *arr) {
+    char buf[256];
+
     lv_obj_t *page = lv_menu_page_create(parent, NULL);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(page, 1158, 900);
@@ -225,7 +225,7 @@ static lv_obj_t *page_scannow_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_bar_set_range(progressbar, 0, 14);
 
     label = lv_label_create(cont1);
-    lv_label_set_text(label, "Scan Ready");
+    lv_label_set_text(label, _lang("Scan Ready"));
     lv_obj_set_style_text_font(label, &lv_font_montserrat_26, 0);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_style_text_color(label, lv_color_make(255, 255, 255), 0);
@@ -235,7 +235,11 @@ static lv_obj_t *page_scannow_create(lv_obj_t *parent, panel_arr_t *arr) {
                          LV_GRID_ALIGN_CENTER, 0, 1);
 
     lv_obj_t *label2 = lv_label_create(cont1);
-    lv_label_set_text(label2, "When scanning is complete,use the\n dial to select a channel and press\n the Enter button to choose");
+    snprintf(buf, sizeof(buf), "%s\n %s\n %s",
+             _lang("When scanning is complete, use the"),
+             _lang("dial to select a channel and press"),
+             _lang("the Enter button to choose"));
+    lv_label_set_text(label2, buf);
     lv_obj_set_style_text_font(label2, &lv_font_montserrat_26, 0);
     lv_obj_set_style_text_align(label2, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_style_text_color(label2, lv_color_make(255, 255, 255), 0);
@@ -254,12 +258,16 @@ static lv_obj_t *page_scannow_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_grid_row_dsc_array(cont2, row_dsc2, 0);
 
     // create channel
-    uint8_t i;
+    uint8_t col_offset = 1;
+    uint8_t row_offset = 0;
+
     for (int i = 0; i < 8; i++) {
-        create_channel_switch(cont2, ((i >> 2) << 2) + 1, i & 0x03, &channel_tb[i]);
+        create_channel_switch(cont2, ((i >> 2) << 2) + col_offset, i & 0x03, &channel_tb[i]);
     }
-    for (int i = 0; i < 2; i++) {
-        create_channel_switch(cont2, (i << 2) + 1, 4, &channel_tb[8 + i]);
+
+    row_offset = 4;
+    for (int i = 0; i < 4; i++) {
+        create_channel_switch(cont2, ((i >> 1) << 2) + col_offset, row_offset + (i & 0x01), &channel_tb[8 + i]);
     }
     page_scannow_set_channel_label();
 
@@ -276,7 +284,7 @@ static void user_select_signal(void) {
 
 static void user_clear_signal(void) {
     user_select_index = 0;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < BASE_CH_NUM; i++) {
         lv_img_set_src(channel_tb[i].img0, &img_signal_status);
         lv_img_set_src(channel_tb[i].img1, &img_ant1);
     }
@@ -312,15 +320,17 @@ int8_t scan_now(void) {
     uint8_t ch, gain;
     bool valid;
     uint8_t valid_index;
+    char buf[128];
 
-    lv_label_set_text(label, "Scanning...");
+    snprintf(buf, sizeof(buf), "%s...", _lang("Scanning"));
+    lv_label_set_text(label, buf);
     lv_bar_set_value(progressbar, 0, LV_ANIM_OFF);
     lv_timer_handler();
     lv_bar_set_value(progressbar, 2, LV_ANIM_OFF);
     lv_timer_handler();
 
     // clear
-    for (ch = 0; ch < 10; ch++) {
+    for (ch = 0; ch < BASE_CH_NUM; ch++) {
         valid_channel_tb[ch] = -1;
         channel_status_tb[ch].is_valid = 0;
     }
@@ -351,7 +361,7 @@ int8_t scan_now(void) {
     }
 
     user_select_signal();
-    lv_label_set_text(label, "Scanning done");
+    lv_label_set_text(label, _lang("Scanning done"));
     if (!valid_index)
         return -1;
     else
@@ -359,7 +369,7 @@ int8_t scan_now(void) {
 }
 
 int scan_reinit(void) {
-    lv_label_set_text(label, "Scanning ready");
+    lv_label_set_text(label, _lang("Scanning ready"));
     lv_bar_set_value(progressbar, 0, LV_ANIM_OFF);
     user_clear_signal();
     lv_timer_handler();

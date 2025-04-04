@@ -72,7 +72,7 @@ void TP2825_Config(int ch_sel, int is_pal) // ch_sel: 0=AV in; 1=Module bay
         I2C_Write(ADDR_TP2825, 0x27, 0x2D);
         I2C_Write(ADDR_TP2825, 0x28, 0xC5); //---
         I2C_Write(ADDR_TP2825, 0x29, 0x18); //---
-        I2C_Write(ADDR_TP2825, 0x2A, 0x30); //---
+        I2C_Write(ADDR_TP2825, 0x2A, 0x30); //[7] color killer (1/0: disabled/enable)
         I2C_Write(ADDR_TP2825, 0x2B, 0x70);
         I2C_Write(ADDR_TP2825, 0x2C, 0x1A);
         I2C_Write(ADDR_TP2825, 0x2D, 0x60);
@@ -144,7 +144,7 @@ void TP2825_Config(int ch_sel, int is_pal) // ch_sel: 0=AV in; 1=Module bay
         I2C_Write(ADDR_TP2825, 0x27, 0x2D);
         I2C_Write(ADDR_TP2825, 0x28, 0xC5); //---
         I2C_Write(ADDR_TP2825, 0x29, 0x18); //---
-        I2C_Write(ADDR_TP2825, 0x2A, 0x30); //---
+        I2C_Write(ADDR_TP2825, 0x2A, 0x30); //[7] color killer (1/0: disabled/enable)
         I2C_Write(ADDR_TP2825, 0x2B, 0x70);
         I2C_Write(ADDR_TP2825, 0x2C, 0x1A);
         I2C_Write(ADDR_TP2825, 0x2D, 0x68);
@@ -187,6 +187,12 @@ void TP2825_Config(int ch_sel, int is_pal) // ch_sel: 0=AV in; 1=Module bay
     }
 
     I2C_Write(ADDR_TP2825, 0x06, TP2825_REG06);
+
+    if (vclk_phase[VIDEO_SOURCE_TP2825_EX] == 0x00000001) {
+        I2C_Write(ADDR_TP2825, 0x4E, 0x37);
+        LOGI("TP2825 CKPOL is Inversed");
+    } else
+        I2C_Write(ADDR_TP2825, 0x4E, 0x77);
 }
 
 void TP2825_Switch_Mode(int is_pal) {
@@ -256,5 +262,13 @@ void TP2825_Set_Clamp(int idx) {
         // I2C_Write(ADDR_TP2825, 0x06, TP2825_REG06);
         LOGI("Clamp = %x", clamps[g_hw_stat.IS_TP2825_L][idx]);
         clamp = idx;
+    }
+}
+
+void TP2825_Set_Pclk(uint8_t inv) {
+    if (inv) {
+        I2C_Write(ADDR_TP2825, 0x4E, 0x37);
+    } else {
+        I2C_Write(ADDR_TP2825, 0x4E, 0x77);
     }
 }

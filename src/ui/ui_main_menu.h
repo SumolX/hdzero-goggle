@@ -1,5 +1,8 @@
-#ifndef __MAIN_MENU_H__
-#define __MAIN_MENU_H__
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,7 +12,7 @@
 #include "ui/page_common.h"
 
 typedef struct {
-    const char *name;
+    char *name;
     panel_arr_t p_arr;
 
     lv_obj_t *page;
@@ -24,6 +27,9 @@ typedef struct {
     void (*on_roller)(uint8_t key);
     void (*on_click)(uint8_t key, int sel);
     void (*on_right_button)(bool is_short);
+
+    int32_t post_bootup_run_priority;
+    void (*post_bootup_run_function)(void(*complete_callback)());
 } page_pack_t;
 
 typedef struct {
@@ -49,4 +55,6 @@ void submenu_click(void);
 void submenu_right_button(bool is_short);
 void progress_bar_update();
 
+#ifdef __cplusplus
+}
 #endif

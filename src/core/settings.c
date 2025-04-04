@@ -8,6 +8,7 @@
 #include <minIni.h>
 
 #include "core/self_test.h"
+#include "lang/language.h"
 #include "ui/page_common.h"
 #include "util/filesystem.h"
 #include "util/system.h"
@@ -32,7 +33,7 @@ const setting_t g_setting_defaults = {
         .source = SETTING_AUTOSCAN_SOURCE_HDZERO,
     },
     .power = {
-        .voltage = 35,
+        .voltage = 3500,
         .display_voltage = true,
         .warning_type = SETTING_POWER_WARNING_TYPE_BOTH,
         .cell_count_mode = SETTING_POWER_CELL_COUNT_MODE_AUTO,
@@ -48,6 +49,7 @@ const setting_t g_setting_defaults = {
         .osd = true,
         .audio = true,
         .audio_source = SETTING_RECORD_AUDIO_SOURCE_MIC,
+        .naming = SETTING_NAMING_CONTIGUOUS,
     },
     .image = {
         .oled = 8,
@@ -65,6 +67,12 @@ const setting_t g_setting_defaults = {
         .gyr_x = 0,
         .gyr_y = 0,
         .gyr_z = 0,
+        .alarm_state = SETTING_HT_ALARM_STATE_OFF,
+        .alarm_angle = 1300,
+        .alarm_delay = 5,
+        .alarm_pattern = SETTING_HT_ALARM_PATTERN_2SHORT,
+        .alarm_on_arm = false,
+        .alarm_on_video = false,
     },
     .elrs = {
         .enable = false,
@@ -73,6 +81,7 @@ const setting_t g_setting_defaults = {
         .no_dial = 0,
     },
     .osd = {
+        .orbit = 2,
         .embedded_mode = EMBEDDED_4x3,
         .startup_visibility = SETTING_OSD_SHOW_AT_STARTUP_SHOW,
         .is_visible = true,
@@ -120,7 +129,7 @@ const setting_t g_setting_defaults = {
             // OSD_GOGGLE_CHANNEL
             {
                 .show = true,
-                .position = {.mode_4_3 = {.x = 540, .y = 0}, .mode_16_9 = {.x = 540, .y = 0}},
+                .position = {.mode_4_3 = {.x = 580, .y = 0}, .mode_16_9 = {.x = 580, .y = 0}},
             },
             // OSD_GOGGLE_SD_REC
             {
@@ -178,6 +187,15 @@ const setting_t g_setting_defaults = {
         .sec = 30,
         .format = 0,
     },
+    // Refer to `page_input.c`'s arrays `rollerFunctionPointers` and `btnFunctionPointers`
+    .inputs = {
+        .roller = 0,
+        .left_click = 0,
+        .left_press = 1,
+        .right_click = 2,
+        .right_press = 6,
+        .right_double_click = 3,
+    },
     .wifi = {
         .enable = false,
         .mode = 0,
@@ -201,15 +219,19 @@ const setting_t g_setting_defaults = {
     },
     .source = {
         .analog_format = SETTING_SOURCES_ANALOG_FORMAT_NTSC,
+        .analog_ratio = SETTING_SOURCES_ANALOG_RATIO_4_3,
         .hdzero_band = SETTING_SOURCES_HDZERO_BAND_RACEBAND,
         .hdzero_bw = SETTING_SOURCES_HDZERO_BW_WIDE,
+    },
+    .language = {
+        .lang = LANG_ENGLISH_DEFAULT,
     },
 };
 
 int settings_put_osd_element_shown(bool show, char *config_name) {
     char setting_key[128];
 
-    sprintf(setting_key, "element_%s_show", config_name);
+    snprintf(setting_key, sizeof(setting_key), "element_%s_show", config_name);
     return settings_put_bool("osd", setting_key, show);
 }
 
@@ -217,9 +239,9 @@ int settings_put_osd_element_pos_x(const setting_osd_goggle_element_positions_t 
     char setting_key[128];
     int ret = 0;
 
-    sprintf(setting_key, "element_%s_pos_4_3_x", config_name);
+    snprintf(setting_key, sizeof(setting_key), "element_%s_pos_4_3_x", config_name);
     ret = ini_putl("osd", setting_key, pos->mode_4_3.x, SETTING_INI);
-    sprintf(setting_key, "element_%s_pos_16_9_x", config_name);
+    snprintf(setting_key, sizeof(setting_key), "element_%s_pos_16_9_x", config_name);
     ret &= ini_putl("osd", setting_key, pos->mode_16_9.x, SETTING_INI);
     return ret;
 }
@@ -228,9 +250,9 @@ int settings_put_osd_element_pos_y(const setting_osd_goggle_element_positions_t 
     char setting_key[128];
     int ret = 0;
 
-    sprintf(setting_key, "element_%s_pos_4_3_y", config_name);
+    snprintf(setting_key, sizeof(setting_key), "element_%s_pos_4_3_y", config_name);
     ret = ini_putl("osd", setting_key, pos->mode_4_3.y, SETTING_INI);
-    sprintf(setting_key, "element_%s_pos_16_9_y", config_name);
+    snprintf(setting_key, sizeof(setting_key), "element_%s_pos_16_9_y", config_name);
     ret &= ini_putl("osd", setting_key, pos->mode_16_9.y, SETTING_INI);
     return ret;
 }
@@ -247,19 +269,19 @@ int settings_put_osd_element(const setting_osd_goggle_element_t *element, char *
 static void settings_load_osd_element(setting_osd_goggle_element_t *element, char *config_name, const setting_osd_goggle_element_t *defaults) {
     char buf[128];
 
-    sprintf(buf, "element_%s_show", config_name);
+    snprintf(buf, sizeof(buf), "element_%s_show", config_name);
     element->show = settings_get_bool("osd", buf, defaults->show);
 
-    sprintf(buf, "element_%s_pos_4_3_x", config_name);
+    snprintf(buf, sizeof(buf), "element_%s_pos_4_3_x", config_name);
     element->position.mode_4_3.x = ini_getl("osd", buf, defaults->position.mode_4_3.x, SETTING_INI);
 
-    sprintf(buf, "element_%s_pos_4_3_y", config_name);
+    snprintf(buf, sizeof(buf), "element_%s_pos_4_3_y", config_name);
     element->position.mode_4_3.y = ini_getl("osd", buf, defaults->position.mode_4_3.y, SETTING_INI);
 
-    sprintf(buf, "element_%s_pos_16_9_x", config_name);
+    snprintf(buf, sizeof(buf), "element_%s_pos_16_9_x", config_name);
     element->position.mode_16_9.x = ini_getl("osd", buf, defaults->position.mode_16_9.x, SETTING_INI);
 
-    sprintf(buf, "element_%s_pos_16_9_y", config_name);
+    snprintf(buf, sizeof(buf), "element_%s_pos_16_9_y", config_name);
     element->position.mode_16_9.y = ini_getl("osd", buf, defaults->position.mode_16_9.y, SETTING_INI);
 }
 
@@ -277,11 +299,11 @@ int settings_put_bool(char *section, char *key, bool value) {
 void settings_reset(void) {
     char buf[256];
 
-    sprintf(buf, "rm -f %s", SETTING_INI);
+    snprintf(buf, sizeof(buf), "rm -f %s", SETTING_INI);
     system_exec(buf);
     usleep(50);
 
-    sprintf(buf, "touch %s", SETTING_INI);
+    snprintf(buf, sizeof(buf), "touch %s", SETTING_INI);
     system_exec(buf);
     usleep(50);
 
@@ -292,7 +314,7 @@ void settings_init(void) {
     // check if backup of old settings file exists after goggle update
     if (fs_file_exists("/mnt/UDISK/setting.ini")) {
         char buf[256];
-        sprintf(buf, "cp -f /mnt/UDISK/setting.ini %s", SETTING_INI);
+        snprintf(buf, sizeof(buf), "cp -f /mnt/UDISK/setting.ini %s", SETTING_INI);
         system_exec(buf);
         usleep(10);
         system_exec("rm /mnt/UDISK/setting.ini");
@@ -315,6 +337,7 @@ void settings_load(void) {
 
     // source
     g_setting.source.analog_format = ini_getl("source", "analog_format", g_setting_defaults.source.analog_format, SETTING_INI);
+    g_setting.source.analog_ratio = ini_getl("source", "analog_ratio", g_setting_defaults.source.analog_ratio, SETTING_INI);
     g_setting.source.hdzero_band = ini_getl("source", "hdzero_band", g_setting_defaults.source.hdzero_band, SETTING_INI);
     g_setting.source.hdzero_bw = ini_getl("source", "hdzero_bw", g_setting_defaults.source.hdzero_bw, SETTING_INI);
 
@@ -324,6 +347,7 @@ void settings_load(void) {
     g_setting.autoscan.last_source = ini_getl("autoscan", "last_source", g_setting_defaults.autoscan.last_source, SETTING_INI);
 
     // osd
+    g_setting.osd.orbit = ini_getl("osd", "orbit", g_setting_defaults.osd.orbit, SETTING_INI);
     g_setting.osd.embedded_mode = ini_getl("osd", "embedded_mode", g_setting_defaults.osd.embedded_mode, SETTING_INI);
     g_setting.osd.startup_visibility = ini_getl("osd", "startup_visibility", g_setting_defaults.osd.startup_visibility, SETTING_INI);
 
@@ -362,13 +386,13 @@ void settings_load(void) {
     settings_load_osd_element(&g_setting.osd.element[OSD_GOGGLE_TEMP_RIGHT], "goggle_temp_right", &g_setting_defaults.osd.element[OSD_GOGGLE_TEMP_RIGHT]);
 
     // power
-    g_setting.power.voltage = ini_getl("power", "voltage", g_setting_defaults.power.voltage, SETTING_INI);
+    g_setting.power.voltage = ini_getl("power", "voltage_mv", g_setting_defaults.power.voltage, SETTING_INI);
     g_setting.power.warning_type = ini_getl("power", "warning_type", g_setting_defaults.power.warning_type, SETTING_INI);
     g_setting.power.cell_count_mode = ini_getl("power", "cell_count_mode", g_setting_defaults.power.cell_count_mode, SETTING_INI);
     g_setting.power.cell_count = ini_getl("power", "cell_count", g_setting_defaults.power.cell_count, SETTING_INI);
     g_setting.power.osd_display_mode = ini_getl("power", "osd_display_mode", g_setting_defaults.power.osd_display_mode, SETTING_INI);
     g_setting.power.power_ana = ini_getl("power", "power_ana_rx", g_setting_defaults.power.power_ana, SETTING_INI);
-    g_setting.power.calibration_offset = ini_getl("power", "calibration_offset", g_setting_defaults.power.calibration_offset, SETTING_INI);
+    g_setting.power.calibration_offset = ini_getl("power", "calibration_offset_mv", g_setting_defaults.power.calibration_offset, SETTING_INI);
 
     // record
     g_setting.record.mode_manual = settings_get_bool("record", "mode_manual", g_setting_defaults.record.mode_manual);
@@ -377,6 +401,7 @@ void settings_load(void) {
     g_setting.record.osd = settings_get_bool("record", "osd", g_setting_defaults.record.osd);
     g_setting.record.audio = settings_get_bool("record", "audio", g_setting_defaults.record.audio);
     g_setting.record.audio_source = ini_getl("record", "audio_source", g_setting_defaults.record.audio_source, SETTING_INI);
+    g_setting.record.naming = ini_getl("record", "naming", g_setting_defaults.record.naming, SETTING_INI);
 
     // image
     g_setting.image.oled = ini_getl("image", "oled", g_setting_defaults.image.oled, SETTING_INI);
@@ -394,6 +419,8 @@ void settings_load(void) {
     g_setting.ht.gyr_x = ini_getl("ht", "gyr_x", g_setting_defaults.ht.gyr_x, SETTING_INI);
     g_setting.ht.gyr_y = ini_getl("ht", "gyr_y", g_setting_defaults.ht.gyr_y, SETTING_INI);
     g_setting.ht.gyr_z = ini_getl("ht", "gyr_z", g_setting_defaults.ht.gyr_z, SETTING_INI);
+    g_setting.ht.alarm_state = ini_getl("ht", "alarm_state", g_setting_defaults.ht.alarm_state, SETTING_INI);
+    g_setting.ht.alarm_angle = ini_getl("ht", "alarm_angle", g_setting_defaults.ht.alarm_angle, SETTING_INI);
 
     // elrs
     g_setting.elrs.enable = settings_get_bool("elrs", "enable", g_setting_defaults.elrs.enable);
@@ -406,6 +433,14 @@ void settings_load(void) {
     g_setting.clock.min = ini_getl("clock", "min", g_setting_defaults.clock.min, SETTING_INI);
     g_setting.clock.sec = ini_getl("clock", "sec", g_setting_defaults.clock.sec, SETTING_INI);
     g_setting.clock.format = ini_getl("clock", "format", g_setting_defaults.clock.format, SETTING_INI);
+
+    // inputs
+    g_setting.inputs.roller = ini_getl("inputs", "roller", g_setting_defaults.inputs.roller, SETTING_INI);
+    g_setting.inputs.left_click = ini_getl("inputs", "left_click", g_setting_defaults.inputs.left_click, SETTING_INI);
+    g_setting.inputs.left_press = ini_getl("inputs", "left_press", g_setting_defaults.inputs.left_press, SETTING_INI);
+    g_setting.inputs.right_click = ini_getl("inputs", "right_click", g_setting_defaults.inputs.right_click, SETTING_INI);
+    g_setting.inputs.right_press = ini_getl("inputs", "right_press", g_setting_defaults.inputs.right_press, SETTING_INI);
+    g_setting.inputs.right_double_click = ini_getl("inputs", "right_double_click", g_setting_defaults.inputs.right_double_click, SETTING_INI);
 
     // wifi
     g_setting.wifi.enable = settings_get_bool("wifi", "enable", g_setting_defaults.wifi.enable);
@@ -431,6 +466,11 @@ void settings_load(void) {
 
     // storage
     g_setting.storage.logging = settings_get_bool("storage", "logging", g_setting_defaults.storage.logging);
+
+    // language
+    if (!language_config()) {
+        g_setting.language.lang = ini_getl("language", "lang", g_setting_defaults.language.lang, SETTING_INI);
+    }
 
     // Check
     if (fs_file_exists(SELF_TEST_FILE)) {

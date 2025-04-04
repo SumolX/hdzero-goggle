@@ -14,6 +14,7 @@
 #include "common.hh"
 #include "core/app_state.h"
 #include "core/osd.h"
+#include "lang/language.h"
 #include "record/record_definitions.h"
 #include "ui/page_common.h"
 #include "ui/ui_player.h"
@@ -21,9 +22,11 @@
 #include "util/filesystem.h"
 #include "util/math.h"
 #include "util/system.h"
-
 #define MEDIA_FILES_DIR REC_diskPATH REC_packPATH // "/mnt/extsd/movies" --> "/mnt/extsd" "/movies/"
-
+// #define MEDIA_FILES_DIR "/mnt/extsd/movies/"--Useful for testing playback page
+bool status_displayed = false;
+lv_obj_t *status;
+LV_IMG_DECLARE(img_star);
 LV_IMG_DECLARE(img_arrow1);
 
 static lv_coord_t col_dsc[] = {320, 320, 320, LV_GRID_TEMPLATE_LAST};
@@ -32,7 +35,33 @@ static lv_coord_t row_dsc[] = {150, 30, 150, 30, 150, 30, 30, LV_GRID_TEMPLATE_L
 static media_db_t media_db;
 static pb_ui_item_t pb_ui[ITEMS_LAYOUT_CNT];
 
+/**
+ * Displays the status message box.
+ */
+static void page_playback_open_status_box(const char *title, const char *text) {
+    status_displayed = true;
+    lv_label_set_text(lv_msgbox_get_title(status), title);
+    lv_label_set_text(lv_msgbox_get_text(status), text);
+    lv_obj_clear_flag(status, LV_OBJ_FLAG_HIDDEN);
+}
+/**
+ * Cancel operation.
+ */
+static void page_playback_cancel() {
+}
+
+static bool page_playback_close_status_box() {
+    lv_obj_add_flag(status, LV_OBJ_FLAG_HIDDEN);
+    status_displayed = false;
+    return status_displayed;
+}
+
+static void page_playback_on_click(uint8_t key, int sel) {
+    pb_key(key);
+}
+
 static lv_obj_t *page_playback_create(lv_obj_t *parent, panel_arr_t *arr) {
+    char buf[128];
     lv_obj_t *page = lv_menu_page_create(parent, NULL);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(page, 1142, 900);
@@ -43,7 +72,8 @@ static lv_obj_t *page_playback_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
     lv_obj_set_size(section, 1142, 894);
 
-    create_text(NULL, section, false, "Playback:", LV_MENU_ITEM_BUILDER_VARIANT_2);
+    snprintf(buf, sizeof(buf), "%s:", _lang("Playback"));
+    create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
     lv_obj_set_size(cont, 1164, 760);
@@ -59,6 +89,10 @@ static lv_obj_t *page_playback_create(lv_obj_t *parent, panel_arr_t *arr) {
         pb_ui[pos]._arrow = lv_img_create(cont);
         lv_img_set_src(pb_ui[pos]._arrow, &img_arrow1);
         lv_obj_add_flag(pb_ui[pos]._arrow, LV_OBJ_FLAG_HIDDEN);
+
+        pb_ui[pos]._star = lv_img_create(cont);
+        lv_img_set_src(pb_ui[pos]._star, &img_star);
+        lv_obj_add_flag(pb_ui[pos]._star, LV_OBJ_FLAG_HIDDEN);
 
         pb_ui[pos]._label = lv_label_create(cont);
         lv_obj_set_style_text_font(pb_ui[pos]._label, &lv_font_montserrat_26, 0);
@@ -78,36 +112,46 @@ static lv_obj_t *page_playback_create(lv_obj_t *parent, panel_arr_t *arr) {
         lv_obj_set_pos(pb_ui[pos]._arrow, pb_ui[pos].x + (ITEM_PREVIEW_W >> 2) - 10,
                        pb_ui[pos].y + ITEM_PREVIEW_H + 10);
 
+        lv_obj_set_pos(pb_ui[pos]._star, pb_ui[pos].x + 5, pb_ui[pos].y);
+
         lv_obj_set_pos(pb_ui[pos]._label, pb_ui[pos].x + (ITEM_PREVIEW_W >> 2) + ITEM_GAP_W,
                        pb_ui[pos].y + ITEM_PREVIEW_H + 10);
     }
 
     lv_obj_t *label = lv_label_create(cont);
-    lv_label_set_text(label, "*Long press the Enter button to exit\n**Long press the Func button to delete");
+    snprintf(buf, sizeof(buf), "*%s\n**%s", _lang("Long press the Enter button to exit"), _lang("Long press the Func button to delete"));
+    lv_label_set_text(label, buf);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_style_text_color(label, lv_color_make(255, 255, 255), 0);
     lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
     lv_obj_set_pos(label, 10, 700);
-
+    status = create_msgbox_item("Status", "None");
+    lv_obj_add_flag(status, LV_OBJ_FLAG_HIDDEN);
     return page;
 }
 
-static void show_pb_item(uint8_t pos, char *label) {
+static void show_pb_item(uint8_t pos, char *label, bool star) {
     char fname[256];
     if (pb_ui[pos].state == ITEM_STATE_INVISIBLE) {
         lv_obj_add_flag(pb_ui[pos]._img, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(pb_ui[pos]._label, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(pb_ui[pos]._arrow, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(pb_ui[pos]._star, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
     lv_label_set_text(pb_ui[pos]._label, label);
     lv_obj_clear_flag(pb_ui[pos]._label, LV_OBJ_FLAG_HIDDEN);
 
-    sprintf(fname, "%s/%s." REC_packJPG, TMP_DIR, label);
+    const lv_coord_t labelPosX = pb_ui[pos].x + (ITEM_PREVIEW_W - lv_txt_get_width(label, strlen(label) - 2, &lv_font_montserrat_26, 0, 0)) / 2;
+    const lv_coord_t labelPosY = pb_ui[pos].y + ITEM_PREVIEW_H + 10;
+    lv_obj_set_pos(pb_ui[pos]._label, labelPosX, labelPosY);
+    lv_obj_set_pos(pb_ui[pos]._arrow, labelPosX - lv_obj_get_width(pb_ui[pos]._arrow) - 5, labelPosY);
+
+    snprintf(fname, sizeof(fname), "%s/%s." REC_packJPG, TMP_DIR, label);
     if (fs_file_exists(fname))
-        sprintf(fname, "A:%s/%s." REC_packJPG, TMP_DIR, label);
+        snprintf(fname, sizeof(fname), "A:%s/%s." REC_packJPG, TMP_DIR, label);
     else
         osd_resource_path(fname, "%s", OSD_RESOURCE_720, DEF_VIDEOICON);
     lv_img_set_src(pb_ui[pos]._img, fname);
@@ -121,6 +165,13 @@ static void show_pb_item(uint8_t pos, char *label) {
         lv_obj_add_style(pb_ui[pos]._img, &style_pb_dark, LV_PART_MAIN);
         lv_obj_add_flag(pb_ui[pos]._arrow, LV_OBJ_FLAG_HIDDEN);
     }
+
+    if (star) {
+        lv_obj_clear_flag(pb_ui[pos]._star, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(pb_ui[pos]._star, LV_OBJ_FLAG_HIDDEN);
+    }
+
     lv_obj_clear_flag(pb_ui[pos]._img, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -158,6 +209,13 @@ int hot_alphasort(const struct dirent **a, const struct dirent **b) {
     return strcoll((*a)->d_name, (*b)->d_name);
 }
 
+static bool dvr_has_stars(const char *filename) {
+    char star_file[256] = "";
+    int count = snprintf(star_file, sizeof(star_file), "%s" REC_starSUFFIX, filename);
+
+    return fs_file_exists(star_file);
+}
+
 static int walk_sdcard() {
     char fname[512];
 
@@ -186,7 +244,7 @@ static int walk_sdcard() {
             continue;
         }
 
-        sprintf(fname, "%s%s", MEDIA_FILES_DIR, in_file->d_name);
+        snprintf(fname, sizeof(fname), "%s%s", MEDIA_FILES_DIR, in_file->d_name);
 
         long size = fs_filesize(fname);
         size >>= 20; // in MB
@@ -201,9 +259,14 @@ static int walk_sdcard() {
         }
 
         media_file_node_t *pnode = &media_db.list[media_db.count];
+        ZeroMemory(pnode->filename, sizeof(pnode->filename));
+        ZeroMemory(pnode->label, sizeof(pnode->label));
+        ZeroMemory(pnode->ext, sizeof(pnode->ext));
         strcpy(pnode->filename, in_file->d_name);
         strncpy(pnode->label, in_file->d_name, dot - in_file->d_name);
         strcpy(pnode->ext, dot + 1);
+        pnode->star = dvr_has_stars(fname);
+
         pnode->size = size;
 
         LOGI("%d: %s-%dMB", media_db.count, pnode->filename, size);
@@ -217,7 +280,7 @@ static int walk_sdcard() {
     free(namelist);
 
     // copy all thumbnail files to /tmp
-    sprintf(fname, "cp %s*." REC_packJPG " %s", MEDIA_FILES_DIR, TMP_DIR);
+    snprintf(fname, sizeof(fname), "cp %s*." REC_packJPG " %s", MEDIA_FILES_DIR, TMP_DIR);
     system_exec(fname);
 
     return media_db.count;
@@ -283,12 +346,26 @@ static void update_page() {
             else
                 pb_ui[i].state = ITEM_STATE_INVISIBLE;
 
-            show_pb_item(i, pnode->label);
+            show_pb_item(i, pnode->label, pnode->star);
         } else {
             pb_ui[i].state = ITEM_STATE_INVISIBLE;
-            show_pb_item(i, NULL);
+            show_pb_item(i, NULL, false);
         }
     }
+}
+
+static void update_item(uint8_t cur_pos, uint8_t lst_pos) {
+    if (cur_pos == lst_pos) {
+        return;
+    }
+
+    lv_obj_clear_flag(pb_ui[cur_pos]._arrow, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_style(pb_ui[cur_pos]._img, &style_pb_dark, LV_PART_MAIN);
+    lv_obj_add_style(pb_ui[cur_pos]._img, &style_pb, LV_PART_MAIN);
+
+    lv_obj_add_flag(pb_ui[lst_pos]._arrow, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_style(pb_ui[lst_pos]._img, &style_pb, LV_PART_MAIN);
+    lv_obj_add_style(pb_ui[lst_pos]._img, &style_pb_dark, LV_PART_MAIN);
 }
 
 static void mark_video_file(int const seq) {
@@ -304,11 +381,14 @@ static void mark_video_file(int const seq) {
     const int index = find_next_available_hot_index();
 
     char cmd[256];
-    int length = sprintf(cmd, "mv %s%s ", MEDIA_FILES_DIR, pnode->filename);
-    REC_filePathGet(&cmd[length], MEDIA_FILES_DIR, REC_packHotPREFIX, index, pnode->ext);
+    char newLabel[68];
+    snprintf(newLabel, sizeof(newLabel), "%s%s", REC_hotPREFIX, pnode->label);
+
+    snprintf(cmd, sizeof(cmd), "mv %s%s %s%s.%s", MEDIA_FILES_DIR, pnode->filename, MEDIA_FILES_DIR, newLabel, pnode->ext);
     system_exec(cmd);
-    length = sprintf(cmd, "mv %s%s." REC_packJPG " ", MEDIA_FILES_DIR, pnode->label);
-    REC_filePathGet(&cmd[length], MEDIA_FILES_DIR, REC_packHotPREFIX, index, REC_packJPG);
+    snprintf(cmd, sizeof(cmd), "mv %s%s." REC_packJPG " %s%s." REC_packJPG, MEDIA_FILES_DIR, pnode->label, MEDIA_FILES_DIR, newLabel);
+    system_exec(cmd);
+    snprintf(cmd, sizeof(cmd), "mv %s%s" REC_starSUFFIX " %s%s.%s" REC_starSUFFIX, MEDIA_FILES_DIR, pnode->filename, MEDIA_FILES_DIR, newLabel, pnode->ext);
     system_exec(cmd);
 
     walk_sdcard();
@@ -324,7 +404,7 @@ static void delete_video_file(int seq) {
     }
 
     char cmd[128];
-    sprintf(cmd, "rm %s%s.*", MEDIA_FILES_DIR, pnode->label);
+    snprintf(cmd, sizeof(cmd), "rm %s%s.*", MEDIA_FILES_DIR, pnode->label);
 
     if (system_exec(cmd) != -1) {
         walk_sdcard();
@@ -337,6 +417,7 @@ static void delete_video_file(int seq) {
 }
 
 static void page_playback_exit() {
+    page_playback_close_status_box();
     clear_videofile_cnt();
     update_page();
 }
@@ -354,13 +435,10 @@ static void page_playback_enter() {
 void pb_key(uint8_t const key) {
     static bool done = true;
     static uint8_t state = 0; // 0= select video files, 1=playback
+    static bool status_deleting = false;
     char fname[128];
-
-    // LOGI("onkey:Key=%d,Count=%d",key,media_db.count);
-
-    if (!key || !media_db.count || !done) {
-        return;
-    }
+    uint32_t cur_page_num, lst_page_num;
+    uint8_t cur_pos, lst_pos;
 
     if (state == 1) {
         if (mplayer_on_key(key)) {
@@ -370,28 +448,65 @@ void pb_key(uint8_t const key) {
         return;
     }
 
+    if (!key || !media_db.count || (!done && status_displayed && !status_deleting)) {
+        return;
+    }
+    char text[128];
     done = false;
     switch (key) {
     case DIAL_KEY_UP: // up
+        if (status_displayed) {
+            page_playback_close_status_box();
+            break;
+        }
+        lst_page_num = (uint32_t)floor((double)media_db.cur_sel / ITEMS_LAYOUT_CNT);
+        lst_pos = media_db.cur_sel - lst_page_num * ITEMS_LAYOUT_CNT;
+
         if (media_db.cur_sel == (media_db.count - 1)) {
             media_db.cur_sel = 0;
         } else {
             media_db.cur_sel++;
         }
-        update_page();
+
+        cur_page_num = (uint32_t)floor((double)media_db.cur_sel / ITEMS_LAYOUT_CNT);
+        cur_pos = media_db.cur_sel - cur_page_num * ITEMS_LAYOUT_CNT;
+
+        if (lst_page_num == cur_page_num) {
+            update_item(cur_pos, lst_pos);
+        } else {
+            update_page();
+        }
         break;
 
     case DIAL_KEY_DOWN: // down
+        if (status_displayed) {
+            page_playback_close_status_box();
+            break;
+        }
+        lst_page_num = (uint32_t)floor((double)media_db.cur_sel / ITEMS_LAYOUT_CNT);
+        lst_pos = media_db.cur_sel - lst_page_num * ITEMS_LAYOUT_CNT;
+
         if (media_db.cur_sel) {
             media_db.cur_sel--;
         } else {
             media_db.cur_sel = (media_db.count - 1);
         }
-        update_page();
+
+        cur_page_num = (uint32_t)floor((double)media_db.cur_sel / ITEMS_LAYOUT_CNT);
+        cur_pos = media_db.cur_sel - cur_page_num * ITEMS_LAYOUT_CNT;
+
+        if (lst_page_num == cur_page_num) {
+            update_item(cur_pos, lst_pos);
+        } else {
+            update_page();
+        }
         break;
 
     case DIAL_KEY_CLICK: // Enter
-        if (get_seleteced(media_db.cur_sel, fname)) {
+        if (status_displayed) {
+            delete_video_file(media_db.cur_sel);
+            status_deleting = page_playback_close_status_box();
+        } else if (get_seleteced(media_db.cur_sel, fname)) {
             mplayer_file(fname);
             state = 1;
             app_state_push(APP_STATE_PLAYBACK);
@@ -399,25 +514,31 @@ void pb_key(uint8_t const key) {
         break;
 
     case DIAL_KEY_PRESS: // long press
+        status_deleting = page_playback_close_status_box();
         page_playback_exit();
         break;
 
     case RIGHT_KEY_CLICK:
-        mark_video_file(media_db.cur_sel);
+        if (status_displayed) {
+            status_deleting = page_playback_close_status_box();
+        } else {
+            mark_video_file(media_db.cur_sel);
+        }
         break;
 
     case RIGHT_KEY_PRESS:
-        delete_video_file(media_db.cur_sel);
+        if (!status_displayed) {
+            snprintf(text, sizeof(text), "%s", "Click center of dial to continue.\nClick function(right button) or scroll to exit.");
+            page_playback_open_status_box("Are you sure you want to DELETE the file", text);
+            status_deleting = true;
+        } else {
+            page_playback_close_status_box();
+        }
         break;
+        done = true;
     }
-    done = true;
 }
-
 static void page_playback_on_roller(uint8_t key) {
-    pb_key(key);
-}
-
-static void page_playback_on_click(uint8_t key, int sel) {
     pb_key(key);
 }
 

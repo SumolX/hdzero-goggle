@@ -12,13 +12,14 @@
 #include "driver/dm5680.h"
 #include "driver/hardware.h"
 #include "driver/mcp3021.h"
+#include "lang/language.h"
 #include "page_common.h"
 #include "ui/ui_style.h"
 
-#define WARNING_CELL_VOLTAGE_MIN 28
-#define WARNING_CELL_VOLTAGE_MAX 42
-#define CALIBRATION_OFFSET_MIN   -25
-#define CALIBRATION_OFFSET_MAX   25
+#define WARNING_CELL_VOLTAGE_MIN 2800
+#define WARNING_CELL_VOLTAGE_MAX 4200
+#define CALIBRATION_OFFSET_MIN   -2500
+#define CALIBRATION_OFFSET_MAX   2500
 
 enum {
     ROW_BATT_C_LABEL = 0,
@@ -42,6 +43,8 @@ static btn_group_t btn_group_osd_display_mode;
 static btn_group_t btn_group_warn_type;
 static btn_group_t btn_group_power_ana;
 
+static slider_group_t *selected_slider_group = NULL;
+
 static lv_coord_t col_dsc[] = {160, 200, 160, 160, 120, 160, LV_GRID_TEMPLATE_LAST};
 static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
 lv_obj_t *label_cell_count;
@@ -55,26 +58,35 @@ static void page_power_update_cell_count() {
     LOGI("cell_count:%d", g_battery.type);
     ini_putl("power", "cell_count", g_battery.type, SETTING_INI);
 
-    sprintf(str, "%dS", g_battery.type);
+    snprintf(str, sizeof(str), "%dS", g_battery.type);
     lv_label_set_text(label_cell_count, str);
 
     lv_slider_set_value(slider_group_cell_count.slider, g_battery.type, LV_ANIM_OFF);
     char buf[5];
-    sprintf(buf, "%d", g_battery.type);
+    snprintf(buf, sizeof(buf), "%d", g_battery.type);
     lv_label_set_text(slider_group_cell_count.label, buf);
+
+    const bool isAutoCellCount = btn_group_cell_count_mode.current == 0;
+    slider_enable(&slider_group_cell_count, !isAutoCellCount);
+    if (isAutoCellCount) {
+        lv_obj_clear_flag(pp_power.p_arr.panel[2], FLAG_SELECTABLE);
+    } else {
+        lv_obj_add_flag(pp_power.p_arr.panel[2], FLAG_SELECTABLE);
+    }
 }
 
 static void page_power_update_calibration_offset() {
     g_battery.offset = g_setting.power.calibration_offset;
-    ini_putl("power", "calibration_offset", g_battery.offset, SETTING_INI);
+    ini_putl("power", "calibration_offset_mv", g_battery.offset, SETTING_INI);
 
     lv_slider_set_value(slider_group_calibration_offset.slider, g_battery.offset, LV_ANIM_OFF);
-    char buf[6];
-    sprintf(buf, "%.1fV", g_battery.offset / 10.f);
+    char buf[7];
+    snprintf(buf, sizeof(buf), "%.2fV", g_battery.offset / 1000.0);
     lv_label_set_text(slider_group_calibration_offset.label, buf);
 }
 
 static lv_obj_t *page_power_create(lv_obj_t *parent, panel_arr_t *arr) {
+    char buf[128];
     // Update number of rows based on Batch 2 vs Batch 1 options
     pp_power.p_arr.max = getHwRevision() >= HW_REV_2 ? ROW_COUNT : ROW_COUNT - 1;
 
@@ -88,7 +100,8 @@ static lv_obj_t *page_power_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
     lv_obj_set_size(section, 1063, 984);
 
-    create_text(NULL, section, false, "Power:", LV_MENU_ITEM_BUILDER_VARIANT_2);
+    snprintf(buf, sizeof(buf), "%s:", _lang("Power"));
+    create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
     lv_obj_set_size(cont, 970, 680);
@@ -101,36 +114,38 @@ static lv_obj_t *page_power_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_set_style_grid_row_dsc_array(cont, row_dsc, 0);
 
     create_select_item(arr, cont);
+    lv_obj_clear_flag(pp_power.p_arr.panel[0], FLAG_SELECTABLE);
 
     // create menu entries
-    create_label_item(cont, "Battery", 1, ROW_BATT_C_LABEL, 1);
+    create_label_item(cont, _lang("Battery"), 1, ROW_BATT_C_LABEL, 1);
     label_cell_count = create_label_item(cont, "-S", 2, ROW_BATT_C_LABEL, 1);
-    create_btn_group_item(&btn_group_cell_count_mode, cont, 2, "Cell Count Mode", "Auto", "Manual", "", "", ROW_CELL_COUNT_MODE);
-    create_slider_item(&slider_group_cell_count, cont, "Cell Count", CELL_MAX_COUNT, g_setting.power.cell_count, ROW_CELL_COUNT);
-    create_slider_item(&slider_group_cell_voltage, cont, "Warning Cell Voltage", WARNING_CELL_VOLTAGE_MAX, g_setting.power.voltage, ROW_WARNING_CELL_VOLTAGE);
-    create_slider_item(&slider_group_calibration_offset, cont, "Voltage Calibration", 0, g_setting.power.calibration_offset, ROW_CALIBRATION_OFFSET);
-    create_btn_group_item(&btn_group_osd_display_mode, cont, 2, "Display Mode", "Total", "Cell Avg.", "", "", ROW_OSD_DISPLAY_MODE);
-    create_btn_group_item(&btn_group_warn_type, cont, 3, "Warning Type", "Beep", "Visual", "Both", "", ROW_WARN_TYPE);
+    create_btn_group_item(&btn_group_cell_count_mode, cont, 2, _lang("Cell Mode"), _lang("Auto"), _lang("Manual"), "", "", ROW_CELL_COUNT_MODE);
+    create_slider_item(&slider_group_cell_count, cont, _lang("Cell Count"), CELL_MAX_COUNT, g_setting.power.cell_count, ROW_CELL_COUNT);
+    create_slider_item(&slider_group_cell_voltage, cont, _lang("Warning Cell Voltage"), WARNING_CELL_VOLTAGE_MAX, g_setting.power.voltage, ROW_WARNING_CELL_VOLTAGE);
+    create_slider_item(&slider_group_calibration_offset, cont, _lang("Voltage Calibration"), 0, g_setting.power.calibration_offset, ROW_CALIBRATION_OFFSET);
+    create_btn_group_item(&btn_group_osd_display_mode, cont, 2, _lang("Display Mode"), _lang("Total"), _lang("Cell Avg."), "", "", ROW_OSD_DISPLAY_MODE);
+    create_btn_group_item(&btn_group_warn_type, cont, 3, _lang("Warning Type"), _lang("Beep"), _lang("Visual"), _lang("Both"), "", ROW_WARN_TYPE);
 
     // Batch 2 goggles only
     if (getHwRevision() >= HW_REV_2) {
-        create_btn_group_item(&btn_group_power_ana, cont, 2, "AnalogRX Power", "On", "Auto", "", "", ROW_POWER_ANA);
+        create_btn_group_item(&btn_group_power_ana, cont, 2, _lang("AnalogRX Power"), _lang("On"), _lang("Auto"), "", "", ROW_POWER_ANA);
     }
 
     // Back entry
-    create_label_item(cont, "< Back", 1, pp_power.p_arr.max - 1, 1);
+    snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
+    create_label_item(cont, buf, 1, pp_power.p_arr.max - 1, 1);
 
     // set menu entry min/max values and labels
-    char str[5];
-    sprintf(str, "%d.%d", g_setting.power.voltage / 10, g_setting.power.voltage % 10);
+    char str[6];
+    snprintf(str, sizeof(buf), "%.2f", g_setting.power.voltage / 1000.0);
     lv_slider_set_range(slider_group_cell_voltage.slider, WARNING_CELL_VOLTAGE_MIN, WARNING_CELL_VOLTAGE_MAX);
     lv_label_set_text(slider_group_cell_voltage.label, str);
 
-    sprintf(str, "%d", g_setting.power.cell_count);
+    snprintf(str, sizeof(buf), "%d", g_setting.power.cell_count);
     lv_slider_set_range(slider_group_cell_count.slider, CELL_MIN_COUNT, CELL_MAX_COUNT);
     lv_label_set_text(slider_group_cell_count.label, str);
 
-    sprintf(str, "%.1fV", g_setting.power.calibration_offset / 10.f);
+    snprintf(str, sizeof(buf), "%.2fV", g_setting.power.calibration_offset / 1000.0);
     lv_slider_set_range(slider_group_calibration_offset.slider, CALIBRATION_OFFSET_MIN, CALIBRATION_OFFSET_MAX);
     lv_label_set_text(slider_group_calibration_offset.label, str);
 
@@ -146,21 +161,10 @@ static lv_obj_t *page_power_create(lv_obj_t *parent, panel_arr_t *arr) {
     page_power_update_cell_count();
     page_power_update_calibration_offset();
 
-    lv_obj_t *label = lv_label_create(cont);
-    lv_label_set_text(label, "*Cell count setting is disabled in auto mode");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_style_text_color(label, lv_color_make(255, 255, 255), 0);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_pad_top(label, 12, 0);
-    lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
-    lv_obj_set_grid_cell(label, LV_GRID_ALIGN_START, 1, 4,
-                         LV_GRID_ALIGN_START, pp_power.p_arr.max, 3);
-
     return page;
 }
 
-void power_cell_count_inc(void) {
+static void power_cell_count_inc(void) {
     int32_t value = 0;
 
     value = lv_slider_get_value(slider_group_cell_count.slider);
@@ -171,7 +175,7 @@ void power_cell_count_inc(void) {
     page_power_update_cell_count();
 }
 
-void power_cell_count_dec(void) {
+static void power_cell_count_dec(void) {
     int32_t value = 0;
 
     value = lv_slider_get_value(slider_group_cell_count.slider);
@@ -183,66 +187,107 @@ void power_cell_count_dec(void) {
     page_power_update_cell_count();
 }
 
-void power_warning_voltage_inc(void) {
+static void power_warning_voltage_inc(void) {
     int32_t value = 0;
 
     value = lv_slider_get_value(slider_group_cell_voltage.slider);
     if (value < WARNING_CELL_VOLTAGE_MAX)
-        value += 1;
+        value += 10;
 
     lv_slider_set_value(slider_group_cell_voltage.slider, value, LV_ANIM_OFF);
 
-    char buf[5];
-    sprintf(buf, "%d.%d", value / 10, value % 10);
+    char buf[6];
+    snprintf(buf, sizeof(buf), "%.2f", value / 1000.0);
     lv_label_set_text(slider_group_cell_voltage.label, buf);
 
     g_setting.power.voltage = value;
     LOGI("vol:%d", g_setting.power.voltage);
-    ini_putl("power", "voltage", g_setting.power.voltage, SETTING_INI);
+    ini_putl("power", "voltage_mv", g_setting.power.voltage, SETTING_INI);
 }
 
-void power_warning_voltage_dec(void) {
+static void power_warning_voltage_dec(void) {
     int32_t value = 0;
 
     value = lv_slider_get_value(slider_group_cell_voltage.slider);
     if (value > WARNING_CELL_VOLTAGE_MIN)
-        value -= 1;
+        value -= 10;
 
     lv_slider_set_value(slider_group_cell_voltage.slider, value, LV_ANIM_OFF);
-    char buf[5];
-    sprintf(buf, "%d.%d", value / 10, value % 10);
+    char buf[6];
+    snprintf(buf, sizeof(buf), "%.2f", value / 1000.0);
     lv_label_set_text(slider_group_cell_voltage.label, buf);
 
     g_setting.power.voltage = value;
     LOGI("vol:%d", g_setting.power.voltage);
-    ini_putl("power", "voltage", g_setting.power.voltage, SETTING_INI);
+    ini_putl("power", "voltage_mv", g_setting.power.voltage, SETTING_INI);
 }
 
-void power_calibration_offset_inc(void) {
+static void power_calibration_offset_inc(void) {
     int32_t value = 0;
 
     value = lv_slider_get_value(slider_group_calibration_offset.slider);
     if (value < CALIBRATION_OFFSET_MAX)
-        value += 1;
+        value += 10;
 
     g_setting.power.calibration_offset = value;
 
     page_power_update_calibration_offset();
 }
 
-void power_calibration_offset_dec(void) {
+static void power_calibration_offset_dec(void) {
     int32_t value = 0;
 
     value = lv_slider_get_value(slider_group_calibration_offset.slider);
     if (value > CALIBRATION_OFFSET_MIN)
-        value -= 1;
+        value -= 10;
 
     g_setting.power.calibration_offset = value;
 
     page_power_update_calibration_offset();
 }
 
+static void page_power_exit_slider() {
+    lv_obj_add_style(selected_slider_group->slider, &style_silder_main, LV_PART_MAIN);
+    app_state_push(APP_STATE_SUBMENU);
+    selected_slider_group = NULL;
+}
+
+static void page_power_exit() {
+    if (selected_slider_group != NULL) {
+        page_power_exit_slider();
+    }
+}
+
+static void page_power_on_roller(uint8_t key) {
+    if (selected_slider_group == NULL) {
+        return;
+    }
+
+    if (key == DIAL_KEY_UP) {
+        if (selected_slider_group == &slider_group_cell_voltage) {
+            power_warning_voltage_dec();
+        } else if (selected_slider_group == &slider_group_cell_count) {
+            power_cell_count_dec();
+        } else if (selected_slider_group == &slider_group_calibration_offset) {
+            power_calibration_offset_dec();
+        }
+    } else if (key == DIAL_KEY_DOWN) {
+        if (selected_slider_group == &slider_group_cell_voltage) {
+            power_warning_voltage_inc();
+        } else if (selected_slider_group == &slider_group_cell_count) {
+            power_cell_count_inc();
+        } else if (selected_slider_group == &slider_group_calibration_offset) {
+            power_calibration_offset_inc();
+        }
+    }
+}
+
 static void page_power_on_click(uint8_t key, int sel) {
+
+    if (selected_slider_group != NULL) {
+        page_power_exit_slider();
+        return;
+    }
 
     switch (sel) {
 
@@ -256,34 +301,22 @@ static void page_power_on_click(uint8_t key, int sel) {
 
     case ROW_CELL_COUNT:
         if (g_setting.power.cell_count_mode == SETTING_POWER_CELL_COUNT_MODE_AUTO)
-            ;
-        else if (g_app_state == PAGE_POWER_SLIDE_CELL_COUNT) {
-            app_state_push(APP_STATE_SUBMENU);
-            lv_obj_add_style(slider_group_cell_count.slider, &style_silder_main, LV_PART_MAIN);
-        } else {
-            app_state_push(PAGE_POWER_SLIDE_CELL_COUNT);
-            lv_obj_add_style(slider_group_cell_count.slider, &style_silder_select, LV_PART_MAIN);
-        }
+            break;
+        app_state_push(APP_STATE_SUBMENU_ITEM_FOCUSED);
+        lv_obj_add_style(slider_group_cell_count.slider, &style_silder_select, LV_PART_MAIN);
+        selected_slider_group = &slider_group_cell_count;
         break;
 
     case ROW_WARNING_CELL_VOLTAGE:
-        if (g_app_state == PAGE_POWER_SLIDE_WARNING_CELL_VOLTAGE) {
-            app_state_push(APP_STATE_SUBMENU);
-            lv_obj_add_style(slider_group_cell_voltage.slider, &style_silder_main, LV_PART_MAIN);
-        } else {
-            app_state_push(PAGE_POWER_SLIDE_WARNING_CELL_VOLTAGE);
-            lv_obj_add_style(slider_group_cell_voltage.slider, &style_silder_select, LV_PART_MAIN);
-        }
+        app_state_push(APP_STATE_SUBMENU_ITEM_FOCUSED);
+        lv_obj_add_style(slider_group_cell_voltage.slider, &style_silder_select, LV_PART_MAIN);
+        selected_slider_group = &slider_group_cell_voltage;
         break;
 
     case ROW_CALIBRATION_OFFSET:
-        if (g_app_state == PAGE_POWER_SLIDE_CALIBRATION_OFFSET) {
-            app_state_push(APP_STATE_SUBMENU);
-            lv_obj_add_style(slider_group_calibration_offset.slider, &style_silder_main, LV_PART_MAIN);
-        } else {
-            app_state_push(PAGE_POWER_SLIDE_CALIBRATION_OFFSET);
-            lv_obj_add_style(slider_group_calibration_offset.slider, &style_silder_select, LV_PART_MAIN);
-        }
+        app_state_push(APP_STATE_SUBMENU_ITEM_FOCUSED);
+        lv_obj_add_style(slider_group_calibration_offset.slider, &style_silder_select, LV_PART_MAIN);
+        selected_slider_group = &slider_group_calibration_offset;
         break;
 
     case ROW_OSD_DISPLAY_MODE:
@@ -321,10 +354,10 @@ page_pack_t pp_power = {
     .name = "Power",
     .create = page_power_create,
     .enter = NULL,
-    .exit = NULL,
+    .exit = page_power_exit,
     .on_created = NULL,
     .on_update = NULL,
-    .on_roller = NULL,
+    .on_roller = page_power_on_roller,
     .on_click = page_power_on_click,
     .on_right_button = NULL,
 };

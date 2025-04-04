@@ -42,6 +42,7 @@ typedef enum {
     FC_VARIANT_UNKNOWN = 0,
     FC_VARIANT_ARDU,
     FC_VARIANT_BTFL,
+    FC_VARIANT_EMUF,
     FC_VARIANT_INAV,
     FC_VARIANT_QUIC
 } fc_variant_t;
@@ -69,7 +70,7 @@ void osd_resource_path(char *buf, const char *fmt, osd_resource_t osd_resource_t
 
     va_list args;
     va_start(args, osd_resource_type);
-    vsprintf(filename, fmt, args);
+    vsnprintf(filename, sizeof(filename), fmt, args);
     va_end(args);
     strcpy(buf2, buf);
     strcpy(buf, RESOURCE_PATH_SDCARD);
@@ -91,6 +92,15 @@ void osd_resource_path(char *buf, const char *fmt, osd_resource_t osd_resource_t
     memmove(buf + 2, buf, strlen(buf) + 2);
     buf[0] = 'A';
     buf[1] = ':';
+}
+
+void osd_toggle() {
+    g_setting.osd.is_visible = !g_setting.osd.is_visible;
+    if (g_setting.osd.is_visible) {
+        channel_osd_mode = CHANNEL_SHOWTIME;
+    }
+
+    settings_put_bool("osd", "is_visible", g_setting.osd.is_visible);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -263,9 +273,9 @@ uint8_t channel_osd_mode;
 
 char *channel2str(uint8_t band, uint8_t channel) // channel=[1:18]
 {
-    static char *ChannelName[2][10] = {
-        {"R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "F2", "F4"},
-        {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "  ", "  "},
+    static char *ChannelName[2][BASE_CH_NUM] = {
+        {"R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "E1", "F1", "F2", "F4"},
+        {"L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "  ", "  ", "  ", "  "},
     };
 
     if ((channel > 0) && (channel <= CHANNEL_NUM))
@@ -282,12 +292,12 @@ void osd_channel_show(bool bShow) {
     if (channel_osd_mode & 0x80) {
         ch = channel_osd_mode & 0x7F;
         color = lv_color_make(0xFF, 0x20, 0x20);
-        sprintf(buf, "  To %s?  ", channel2str(g_setting.source.hdzero_band, ch));
+        snprintf(buf, sizeof(buf), "  To %s?  ", channel2str(g_setting.source.hdzero_band, ch));
         lv_obj_set_style_bg_opa(g_osd_hdzero.channel[is_fhd], LV_OPA_100, 0);
     } else {
         ch = g_setting.scan.channel & 0x7F;
         color = lv_color_make(0xFF, 0xFF, 0xFF);
-        sprintf(buf, "CH:%s", channel2str(g_setting.source.hdzero_band, ch));
+        snprintf(buf, sizeof(buf), "CH:%s", channel2str(g_setting.source.hdzero_band, ch));
         lv_obj_set_style_bg_opa(g_osd_hdzero.channel[is_fhd], 0, 0);
     }
 
@@ -343,6 +353,7 @@ static void osd_object_create_label(uint8_t fhd, lv_obj_t **obj, char *text, set
     switch (g_fc_variant_type) {
     case FC_VARIANT_ARDU:
     case FC_VARIANT_BTFL:
+    case FC_VARIANT_EMUF:
     case FC_VARIANT_INAV:
         lv_obj_set_style_text_font(*obj, &conthrax_26, 0);
         break;
@@ -633,13 +644,13 @@ void osd_hdzero_update(void) {
         lv_obj_add_flag(g_osd_hdzero.ant3[is_fhd], LV_OBJ_FLAG_HIDDEN);
 
     if (g_setting.storage.selftest) {
-        sprintf(buf, "T:%d-%d", fan_speed.top, g_temperature.top / 10);
+        snprintf(buf, sizeof(buf), "T:%d-%d", fan_speed.top, g_temperature.top / 10);
         lv_label_set_text(g_osd_hdzero.osd_tempe[is_fhd][0], buf);
 
-        sprintf(buf, "L:%d-%d", fan_speed.left, g_temperature.left / 10);
+        snprintf(buf, sizeof(buf), "L:%d-%d", fan_speed.left, g_temperature.left / 10);
         lv_label_set_text(g_osd_hdzero.osd_tempe[is_fhd][1], buf);
 
-        sprintf(buf, "R:%d-%d", fan_speed.right, g_temperature.right / 10);
+        snprintf(buf, sizeof(buf), "R:%d-%d", fan_speed.right, g_temperature.right / 10);
         lv_label_set_text(g_osd_hdzero.osd_tempe[is_fhd][2], buf);
     }
 }
@@ -778,9 +789,9 @@ static void create_osd_scr(void) {
         lv_obj_clear_flag(scr_main, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_clear_flag(scr_osd[i], LV_OBJ_FLAG_SCROLLABLE);
         if (i)
-            lv_obj_set_size(scr_osd[i], 1920, 1080);
+            lv_obj_set_size(scr_osd[i], DRAW_HOR_RES_FHD, DRAW_VER_RES_FHD);
         else
-            lv_obj_set_size(scr_osd[i], 1280, 720);
+            lv_obj_set_size(scr_osd[i], DRAW_HOR_RES_HD, DRAW_VER_RES_HD);
         lv_obj_add_flag(scr_osd[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_style(scr_osd[i], &style_osd, 0);
     }
@@ -918,13 +929,13 @@ void load_fc_osd_font(uint8_t fhd) {
     int i;
 
     if (fhd) {
-        sprintf(fp[0], "%s%s_FHD_000.bmp", FC_OSD_SDCARD_PATH, fc_variant);
-        sprintf(fp[1], "%s%s_FHD_000.bmp", FC_OSD_LOCAL_PATH, fc_variant);
-        sprintf(fp[2], "%sBTFL_FHD_000.bmp", FC_OSD_LOCAL_PATH);
+        snprintf(fp[0], sizeof(fp[0]), "%s%s_FHD_000.bmp", FC_OSD_SDCARD_PATH, fc_variant);
+        snprintf(fp[1], sizeof(fp[1]), "%s%s_FHD_000.bmp", FC_OSD_LOCAL_PATH, fc_variant);
+        snprintf(fp[2], sizeof(fp[2]), "%sBTFL_FHD_000.bmp", FC_OSD_LOCAL_PATH);
     } else {
-        sprintf(fp[0], "%s%s_000.bmp", FC_OSD_SDCARD_PATH, fc_variant);
-        sprintf(fp[1], "%s%s_000.bmp", FC_OSD_LOCAL_PATH, fc_variant);
-        sprintf(fp[2], "%sBTFL_000.bmp", FC_OSD_LOCAL_PATH);
+        snprintf(fp[0], sizeof(fp[0]), "%s%s_000.bmp", FC_OSD_SDCARD_PATH, fc_variant);
+        snprintf(fp[1], sizeof(fp[1]), "%s%s_000.bmp", FC_OSD_LOCAL_PATH, fc_variant);
+        snprintf(fp[2], sizeof(fp[2]), "%sBTFL_000.bmp", FC_OSD_LOCAL_PATH);
     }
 
     // Optimized for runtime execution
@@ -932,6 +943,8 @@ void load_fc_osd_font(uint8_t fhd) {
         g_fc_variant_type = FC_VARIANT_ARDU;
     } else if (0 == strncmp(fc_variant, "BTFL", sizeof(fc_variant))) {
         g_fc_variant_type = FC_VARIANT_BTFL;
+    } else if (0 == strncmp(fc_variant, "EMUF", sizeof(fc_variant))) {
+        g_fc_variant_type = FC_VARIANT_EMUF;
     } else if (0 == strncmp(fc_variant, "INAV", sizeof(fc_variant))) {
         g_fc_variant_type = FC_VARIANT_INAV;
     } else if (0 == strncmp(fc_variant, "QUIC", sizeof(fc_variant))) {
@@ -944,6 +957,7 @@ void load_fc_osd_font(uint8_t fhd) {
     switch (g_fc_variant_type) {
     case FC_VARIANT_ARDU:
     case FC_VARIANT_BTFL:
+    case FC_VARIANT_EMUF:
     case FC_VARIANT_INAV:
         clock_format_offsets[OSD_RESOURCE_720] = 150;
         clock_format_offsets[OSD_RESOURCE_1080] = 100;

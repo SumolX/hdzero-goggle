@@ -1,5 +1,8 @@
-#ifndef _HARDWARE_H
-#define _HARDWARE_H
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,10 +16,12 @@ typedef enum {
 
 typedef enum {
     HDMIIN_VTMG_UNKNOW = 0,
-    HDMIIN_VTMG_1080P = 1,
-    HDMIIN_VTMG_720P50 = 2,
-    HDMIIN_VTMG_720P60 = 3,
-    HDMIIN_VTMG_720P100 = 4,
+    HDMIIN_VTMG_1080P60 = 1,
+    HDMIIN_VTMG_1080P50 = 2,
+    HDMIIN_VTMG_1080Pother = 3,
+    HDMIIN_VTMG_720P50 = 4,
+    HDMIIN_VTMG_720P60 = 5,
+    HDMIIN_VTMG_720P100 = 6,
 } hdmiin_vtmg_t;
 
 typedef enum {
@@ -27,6 +32,24 @@ typedef enum {
     VDPO_TMG_720P100 = 4,
     VDPO_TMG_1080P60 = 5,
 } vdpo_tmg_t;
+
+typedef enum {
+    VIDEO_SOURCE_VERSION = 0,
+    VIDEO_SOURCE_MENU_UI = 1,
+    VIDEO_SOURCE_HDZERO_IN_720P60_50 = 2,
+    VIDEO_SOURCE_HDZERO_IN_720P90 = 3,
+    VIDEO_SOURCE_HDZERO_IN_1080P30 = 4,
+    VIDEO_SOURCE_AV_IN = 5,
+    VIDEO_SOURCE_HDMI_IN_1080P50 = 6,
+    VIDEO_SOURCE_HDMI_IN_1080P60 = 7,
+    VIDEO_SOURCE_HDMI_IN_1080POTHER = 8,
+    VIDEO_SOURCE_HDMI_IN_720P50 = 9,
+    VIDEO_SOURCE_HDMI_IN_720P60 = 10,
+    VIDEO_SOURCE_HDMI_IN_720P100 = 11,
+    VIDEO_SOURCE_HDMI_OUT = 11,
+    VIDEO_SOURCE_TP2825_EX = 12,
+    VIDEO_SOURCE_NUM = 13,
+} video_source_t;
 
 typedef struct {
     source_mode_t source_mode;
@@ -81,9 +104,16 @@ void Analog_Module_Power(bool Force);
 
 int HDZERO_detect();
 int AV_in_detect();
-void HDMI_in_detect();
+int HDMI_in_detect();
 
 int Get_VideoLatancy_status(); // ret: 0=unlocked, 1=locked
 int Get_HAN_status();          // ret: 0=error; 1=ok
 
+void vclk_phase_init();
+void pclk_phase_init();
+
+extern uint32_t vclk_phase[VIDEO_SOURCE_NUM];
+
+#ifdef __cplusplus
+}
 #endif

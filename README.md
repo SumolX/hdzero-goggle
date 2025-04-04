@@ -4,6 +4,8 @@
 
 The firmware can either be built in a [devcontainer](https://containers.dev/) or natively on a linux machine.
 
+Note: decompressing the repository in Windows system may damage some files and prevent correct builds.
+
 ### Devcontainer Setup
 
 This repository supports the [vscode devcontainer](https://code.visualstudio.com/docs/devcontainers/containers) integration.
@@ -32,6 +34,7 @@ An appropiate vscode build task ships with this repository as well.
 The firmware is generated as ~/hdz_goggle/code/out/HDZERO_GOGGLE-x.x.x.bin
 Where x.x.x is the OTA_VER.RX_VER.VA_VER
 
+
 ## Loading the Firmware
 
 Firmware can be either flashed via goggle menu or alternatively be executed via the SD Card with a custom development script.  An example of this development script is provided below.  The goggles automatically checks to see if the develop.sh script exists in the root of the SD Card and if found develop.sh is then executed.
@@ -44,7 +47,7 @@ SD Card File Hierarchy:
 
 ```
 /develop.sh
-/HDZGOOGLE
+/HDZGOGGLE
 ```
 
 Development script (develop.sh):

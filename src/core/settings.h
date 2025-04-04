@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -50,6 +54,18 @@ typedef enum {
     SETTING_POWER_WARNING_TYPE_BOTH = 2
 } setting_power_warning_type_t;
 
+typedef enum {
+    SETTING_HT_ALARM_STATE_OFF = 0,
+    SETTING_HT_ALARM_STATE_VIDEO = 1,
+    SETTING_HT_ALARM_STATE_ARM = 2,
+} setting_ht_alarm_state_t;
+
+typedef enum {
+    SETTING_HT_ALARM_PATTERN_1SHORT = 0,
+    SETTING_HT_ALARM_PATTERN_2SHORT = 1,
+    SETTING_HT_ALARM_PATTERN_1LONG = 2
+} setting_ht_alarm_pattern_t;
+
 typedef struct {
     int voltage;
     bool display_voltage;
@@ -67,6 +83,11 @@ typedef enum {
     SETTING_RECORD_AUDIO_SOURCE_AV_IN = 2
 } setting_record_audio_source_t;
 
+typedef enum {
+    SETTING_NAMING_CONTIGUOUS,
+    SETTING_NAMING_DATE
+} setting_record_naming_t;
+
 typedef struct {
     bool mode_manual;
     bool format_ts;
@@ -74,6 +95,7 @@ typedef struct {
     bool osd;
     bool audio;
     setting_record_audio_source_t audio_source;
+    setting_record_naming_t naming;
 } setting_record_t;
 
 typedef struct {
@@ -93,6 +115,12 @@ typedef struct {
     int32_t gyr_x;
     int32_t gyr_y;
     int32_t gyr_z;
+    setting_ht_alarm_state_t alarm_state;
+    int alarm_angle;
+    uint16_t alarm_delay;
+    setting_ht_alarm_pattern_t alarm_pattern;
+    bool alarm_on_arm;
+    bool alarm_on_video;
 } setting_head_tracker_t;
 
 typedef struct {
@@ -102,7 +130,7 @@ typedef struct {
 typedef enum {
     EMBEDDED_4x3,
     EMBEDDED_16x9
-} setting_embedded_mode_t;
+} setting_osd_embedded_mode_t;
 
 typedef enum {
     SETTING_OSD_SHOW_AT_STARTUP_SHOW,
@@ -149,7 +177,8 @@ typedef enum {
 } osd_goggle_element_e;
 
 typedef struct {
-    setting_embedded_mode_t embedded_mode;
+    int orbit;
+    setting_osd_embedded_mode_t embedded_mode;
     setting_osd_show_at_startup_t startup_visibility;
     bool is_visible;
     setting_osd_goggle_element_t element[OSD_GOGGLE_NUM];
@@ -204,6 +233,11 @@ typedef enum {
     SETTING_SOURCES_ANALOG_FORMAT_NTSC = 0,
     SETTING_SOURCES_ANALOG_FORMAT_PAL = 1
 } setting_sources_analog_format_t;
+
+typedef enum {
+    SETTING_SOURCES_ANALOG_RATIO_4_3 = 0,
+    SETTING_SOURCES_ANALOG_RATIO_16_9 = 1
+} setting_sources_analog_ratio_t;
 typedef enum {
     SETTING_SOURCES_HDZERO_BAND_RACEBAND = 0,
     SETTING_SOURCES_HDZERO_BAND_LOWBAND = 1
@@ -215,14 +249,28 @@ typedef enum {
 
 typedef struct {
     setting_sources_analog_format_t analog_format; // 0=NTSC, 1= PAL
+    setting_sources_analog_ratio_t analog_ratio;   // 0=4:3, 1=16:9
     setting_sources_hdzero_band_t hdzero_band;
     setting_sources_hdzero_bw_t hdzero_bw;
 } setting_sources_t;
 
 typedef struct {
+    uint16_t roller;
+    uint16_t left_click;
+    uint16_t left_press;
+    uint16_t right_click;
+    uint16_t right_press;
+    uint16_t right_double_click;
+} setting_inputs_t;
+
+typedef struct {
     bool logging;
     bool selftest;
 } setting_storage_t;
+
+typedef struct {
+    uint16_t lang;
+} language_t;
 
 typedef struct {
     setting_scan_t scan;
@@ -237,8 +285,10 @@ typedef struct {
     wifi_t wifi;
     setting_osd_t osd;
     setting_clock_t clock;
+    setting_inputs_t inputs;
     ease_use_t ease;
     setting_storage_t storage;
+    language_t language;
 } setting_t;
 
 extern setting_t g_setting;
@@ -254,3 +304,7 @@ int settings_put_osd_element(const setting_osd_goggle_element_t *element, char *
 int settings_put_osd_element_pos_y(const setting_osd_goggle_element_positions_t *pos, char *config_name);
 int settings_put_osd_element_pos_x(const setting_osd_goggle_element_positions_t *pos, char *config_name);
 int settings_put_osd_element_shown(bool show, char *config_name);
+
+#ifdef __cplusplus
+}
+#endif

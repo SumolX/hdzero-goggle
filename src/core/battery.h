@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -9,7 +13,7 @@
 typedef struct {
     int type; // cell count
     int voltage;
-    int offset; // in 100mV
+    int offset; // in mV
 } sys_battery_t;
 
 extern sys_battery_t g_battery;
@@ -19,4 +23,8 @@ void battery_update();
 
 bool battery_is_low();
 int battery_get_millivolts(bool per_cell);
-void battery_get_voltage_str(char* buf);
+void battery_get_voltage_str(char *buf);
+
+#ifdef __cplusplus
+}
+#endif

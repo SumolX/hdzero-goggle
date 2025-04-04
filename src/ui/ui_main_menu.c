@@ -1,6 +1,7 @@
 #include "ui/ui_main_menu.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <log/log.h>
 #include <lvgl/lvgl.h>
@@ -10,6 +11,7 @@
 #include "driver/hardware.h"
 #include "driver/mcp3021.h"
 #include "driver/oled.h"
+#include "lang/language.h"
 #include "ui/page_autoscan.h"
 #include "ui/page_clock.h"
 #include "ui/page_common.h"
@@ -18,6 +20,7 @@
 #include "ui/page_focus_chart.h"
 #include "ui/page_headtracker.h"
 #include "ui/page_imagesettings.h"
+#include "ui/page_input.h"
 #include "ui/page_osd.h"
 #include "ui/page_playback.h"
 #include "ui/page_power.h"
@@ -60,10 +63,15 @@ static page_pack_t *page_packs[] = {
     &pp_version,
     &pp_focus_chart,
     &pp_clock,
+    &pp_input,
     &pp_sleep,
 };
 
-#define PAGE_COUNT (sizeof(page_packs) / sizeof(page_packs[0]))
+#define PAGE_COUNT (ARRAY_SIZE(page_packs))
+
+static page_pack_t *post_bootup_actions[PAGE_COUNT];
+static size_t post_bootup_actions_count = 0;
+static bool bootup_actions_fired = false;
 
 static page_pack_t *find_pp(lv_obj_t *page) {
     for (uint32_t i = 0; i < PAGE_COUNT; i++) {
@@ -74,19 +82,16 @@ static page_pack_t *find_pp(lv_obj_t *page) {
     return NULL;
 }
 
-static void clear_all_icon(void) {
-    for (uint32_t i = 0; i < PAGE_COUNT; i++) {
-        lv_img_set_src(page_packs[i]->icon, LV_SYMBOL_DUMMY);
-    }
+static void select_menu_tab(page_pack_t *pp) {
+    lv_obj_clear_flag(pp->icon, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_style_bg_opa(((lv_menu_t *)menu)->selected_tab, LV_OPA_50, LV_STATE_CHECKED);
 }
 
-static void menu_event_handler(lv_event_t *e) {
-    clear_all_icon();
-
-    page_pack_t *pp = find_pp(lv_menu_get_cur_main_page(menu));
-    if (pp) {
-        lv_img_set_src(pp->icon, &img_arrow);
-    }
+static void deselect_menu_tab(page_pack_t *pp) {
+    // LV_OPA_20 is the default for pressed menu
+    // see lv_theme_default.c styles->menu_pressed
+    lv_obj_set_style_bg_opa(((lv_menu_t *)menu)->selected_tab, LV_OPA_20, LV_STATE_CHECKED);
+    lv_obj_add_flag(pp->icon, LV_OBJ_FLAG_HIDDEN);
 }
 
 void submenu_enter(void) {
@@ -95,9 +100,12 @@ void submenu_enter(void) {
         return;
     }
 
+    select_menu_tab(pp);
+
     if (pp->p_arr.max) {
-        // if we have selectable entries, select the first one
-        pp->p_arr.cur = 0;
+        // if we have selectable entries, select the first selectable one
+        for (pp->p_arr.cur = 0; !lv_obj_has_flag(pp->p_arr.panel[pp->p_arr.cur], FLAG_SELECTABLE); ++pp->p_arr.cur)
+            ;
         set_select_item(&pp->p_arr, pp->p_arr.cur);
     }
 
@@ -128,15 +136,19 @@ void submenu_roller(uint8_t key) {
     if (pp->p_arr.max) {
         // if we have selectable entries, move selection
         if (key == DIAL_KEY_UP) {
-            if (pp->p_arr.cur < pp->p_arr.max - 1)
-                pp->p_arr.cur++;
-            else
-                pp->p_arr.cur = 0;
+            do {
+                if (pp->p_arr.cur < pp->p_arr.max - 1)
+                    pp->p_arr.cur++;
+                else
+                    pp->p_arr.cur = 0;
+            } while (!lv_obj_has_flag(pp->p_arr.panel[pp->p_arr.cur], FLAG_SELECTABLE));
         } else if (key == DIAL_KEY_DOWN) {
-            if (pp->p_arr.cur > 0)
-                pp->p_arr.cur--;
-            else
-                pp->p_arr.cur = pp->p_arr.max - 1;
+            do {
+                if (pp->p_arr.cur > 0)
+                    pp->p_arr.cur--;
+                else
+                    pp->p_arr.cur = pp->p_arr.max - 1;
+            } while (!lv_obj_has_flag(pp->p_arr.panel[pp->p_arr.cur], FLAG_SELECTABLE));
         }
         set_select_item(&pp->p_arr, pp->p_arr.cur);
     }
@@ -172,6 +184,8 @@ void submenu_exit() {
     if (!pp) {
         return;
     }
+
+    deselect_menu_tab(pp);
 
     if (pp->exit) {
         // if your page as a exit event handler, call it
@@ -231,6 +245,8 @@ static void menu_reinit(void) {
         scan_reinit();
     }
 
+    deselect_menu_tab(pp);
+
     if (pp->p_arr.max) {
         // if we have selectable icons, reset the selector
         pp->p_arr.cur = 0;
@@ -259,12 +275,13 @@ static void main_menu_create_entry(lv_obj_t *menu, lv_obj_t *section, page_pack_
     lv_obj_t *cont = lv_menu_cont_create(section);
 
     pp->label = lv_label_create(cont);
-    lv_label_set_text(pp->label, pp->name);
+    lv_label_set_text(pp->label, _lang(pp->name));
     lv_obj_set_style_text_font(pp->label, &lv_font_montserrat_26, 0);
     lv_label_set_long_mode(pp->label, LV_LABEL_LONG_SCROLL_CIRCULAR);
 
     pp->icon = lv_img_create(cont);
     lv_img_set_src(pp->icon, &img_arrow);
+    lv_obj_add_flag(pp->icon, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_set_style_text_font(cont, &lv_font_montserrat_26, 0);
     lv_menu_set_load_page_event(menu, cont, pp->page);
@@ -272,6 +289,19 @@ static void main_menu_create_entry(lv_obj_t *menu, lv_obj_t *section, page_pack_
     if (pp->on_created) {
         pp->on_created();
     }
+}
+
+static int post_bootup_actions_cmp(const void * lhs, const void * rhs) {
+    const int32_t leftPriority = ((page_pack_t*) lhs)->post_bootup_run_priority;
+    const int32_t rightPriority = ((page_pack_t*) rhs)->post_bootup_run_priority;
+
+    if (leftPriority < rightPriority) {
+        return -1;
+    } else if (leftPriority > rightPriority) {
+        return 1;
+    }
+
+    return 0;
 }
 
 void main_menu_init(void) {
@@ -290,11 +320,16 @@ void main_menu_init(void) {
 
     lv_obj_t *section = lv_menu_section_create(root_page);
     lv_obj_clear_flag(section, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_event_cb(menu, menu_event_handler, LV_EVENT_VALUE_CHANGED, NULL);
 
     for (uint32_t i = 0; i < PAGE_COUNT; i++) {
         main_menu_create_entry(menu, section, page_packs[i]);
+        if (page_packs[i]->post_bootup_run_priority > 0 && page_packs[i]->post_bootup_run_function != NULL) {
+            post_bootup_actions[post_bootup_actions_count++] = page_packs[i];
+        }
     }
+
+    // Resort based on priority
+    qsort(post_bootup_actions, post_bootup_actions_count, sizeof(page_pack_t*), post_bootup_actions_cmp);
 
     lv_obj_add_style(section, &style_rootmenu, LV_PART_MAIN);
     lv_obj_set_size(section, 250, 975);
@@ -321,14 +356,33 @@ void main_menu_init(void) {
     keyboard_init();
 }
 
+static void bootup_action_completed() {
+    bootup_actions_fired = false;
+}
+
+static void handle_bootup_action() {
+    static page_pack_t **next_bootup_action = &post_bootup_actions[0];
+    if (next_bootup_action - &post_bootup_actions[0] >= post_bootup_actions_count) {
+        return;
+    }
+
+    (*next_bootup_action++)->post_bootup_run_function(bootup_action_completed);
+}
+
 void main_menu_update() {
     static uint32_t delta_ms = 0;
     uint32_t now_ms = time_ms();
     delta_ms = now_ms - delta_ms;
+
     for (uint32_t i = 0; i < PAGE_COUNT; i++) {
         if (page_packs[i]->on_update) {
             page_packs[i]->on_update(delta_ms);
         }
+    }
+
+    if (!bootup_actions_fired) {
+        bootup_actions_fired = true;
+        handle_bootup_action();
     }
     delta_ms = now_ms;
 }

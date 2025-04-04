@@ -10,26 +10,39 @@
 #include "core/settings.h"
 #include "driver/fans.h"
 #include "driver/nct75.h"
+#include "lang/language.h"
 #include "ui/page_common.h"
 #include "ui/page_fans.h"
 #include "ui/ui_attribute.h"
 #include "ui/ui_style.h"
 
 typedef enum {
-    FANS_MODE_TOP = 0,
+    FANS_MODE_NO_FAN = 0,
+    FANS_MODE_TOP,
     FANS_MODE_SIDE,
 } fans_mode_t;
 
 static lv_coord_t col_dsc[] = {160, 160, 160, 160, 140, 160, LV_GRID_TEMPLATE_LAST};
 static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 60, 60, LV_GRID_TEMPLATE_LAST};
 
-fans_mode_t fans_mode = FANS_MODE_TOP;
+static fans_mode_t fans_mode = FANS_MODE_NO_FAN;
 
 static btn_group_t btn_group_fans;
 
 static slider_group_t slider_group[2];
 
+static void update_visibility() {
+    slider_enable(&slider_group[1], btn_group_fans.current != 0);
+
+    if (btn_group_fans.current == 0) {
+        lv_obj_clear_flag(pp_fans.p_arr.panel[2], FLAG_SELECTABLE);
+    } else {
+        lv_obj_add_flag(pp_fans.p_arr.panel[2], FLAG_SELECTABLE);
+    }
+}
+
 static lv_obj_t *page_fans_create(lv_obj_t *parent, panel_arr_t *arr) {
+    char buf[128];
     lv_obj_t *page = lv_menu_page_create(parent, NULL);
     lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(page, 1053, 900);
@@ -40,7 +53,8 @@ static lv_obj_t *page_fans_create(lv_obj_t *parent, panel_arr_t *arr) {
     lv_obj_add_style(section, &style_submenu, LV_PART_MAIN);
     lv_obj_set_size(section, 1053, 894);
 
-    create_text(NULL, section, false, "Fans:", LV_MENU_ITEM_BUILDER_VARIANT_2);
+    snprintf(buf, sizeof(buf), "%s:", _lang("Fans"));
+    create_text(NULL, section, false, buf, LV_MENU_ITEM_BUILDER_VARIANT_2);
 
     lv_obj_t *cont = lv_obj_create(section);
     lv_obj_set_size(cont, 960, 600);
@@ -54,94 +68,146 @@ static lv_obj_t *page_fans_create(lv_obj_t *parent, panel_arr_t *arr) {
 
     create_select_item(arr, cont);
 
-    create_btn_group_item(&btn_group_fans, cont, 2, "Auto Control", "On", "Off", "", "", 0);
-    create_slider_item(&slider_group[0], cont, "Top Fan", MAX_FAN_TOP, 2, 1);
+    create_btn_group_item(&btn_group_fans, cont, 2, _lang("Auto Control"), _lang("On"), _lang("Off"), "", "", 0);
+    create_slider_item(&slider_group[0], cont, _lang("Top Fan"), MAX_FAN_TOP, 2, 1);
     lv_slider_set_range(slider_group[0].slider, MIN_FAN_TOP, MAX_FAN_TOP);
-    create_slider_item(&slider_group[1], cont, "Side Fans", MAX_FAN_SIDE, 2, 2);
+    create_slider_item(&slider_group[1], cont, _lang("Side Fans"), MAX_FAN_SIDE, 2, 2);
     lv_slider_set_range(slider_group[1].slider, MIN_FAN_SIDE, MAX_FAN_SIDE);
 
-    create_label_item(cont, "< Back", 1, 3, 1);
+    snprintf(buf, sizeof(buf), "< %s", _lang("Back"));
+    create_label_item(cont, buf, 1, 3, 1);
 
     btn_group_set_sel(&btn_group_fans, !g_setting.fans.auto_mode);
 
     lv_slider_set_value(slider_group[0].slider, g_setting.fans.top_speed, LV_ANIM_OFF);
     lv_slider_set_value(slider_group[1].slider, g_setting.fans.left_speed, LV_ANIM_OFF);
 
-    char buf[5];
-    sprintf(buf, "%d", g_setting.fans.top_speed);
+    snprintf(buf, sizeof(buf), "%d", g_setting.fans.top_speed);
     lv_label_set_text(slider_group[0].label, buf);
-    sprintf(buf, "%d", g_setting.fans.left_speed);
+    snprintf(buf, sizeof(buf), "%d", g_setting.fans.left_speed);
     lv_label_set_text(slider_group[1].label, buf);
+
+    update_visibility();
 
     return page;
 }
 
-void fans_speed_inc(void) {
-    int32_t value = 0;
-    char buf[5];
+static void fans_top_speed_inc() {
+    char buf[12];
+    int32_t value = lv_slider_get_value(slider_group[0].slider);
 
+    if (value < MAX_FAN_TOP)
+        value += 1;
+
+    lv_slider_set_value(slider_group[0].slider, value, LV_ANIM_OFF);
+
+    snprintf(buf, sizeof(buf), "%d", value);
+    lv_label_set_text(slider_group[0].label, buf);
+
+    fans_top_setspeed(value);
+
+    g_setting.fans.top_speed = value;
+    ini_putl("fans", "top_speed", value, SETTING_INI);
+}
+
+static void fans_top_speed_dec() {
+    char buf[12];
+    int32_t value = lv_slider_get_value(slider_group[0].slider);
+
+    if (value > MIN_FAN_TOP)
+        value -= 1;
+
+    lv_slider_set_value(slider_group[0].slider, value, LV_ANIM_OFF);
+    snprintf(buf, sizeof(buf), "%d", value);
+    lv_label_set_text(slider_group[0].label, buf);
+
+    fans_top_setspeed(value);
+
+    g_setting.fans.top_speed = (uint8_t)value;
+    ini_putl("fans", "top_speed", value, SETTING_INI);
+}
+
+static void fans_side_speed_inc() {
+    char buf[12];
+    int32_t value = lv_slider_get_value(slider_group[1].slider);
+
+    if (value < MAX_FAN_SIDE)
+        value += 1;
+
+    lv_slider_set_value(slider_group[1].slider, value, LV_ANIM_OFF);
+
+    snprintf(buf, sizeof(buf), "%d", value);
+    lv_label_set_text(slider_group[1].label, buf);
+
+    g_setting.fans.left_speed = value;
+    ini_putl("fans", "left_speed", value, SETTING_INI);
+    g_setting.fans.right_speed = value;
+    ini_putl("fans", "right_speed", value, SETTING_INI);
+}
+
+static void fans_side_speed_dec() {
+    char buf[12];
+    int32_t value = lv_slider_get_value(slider_group[1].slider);
+
+    if (value > MIN_FAN_SIDE)
+        value -= 1;
+
+    lv_slider_set_value(slider_group[1].slider, value, LV_ANIM_OFF);
+    snprintf(buf, sizeof(buf), "%d", value);
+    lv_label_set_text(slider_group[1].label, buf);
+
+    g_setting.fans.left_speed = value;
+    ini_putl("fans", "left_speed", value, SETTING_INI);
+    g_setting.fans.right_speed = value;
+    ini_putl("fans", "right_speed", value, SETTING_INI);
+}
+
+static void fans_speed_inc(void) {
     if (fans_mode == FANS_MODE_TOP) {
-        value = lv_slider_get_value(slider_group[0].slider);
-        if (value < MAX_FAN_TOP)
-            value += 1;
-
-        lv_slider_set_value(slider_group[0].slider, value, LV_ANIM_OFF);
-
-        sprintf(buf, "%d", value);
-        lv_label_set_text(slider_group[0].label, buf);
-
-        fans_top_setspeed(value);
-
-        g_setting.fans.top_speed = value;
-        ini_putl("fans", "top_speed", value, SETTING_INI);
+        fans_top_speed_inc();
     } else if (fans_mode == FANS_MODE_SIDE) {
-        value = lv_slider_get_value(slider_group[1].slider);
-        if (value < MAX_FAN_SIDE)
-            value += 1;
-
-        lv_slider_set_value(slider_group[1].slider, value, LV_ANIM_OFF);
-
-        sprintf(buf, "%d", value);
-        lv_label_set_text(slider_group[1].label, buf);
-
-        g_setting.fans.left_speed = value;
-        ini_putl("fans", "left_speed", value, SETTING_INI);
-        g_setting.fans.right_speed = value;
-        ini_putl("fans", "right_speed", value, SETTING_INI);
+        fans_side_speed_inc();
     }
 }
-void fans_speed_dec(void) {
-    int32_t value = 0;
-    char buf[5];
 
+static void fans_speed_dec(void) {
     if (fans_mode == FANS_MODE_TOP) {
-        value = lv_slider_get_value(slider_group[0].slider);
-
-        if (value > MIN_FAN_TOP)
-            value -= 1;
-
-        lv_slider_set_value(slider_group[0].slider, value, LV_ANIM_OFF);
-        sprintf(buf, "%d", value);
-        lv_label_set_text(slider_group[0].label, buf);
-
-        fans_top_setspeed(value);
-
-        g_setting.fans.top_speed = (uint8_t)value;
-        ini_putl("fans", "top_speed", value, SETTING_INI);
+        fans_top_speed_dec();
     } else if (fans_mode == FANS_MODE_SIDE) {
-        value = lv_slider_get_value(slider_group[1].slider);
+        fans_side_speed_dec();
+    }
+}
 
-        if (value > MIN_FAN_SIDE)
-            value -= 1;
+static void page_fans_exit_slider() {
+    lv_obj_t *slider;
+    if (fans_mode == FANS_MODE_TOP) {
+        slider = slider_group[0].slider;
+    } else if (fans_mode == FANS_MODE_SIDE) {
+        slider = slider_group[1].slider;
+    } else {
+        return;
+    }
 
-        lv_slider_set_value(slider_group[1].slider, value, LV_ANIM_OFF);
-        sprintf(buf, "%d", value);
-        lv_label_set_text(slider_group[1].label, buf);
+    app_state_push(APP_STATE_SUBMENU);
+    lv_obj_add_style(slider, &style_silder_main, LV_PART_MAIN);
+    fans_mode = FANS_MODE_NO_FAN;
+}
 
-        g_setting.fans.left_speed = value;
-        ini_putl("fans", "left_speed", value, SETTING_INI);
-        g_setting.fans.right_speed = value;
-        ini_putl("fans", "right_speed", value, SETTING_INI);
+static void page_fans_mode_exit() {
+    if (fans_mode != FANS_MODE_NO_FAN) {
+        page_fans_exit_slider();
+    }
+}
+
+static void page_fans_mode_on_roller(uint8_t key) {
+    if (g_app_state != APP_STATE_SUBMENU_ITEM_FOCUSED) {
+        return;
+    }
+
+    if (key == DIAL_KEY_UP) {
+        fans_speed_dec();
+    } else if (key == DIAL_KEY_DOWN) {
+        fans_speed_inc();
     }
 }
 
@@ -152,6 +218,7 @@ static void page_fans_mode_on_click(uint8_t key, int sel) {
         btn_group_toggle_sel(&btn_group_fans);
         g_setting.fans.auto_mode = btn_group_get_sel(&btn_group_fans) == 0;
         settings_put_bool("fans", "auto", g_setting.fans.auto_mode);
+        update_visibility();
         return;
     } else if (sel == 1) {
         slider = slider_group[0].slider;
@@ -163,11 +230,10 @@ static void page_fans_mode_on_click(uint8_t key, int sel) {
         return;
     }
 
-    if (g_app_state == PAGE_FAN_SLIDE) {
-        app_state_push(APP_STATE_SUBMENU);
-        lv_obj_add_style(slider, &style_silder_main, LV_PART_MAIN);
+    if (g_app_state == APP_STATE_SUBMENU_ITEM_FOCUSED) {
+        page_fans_exit_slider();
     } else {
-        app_state_push(PAGE_FAN_SLIDE);
+        app_state_push(APP_STATE_SUBMENU_ITEM_FOCUSED);
         lv_obj_add_style(slider, &style_silder_select, LV_PART_MAIN);
     }
 }
@@ -182,6 +248,10 @@ void step_topfan() {
 
     fans_top_setspeed(g_setting.fans.top_speed);
     ini_putl("fans", "top_speed", g_setting.fans.top_speed, SETTING_INI);
+
+    lv_slider_set_value(slider_group[0].slider, g_setting.fans.top_speed, LV_ANIM_OFF);
+    snprintf(str, sizeof(str), "%d", g_setting.fans.top_speed);
+    lv_label_set_text(slider_group[0].label, str);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -335,6 +405,14 @@ void fans_auto_ctrl() {
     }
 }
 
+void change_topfan(uint8_t key) {
+    if (key == DIAL_KEY_UP) {
+        fans_top_speed_inc();
+    } else if (key == DIAL_KEY_DOWN) {
+        fans_top_speed_dec();
+    }
+}
+
 page_pack_t pp_fans = {
     .p_arr = {
         .cur = 0,
@@ -343,10 +421,10 @@ page_pack_t pp_fans = {
     .name = "Fans",
     .create = page_fans_create,
     .enter = NULL,
-    .exit = NULL,
+    .exit = page_fans_mode_exit,
     .on_created = NULL,
     .on_update = NULL,
-    .on_roller = NULL,
+    .on_roller = page_fans_mode_on_roller,
     .on_click = page_fans_mode_on_click,
     .on_right_button = NULL,
 };

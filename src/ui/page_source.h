@@ -1,5 +1,8 @@
-#ifndef _PAGE_SOURCE_H
-#define _PAGE_SOURCE_H
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <lvgl/lvgl.h>
 
@@ -8,5 +11,9 @@
 extern page_pack_t pp_source;
 
 void source_status_timer();
+void source_toggle();
+void source_cycle();
 
+#ifdef __cplusplus
+}
 #endif

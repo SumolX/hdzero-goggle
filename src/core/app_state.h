@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 
 typedef enum {
@@ -24,13 +28,7 @@ typedef enum {
 
     APP_STATE_USER_INPUT_DISABLED = 20,
 
-    // TODO pages should set the on_roller callback and handle the input themselves
-    // instead of creating an app state. (use APP_STATE_SUBMENU_ITEM_FOCUSED)
-    PAGE_FAN_SLIDE = 100,
-    PAGE_ANGLE_SLIDE = 101,
-    PAGE_POWER_SLIDE_CELL_COUNT = 102,
-    PAGE_POWER_SLIDE_WARNING_CELL_VOLTAGE = 103,
-    PAGE_POWER_SLIDE_CALIBRATION_OFFSET = 104,
+    APP_STATE_SLEEP = 30,
 } app_state_t;
 
 extern app_state_t g_app_state;
@@ -38,6 +36,11 @@ extern app_state_t g_app_state;
 void app_state_push(app_state_t state);
 
 void app_switch_to_menu();
+void app_exit_menu();
 void app_switch_to_analog(bool is_bay);
 void app_switch_to_hdmi_in();
 void app_switch_to_hdzero(bool is_default);
+
+#ifdef __cplusplus
+}
+#endif

@@ -31,6 +31,8 @@
 #include "util/sdcard.h"
 #include "util/system.h"
 
+void (*sdcard_ready_cb)() = NULL;
+
 ///////////////////////////////////////////////////////////////////////////////
 // SD card exist
 static void detect_sdcard(void) {
@@ -41,18 +43,16 @@ static void detect_sdcard(void) {
         g_sdcard_enable = sdcard_mounted();
 
         if ((g_sdcard_enable && !sdcard_enable_last) || g_sdcard_det_req) {
-            struct statfs info;
-            if (statfs("/mnt/extsd", &info) == 0)
-                g_sdcard_size = (info.f_bsize * info.f_bavail) >> 20; // in MB
-            else
-                g_sdcard_size = 0;
+            sdcard_update_free_size();
             g_sdcard_det_req = 0;
         }
 
         // Only repair card at bootup or when inserted
         if (g_init_done) {
             if (sdcard_init_scan && g_sdcard_enable) {
-                page_storage_init_auto_sd_repair();
+                if (sdcard_ready_cb) {
+                    sdcard_ready_cb();
+                }
                 sdcard_init_scan = false;
             } else if (!g_sdcard_enable && sdcard_enable_last) {
                 sdcard_init_scan = true;
@@ -67,7 +67,7 @@ static void detect_sdcard(void) {
 // Signal loss|accquire processing
 #define SIGNAL_LOSS_DURATION_THR 20 // 25=4 seconds,
 #define SIGNAL_ACCQ_DURATION_THR 10
-static void check_hdzero_signal(int vtmg_change) {
+static void check_source_signal(int vtmg_change) {
     static uint8_t cnt = 0;
     uint8_t is_valid;
 
@@ -78,12 +78,21 @@ static void check_hdzero_signal(int vtmg_change) {
         tune_channel_timer();
     }
 
-    // exit if no SD card or not in video mode
-    if (g_setting.record.mode_manual || (!g_sdcard_enable) || (g_app_state != APP_STATE_VIDEO))
-        return;
-
-    // exit if HDMI in
     if (g_source_info.source == SOURCE_HDMI_IN)
+        is_valid = g_source_info.hdmi_in_status;
+    else if (g_source_info.source == SOURCE_AV_IN)
+        is_valid = g_source_info.av_in_status;
+    else if (g_source_info.source == SOURCE_EXPANSION)
+        is_valid = g_source_info.av_bay_status;
+    else
+        is_valid = (rx_status[0].rx_valid || rx_status[1].rx_valid);
+
+    if (g_setting.ht.alarm_state == SETTING_HT_ALARM_STATE_VIDEO) {
+        g_setting.ht.alarm_on_video = is_valid;
+    }
+
+    // exit if no SD card or not in video mode
+    if ((g_setting.record.mode_manual && (g_source_info.source != SOURCE_HDMI_IN)) || (!g_sdcard_enable) || (g_app_state != APP_STATE_VIDEO))
         return;
 
     // Analog VTMG change -> Restart recording
@@ -103,12 +112,12 @@ static void check_hdzero_signal(int vtmg_change) {
         cnt = 0;
     }
 
-    if (g_source_info.source == SOURCE_AV_IN)
-        is_valid = g_source_info.av_in_status;
-    else if (g_source_info.source == SOURCE_EXPANSION)
-        is_valid = g_source_info.av_bay_status;
-    else
-        is_valid = (rx_status[0].rx_valid || rx_status[1].rx_valid);
+    // HDMI VTMG change -> Restart recording
+    if (g_source_info.source == SOURCE_HDMI_IN && vtmg_change) {
+        LOGI("HDMI IN VTMG change");
+        dvr_cmd(DVR_STOP);
+        cnt = 0;
+    }
 
     if (dvr_is_recording) { // in-recording
         if (!is_valid) {
@@ -116,6 +125,7 @@ static void check_hdzero_signal(int vtmg_change) {
             if (cnt >= SIGNAL_LOSS_DURATION_THR) {
                 cnt = 0;
                 LOGI("Signal lost");
+                g_setting.ht.alarm_on_video = false;
                 dvr_cmd(DVR_STOP);
             }
         } else
@@ -126,7 +136,10 @@ static void check_hdzero_signal(int vtmg_change) {
             if (cnt >= SIGNAL_ACCQ_DURATION_THR) {
                 cnt = 0;
                 LOGI("Signal accquired");
-                dvr_cmd(DVR_START);
+                sdcard_update_free_size();
+                if (!sdcard_is_full()) {
+                    dvr_cmd(DVR_START);
+                }
             }
         } else
             cnt = 0;
@@ -160,11 +173,11 @@ static void *thread_peripheral(void *ptr) {
             g_source_info.av_bay_status = g_hw_stat.av_valid[1];
 
             // detect HDMI in
-            HDMI_in_detect();
+            record_vtmg_change |= HDMI_in_detect();
             g_source_info.hdmi_in_status = g_hw_stat.hdmiin_valid;
 
             g_latency_locked = (bool)Get_VideoLatancy_status();
-            check_hdzero_signal(record_vtmg_change);
+            check_source_signal(record_vtmg_change);
             record_vtmg_change = 0;
         }
         j++;

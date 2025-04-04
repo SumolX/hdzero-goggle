@@ -1,5 +1,8 @@
-#ifndef _PAGE_PLAYBACK_H
-#define _PAGE_PLAYBACK_H
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <lvgl/lvgl.h>
 
@@ -20,13 +23,14 @@
 #define ITEM_STATE_HIGHLIGHT 1
 #define ITEM_STATE_NORMAL    2
 
-#define MAX_VIDEO_FILES 200
+#define MAX_VIDEO_FILES 999
 
 typedef struct {
     char filename[64];
     char label[64];
     char ext[16];
     int size;
+    bool star;
 } media_file_node_t;
 
 typedef struct {
@@ -39,6 +43,7 @@ typedef struct {
     lv_obj_t *_img;
     lv_obj_t *_label;
     lv_obj_t *_arrow;
+    lv_obj_t *_star;
     uint16_t x;
     uint16_t y;
     uint8_t state; // 0: invisible; 1=highlighted; 2= normal
@@ -51,4 +56,6 @@ void pb_key(uint8_t key);
 int get_videofile_cnt();
 void clear_videofile_cnt();
 
+#ifdef __cplusplus
+}
 #endif

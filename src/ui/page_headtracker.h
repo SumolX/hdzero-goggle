@@ -1,5 +1,8 @@
-#ifndef _PAGE_HEADTRACKER_H
-#define _PAGE_HEADTRACKER_H
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <lvgl/lvgl.h>
 
@@ -7,7 +10,6 @@
 
 extern page_pack_t pp_headtracker;
 
-void ht_angle_dec(void);
-void ht_angle_inc(void);
-
+#ifdef __cplusplus
+}
 #endif
