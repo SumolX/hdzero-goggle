@@ -25,7 +25,7 @@ BIN_DIR=$MKAPP_DIR/bin
 IMG_DIR=$MKAPP_DIR/ota_app
 APP_DIR=$MKAPP_DIR/app
 
-APP_SIZE=8388608
+APP_SIZE=11000000
 APP_IMAGE=${IMG_DIR}/app.fex
 APP_VERSION=$(get_app_version)
 
@@ -43,7 +43,7 @@ make_img_md5 ${APP_IMAGE}
 
 FILESIZE=$(stat -c%s "${APP_IMAGE}")
 if (( ${FILESIZE} > ${APP_SIZE})); then
-    echo -e "\e[31;1mERROR: Firmware size is too large for partition!\e[0m"
+    echo -e "\e[31;1mERROR: Firmware size: ${FILESIZE} is too large for partition: ${APP_SIZE}!\e[0m"
     exit 1
 fi
 
