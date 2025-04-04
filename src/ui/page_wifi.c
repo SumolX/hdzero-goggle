@@ -909,24 +909,24 @@ static void page_wifi_on_click(uint8_t key, int sel) {
     page_wifi.item_select = sel;
 
     switch (page_wifi.item_select) {
-    case 0:
+    case 0: // Page Toggle
         btn_group_toggle_sel(&page_wifi.page_select.button);
         page_wifi_update_current_page(btn_group_get_sel(&page_wifi.page_select.button));
         break;
     case 1:
         switch (btn_group_get_sel(&page_wifi.page_select.button)) {
-        case 0:
+        case 0: // Page Basic: Enable
             btn_group_toggle_sel(&page_wifi.page_1.enable.button);
             page_wifi.page_1.enable.dirty =
                 (btn_group_get_sel(&page_wifi.page_1.enable.button) != !g_setting.wifi.enable);
             break;
-        case 1:
+        case 1: // Page Advanced: DHCP
             btn_group_toggle_sel(&page_wifi.page_2.dhcp.button);
             page_wifi.page_2.dhcp.dirty =
                 (btn_group_get_sel(&page_wifi.page_2.dhcp.button) != !g_setting.wifi.dhcp);
             page_wifi_update_current_page(page_wifi.page_select.button.current);
             break;
-        case 2:
+        case 2: // Page System: Root PW
             if (!keyboard_active()) {
                 keyboard_set_text(page_wifi.page_3.root_pw.text);
                 keyboard_open();
@@ -938,7 +938,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
         break;
     case 2:
         switch (btn_group_get_sel(&page_wifi.page_select.button)) {
-        case 0:
+        case 0: // Page Basic: Mode
             btn_group_toggle_sel(&page_wifi.page_1.mode.button);
             int mode = btn_group_get_sel(&page_wifi.page_1.mode.button);
             lv_label_set_text(page_wifi.page_1.ssid.input, page_wifi.page_1.ssid.text[mode]);
@@ -946,7 +946,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
             page_wifi.page_1.mode.dirty =
                 (btn_group_get_sel(&page_wifi.page_1.mode.button) != g_setting.wifi.mode);
             break;
-        case 1:
+        case 1: // Page Advance: Address
             if (!keyboard_active()) {
                 keyboard_set_text(page_wifi.page_2.ip_addr.text);
                 keyboard_open();
@@ -954,7 +954,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
-        case 2:
+        case 2: // Page System: SSH
             btn_group_toggle_sel(&page_wifi.page_3.ssh.button);
             page_wifi.page_3.ssh.dirty =
                 (btn_group_get_sel(&page_wifi.page_3.ssh.button) != !g_setting.wifi.ssh);
@@ -963,7 +963,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
         break;
     case 3:
         switch (btn_group_get_sel(&page_wifi.page_select.button)) {
-        case 0:
+        case 0: // Page Basic: SSID
             if (!keyboard_active()) {
                 int mode = btn_group_get_sel(&page_wifi.page_1.mode.button);
                 keyboard_set_text(page_wifi.page_1.ssid.text[mode]);
@@ -972,7 +972,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
-        case 1:
+        case 1: // Page Advance: Netmask
             if (!keyboard_active()) {
                 keyboard_set_text(page_wifi.page_2.netmask.text);
                 keyboard_open();
@@ -980,19 +980,16 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
-        case 2:
+        case 2: // Page System: Web
             btn_group_toggle_sel(&page_wifi.page_3.www.button);
             page_wifi.page_3.www.dirty =
                 (btn_group_get_sel(&page_wifi.page_3.www.button) != !g_setting.wifi.www);
-            break;
-        case 3:
-            page_wifi_handle_apply_button(page_wifi.page_3.apply_settings);
             break;
         }
         break;
     case 4:
         switch (btn_group_get_sel(&page_wifi.page_select.button)) {
-        case 0:
+        case 0: // Page Basic: Password
             if (!keyboard_active()) {
                 int mode = btn_group_get_sel(&page_wifi.page_1.mode.button);
                 keyboard_set_text(page_wifi.page_1.passwd.text[mode]);
@@ -1001,7 +998,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
-        case 1:
+        case 1: // Page Advanced: Gateway
             if (!keyboard_active()) {
                 keyboard_set_text(page_wifi.page_2.gateway.text);
                 keyboard_open();
@@ -1009,7 +1006,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
-        case 2:
+        case 2: // Page System: Live Video
             btn_group_toggle_sel(&page_wifi.page_3.h265.button);
             page_wifi.page_3.h265.dirty =
                 (btn_group_get_sel(&page_wifi.page_3.h265.button) != g_setting.wifi.h265);
@@ -1018,10 +1015,10 @@ static void page_wifi_on_click(uint8_t key, int sel) {
         break;
     case 5:
         switch (btn_group_get_sel(&page_wifi.page_select.button)) {
-        case 0:
+        case 0: // Page Basic: Apply Settings
             page_wifi_handle_apply_button(page_wifi.page_1.apply_settings);
             break;
-        case 1:
+        case 1: // Page Advanced: DNS
             if (!keyboard_active()) {
                 keyboard_set_text(page_wifi.page_2.dns.text);
                 keyboard_open();
@@ -1029,14 +1026,17 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
+        case 2: // Page System: Apply Settings
+            page_wifi_handle_apply_button(page_wifi.page_3.apply_settings);
+            break;
         }
         break;
     case 6:
         switch (btn_group_get_sel(&page_wifi.page_select.button)) {
-        case 0:
+        case 0: // Page Basic: Back
             submenu_exit();
             break;
-        case 1:
+        case 1: // Page Advanced: RF Channel
             if (!page_wifi.page_2.rf_channel.active) {
                 page_wifi.page_2.rf_channel.active = true;
             } else {
@@ -1049,7 +1049,7 @@ static void page_wifi_on_click(uint8_t key, int sel) {
         break;
     case 7:
         switch (btn_group_get_sel(&page_wifi.page_select.button)) {
-        case 1:
+        case 1: // Page Advanced: Apply Settings
             page_wifi_handle_apply_button(page_wifi.page_2.apply_settings);
             break;
         }
