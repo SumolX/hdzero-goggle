@@ -1,59 +1,12 @@
-# Includes
-. ./constants
-
-# Returns content type
-utils_content_text()
-{
-  echo "Content-Type: text/html"
-  echo ""
-}
-
-# Returns content type
-utils_content_json()
-{
-  echo "Content-Type: application/json"
-  echo ""
-}
-
-# Return error code and message
-utils_print_error()
-{
-   echo "Content-Type: text/html; charset=utf-8"
-   echo ""
-   echo "$1"
-   echo "$2"
-}
-
 # Returns success on substring match 
 utils_has_string() {
-    local str="$1"
-    local sub="$2"
+    str="$1"
+    sub="$2"
     if [ "${str#*"$sub"}" != "$str" ]; then
         return 0
     else
         return 1
     fi
-}
-
-# Returns all lines of posted data in array refernce
-utils_post_data(){
-   local -n arr_ref="$1"
-   while read ln; do
-      #echo "from json.sh: $ln" >> debug
-      arr_ref+=("$ln")
-   done < <(./json.sh -l <<< $POST_DATA)
-}
-
-# Limit actions to SD card and remove bad charaters 
-utils_clean_path(){
-   local path=$(sed 's/[^a-zA-Z0-9\/._-]//g' <<< "$1") #remove glob characters
-   local file=$(basename "$path")
-   path=$(dirname "$path")
-   path="${path#*$SDC_PATH}" #remove base path
-   path=$(sed 's~[^[:alnum:]/]\+~~g' <<< "$path") #remove periods from path only
-   path="$SDC_PATH/$path/$file" #put it back together
-   path=$(echo "$path" | tr -s / ) #remove duplicate backslashes
-   echo $path
 }
 
 # Transfer binary file to client
@@ -145,35 +98,4 @@ utils_is_action_authorized() {
         ret = 0
     fi
     return ret
-}
-
-utils_debug_info(){
-   utils_content_text
-   echo argc is $#. argv is "$*".
-   echo
-   echo SERVER_SOFTWARE = $SERVER_SOFTWARE
-   echo SERVER_NAME = $SERVER_NAME
-   echo GATEWAY_INTERFACE = $GATEWAY_INTERFACE
-   echo SERVER_PROTOCOL = $SERVER_PROTOCOL
-   echo SERVER_PORT = $SERVER_PORT
-   echo SERVER_PROTOCOL = $SERVER_PROTOCOL
-   echo SERVER_PORT = $SERVER_PORT
-   echo REQUEST_METHOD = $REQUEST_METHOD
-   echo HTTP_ACCEPT = "$HTTP_ACCEPT"
-   echo PATH_INFO = "$PATH_INFO"
-   echo PATH_TRANSLATED = "$PATH_TRANSLATED"
-   echo SCRIPT_NAME = "$SCRIPT_NAME"
-   echo QUERY_STRING = "$QUERY_STRING"
-   echo REMOTE_HOST = $REMOTE_HOST
-   echo REMOTE_ADDR = $REMOTE_ADDR
-   echo REMOTE_USER = $REMOTE_USER
-   echo AUTH_TYPE = $AUTH_TYPE
-   echo CONTENT_TYPE = $CONTENT_TYPE
-   echo CONTENT_LENGTH = $CONTENT_LENGTH
-   echo "Content begins:"
-   echo =====
-   dd count=1 bs=$CONTENT_LENGTH
-   echo
-   echo =====
-   echo "Content ends"
 }
