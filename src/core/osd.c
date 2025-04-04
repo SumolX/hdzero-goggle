@@ -974,7 +974,7 @@ void load_fc_osd_font(uint8_t fhd) {
 
     for (i = 0; i < 3; i++) {
         if (!load_fc_osd_font_bmp(fp[i], fhd)) {
-            LOGI(" success!");
+            LOGI(" succecss!");
             return;
         } else
             LOGE(" failed!");
