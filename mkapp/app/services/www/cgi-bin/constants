@@ -4,7 +4,7 @@ HDZ_DVR_M3U8="${HDZ_DVR_PATH}/hdz.m3u8"
 HDZ_LIVE_PATH="${HTML_PATH}/live"
 HDZ_LIVE_M3U8="${HDZ_LIVE_PATH}/hdz.m3u8"
 
-MEDIA_PATH="movies"
+MEDIA_PATH="${HTML_PATH}/movies"
 SDC_PATH="/mnt/extsd"
 APP_PATH="/mnt/app"
 MOVIE_PATH="${SDC_PATH}/DCIM/100HDZRO"
