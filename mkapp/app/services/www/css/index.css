@@ -1,0 +1,245 @@
+.video-js .vjs-remaining-time {
+    display: contents;
+}
+
+#player {
+    grid-column: span 3;
+    padding-right: 3px;
+}
+
+#list {
+    grid-column: span 3;
+    display: none;
+}
+
+#console {
+    grid-column: span 3;
+    text-align: left;
+    overflow-wrap: break-word;
+    display: none;
+}
+
+.video-mode {
+    display: flex;
+    justify-content: space-evenly;
+    margin-bottom: 3px;
+}
+
+.video-mode input[type="radio"] {
+    display: none;
+    margin: 0;
+}
+
+.video-mode label {
+    color: #ffffff;
+    box-sizing: content-box;
+    background-color: #646464;
+    border-radius: 4px;
+    text-align: center;
+    padding: 3px;
+    cursor: pointer;
+    flex: 1 50%;
+}
+
+.video-mode label:hover {
+    opacity: 0.8;
+}
+
+.video-mode input[type="radio"]:checked+label {
+    color: #ffffff;
+    background-color: #ff0000;
+}
+
+.editcontainer {
+    padding-right: 3px;
+}
+
+.editcontainer div:first-child input {
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: 2px;
+}
+
+.editcontainer div:nth-child(2) {
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.editcontainer div:nth-child(2) button:first-child {
+    margin-right: 3px;
+}
+
+.editcontainer div:nth-child(2) button:nth-child(2) {
+    margin-right: 3px;
+}
+
+/* list elements */
+.list-container {
+    display: block;
+    #border: 1px solid pink;
+    max-height: 400px;
+    min-height: 0;
+    overflow-x: auto;
+    padding-right: 3px;
+}
+
+.list-container table {
+    color: #ffffff;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0px;
+    width: 100%;
+}
+
+.list-container table thead,
+tbody {
+    box-sizing: border-box;
+    width: auto;
+}
+
+.list-container table thead {
+    background-color: #646464;
+}
+
+.list-container table tbody {
+    background-color: #4d4d4d;
+    overflow-x: scroll;
+}
+
+.list-container table tbody tr {
+    #border-bottom: 1px solid pink;
+}
+
+.list-container table tbody tr:hover {
+    color: #ffffff;
+    font-weight: bold;
+    background-color: #646464;
+}
+
+.list-container table thead tr th:first-child,
+td:first-child {
+    text-align: left;
+    padding-left: 4px;
+    #border-right: 1px solid pink;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 40%;
+}
+
+.list-container table thead tr th:nth-child(2),
+td:nth-child(2) {
+    padding-right: 4px;
+    text-align: right;
+    #border-right: 1px solid pink;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 25%;
+}
+
+.list-container table thead tr th:nth-child(3),
+td:nth-child(3) {
+    text-align: left;
+    padding-left: 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    width: 35%;
+}
+
+/* size MG span */
+.fsizeunit {
+    font-size: .7em;
+}
+
+.selected {
+    color: #ffffff !important;
+    background: #ff0000 !important;
+}
+
+.highlight {
+    opacity: .7;
+}
+
+@media all and (min-width: 440px) {
+
+    main {
+        grid-template-rows: auto auto auto auto;
+    }
+
+    #list {
+        grid-row: 3;
+        grid-column-start: 1;
+        grid-column: span 2;
+    }
+
+    #console {
+        grid-row: 3;
+        grid-column-start: 3;
+    }
+}
+
+@media all and (min-width: 780px) {
+
+    main {
+        max-width: 780px;
+        margin: 0 auto;
+    }
+}
+
+@media all and (min-width: 1080px) {
+
+    main {
+        grid-template-columns: 40% 30% 29%;
+        max-width: 1520px;
+        padding: 2px 3px 2px 3px;
+        margin: 0 auto;
+    }
+
+    #list {
+        grid-column-start: 3;
+        grid-row-start: 2;
+        grid-row: span 2;
+    }
+
+    #player {
+        grid-column: span 2;
+    }
+
+    #console {
+        grid-row-start: 3;
+        grid-column: span 2;
+    }
+
+    .list-container {
+        max-height: 548px;
+    }
+
+}
+
+@media all and (min-width: 1170px) {
+
+    .list-container {
+        max-height: 588px;
+    }
+}
+
+@media all and (min-width: 1260px) {
+
+    .list-container {
+        max-height: 628px;
+    }
+}
+
+@media all and (min-width: 1350px) {
+
+    .list-container {
+        max-height: 668px;
+    }
+}
+
+@media all and (min-width: 1440px) {
+
+    .list-container {
+        max-height: 708px;
+    }
+}

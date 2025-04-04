@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="stylesheet" href="/css/video-js.min.css" />
+    <link rel="stylesheet" href="/css/global.css?version=47">
+    <link rel="stylesheet" href="/css/index.css?version=47">
+    <script type="text/javascript" src="/script/video.min.js"></script>
+    <script type="text/javascript" src="/script/global.js?version=47"></script>
+    <title>HDZero Goggle</title>
+</head>
+
+<body>
+    <section id="dialog" class="animate modal">
+        <div>
+            <h3 id="d-title"></h3>
+            <p id="d-message">
+            </p>
+            <div id="d-buttons">
+            </div>
+        </div>
+    </section>
+    <main>
+        <header>
+            <div class="nav">
+                <div class="header">
+                    <img src="images/hdzero.png" />
+                    <h1>HDZero Goggle</h1>
+                </div>
+                <div id="login" class="login-button" onclick="login()" onmouseover="togglehover(this);"
+                    onmouseout="togglehover(this);">
+                    <img src="images/HDZLogin.gif" />
+                    <h3>Login</h3>
+                </div>
+                <div id="logout" class="login-button" onclick="getAuthorization()" onmouseover="togglehover(this);"
+                    onmouseout="togglehover(this);">
+                    <img src="images/HDZLogout.gif" />
+                    <h3>Logout</h3>
+                </div>
+            </div>
+        </header>
+        <article id="player">
+            <video id="video-player" class="video-js vjs-default-skin vjs-16-9" playsinline controls preload="none"
+                poster="images/HDtou-01.webp" data-setup='{}'>
+                <source src="live/hdz.m3u8" type="application/x-mpegURL" />
+            </video>
+            <script>
+                var player = videojs('video-player');
+            </script>
+        </article>
+        <article id="console">
+            <div class="video-mode">
+                <input type="radio" id="videostream" name="videomode" onclick="changeVideoMode('stream')" checked />
+                <label for="videostream"><b>Stream</b></label>
+                <input type="radio" id="videodvr" name="videomode" onclick="changeVideoMode('dvr')" />
+                <label for="videodvr"><b>DVR</b></label>
+            </div>
+            <div class="editcontainer">
+                <div>
+                    <input id="videoname" type="text" placeholder="Select DVR Video" maxlength="20">
+                </div>
+                <div>
+                    <button type="button" onclick="modifyFile()">Rename</button>
+                    <button type="button" onclick="removeFile()">Delete</button>
+                    <button type="button" onclick="downloadFile()">Download</button>
+                </div>
+            </div>
+        </article>
+        <article id="list">
+            <div class="list-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Size</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="list-content">
+                    </tbody>
+                </table>
+            </div>
+        </article>
+        <footer><label id="rtsp" /></footer>
+    </main>
+    <script>
+        document.addEventListener("DOMContentLoaded", init_page, false);
+    </script>
+
+</body>
+
+</html>

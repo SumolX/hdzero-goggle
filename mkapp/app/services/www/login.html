@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link rel="stylesheet" href="/css/global.css?version=47">
+    <link rel="stylesheet" href="/css/login.css?version=47">
+    <script src="/script/global.js?version=47"></script>
+    <title>Goggle Login</title>
+</head>
+
+<body>
+    <section id="dialog" class="animate modal">
+        <div>
+            <h3 id="d-title"></h3>
+            <p id="d-message">
+            </p>
+            <div id="d-buttons">
+            </div>
+        </div>
+    </section>
+    <main>
+        <header>
+            <div class="nav">
+                <div class="header">
+                    <img src="images/hdzero.png" />
+                    <h1>HDZero Goggle</h1>
+                </div>
+            </div>
+        </header>
+        <section class="login">
+            <div class="logincontainer">
+                <div class="inputcontainer">
+                    <label for="usr"><b>User</b></label>
+                    <input id="usr" type="text" value="root" name="user" tabindex="-1">
+                </div>
+                <div class="inputcontainer">
+                    <label for="pswd"><b>Password</b></label>
+                    <input id="pswd" type="password" name="password" maxlength="20" required
+                        onkeyup="checkEnter(event)">
+                </div>
+                <button type="submit" onclick="getAuthorization()">Login</button>
+                <button type="button" onclick="returnFromLogin()">Cancel</button>
+            </div>
+        </section>
+        <footer></footer>
+    </main>
+</body>
+
+</html>

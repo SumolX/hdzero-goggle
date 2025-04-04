@@ -1,0 +1,320 @@
+#!/bin/bash
+
+# Includes
+. ./constants
+. ./utils
+
+# Handlers
+on_file_list() {
+   filter=
+   body=
+   if [ -z "$1" ]; then
+     path="$SDC_PATH"
+   else
+     clean=$(echo "$1" | sed 's~[^[:alnum:]/]\+~~g')
+     path="$SDC_PATH/$clean" 
+   fi
+   if [ -n "$2" ]; then
+      IFS='.' read -r -a arr <<< "$2"
+      if [ -n "${arr[0]}" ]; then
+         clean=$(echo "${arr[0]}" | sed 's~[^[:alnum:]*]\+~~g')
+	 filter="/$clean"
+         if [ -n "${arr[1]}" ]; then
+            clean=$(echo "${arr[1]}" | sed 's~[^[:alnum:]*]\+~~g')
+	    filter="$filter.$clean"
+         fi
+      fi
+   fi
+   for file in "$path"; do
+      if (( `ls -B $file$filter | wc -l` > 0 )); then
+         body="$body $(echo "$(ls -l --full-time $file$filter)" | grep -v total | \
+         awk '{printf"{\"name\":\"%s\",\"date\":\"%s\",\"time\":\"%s\",\"offset\":\"%s\",\"size\":\"%s\",\"permissions\":\"%s\"},",$9,$6,$7,$8,$5,$1}')"
+      else
+          break
+      fi
+   done
+   if [ -n "$body" ]; then
+      utils_content_json   
+      echo "{\"info_list\":[${body%,}]}"
+   else
+      utils_print_error "Status: 404 Not Found" "File does not exist."
+   fi
+}
+
+on_file_stat(){
+   utils_content_json   
+   if [ -z "$1" ]; then
+     path="$SDC_PATH"
+   else
+     path="$1"
+   fi   
+   echo $(df -k "$path" | grep -v Filesystem | awk '{printf "{\"path\":\"%s\",\"used\":\"%s\",\"available\":\"%s\"}",$1,$3,$4}')
+}
+
+on_file_upload() {
+   utils_content_text
+   pos=0
+
+   exec 3<$2
+   while IFS= read -r -u 3 line; 
+   do
+       # check for boundary
+       if [[ "$line" == "--$1"* && "$line" != *"--$1--"* ]]
+       then
+          while IFS= read -r -u 3  header && [[ "$header" != $'\r' ]] && [[ "$header" != '\n'^ ]]
+          do
+             if [[ "$header" == *"filename"* ]]; then
+                file=$(sed 's/.*filename="\([^"]*\)".*/\1/' <<< "$header")
+	        break; 
+             fi
+          done  
+	  path=$(utils_clean_path "$file")
+	  if [ ! -d $(dirname "$path") ]; then
+             echo "Error: directory $path does not exist."
+	  else
+	     ./multip "--$1" "$2" "$path" "$pos"
+	     pos=$?
+	  fi
+	  echo "Successfully uploaded file: $path next: $pos"
+       fi
+   done 3< "$2"
+   rm -Rf "$2"
+}
+
+on_file_download() {
+    #utils_is_action_authorized "${HTTP_COOKIE#token=}"
+    path=$(utils_clean_path "$1")
+    size=$(stat -c%s "$path")
+    size=$((size/4096))
+    if [[ $size -lt $KB_LIMIT && -f "$path" ]]; then
+       file=$(basename "$path")
+       path=$(dirname "$path")
+       utils_send_binary_file "$path" "$file"
+    else
+        echo "Error: directory $path does not exist." 
+    fi
+}
+
+on_file_convert() {
+   utils_content_text
+   #UTILs_is_action_authorized "${HTTP_COOKIE#token=}"
+   utils_post_data arr
+   for (( i=0; i<${#arr[@]}; i+=2)); do
+     for (( j=0; j<2; j++)); do
+       IFS="," read key value <<< $(sed 's/^.*,"\(.*\)"\]\t"\(.*\)"$/\1,\2/' <<< ${arr[i+j]})
+       case $j in
+          0)
+	    f_path=$(utils_clean_path "$value")
+	    ;;
+          1)
+	    t_path=$(utils_clean_path "$value")
+	    ;;
+       esac
+     done
+     echo "f: $f_path t: $t_path" >> debug
+     f_file=$(basename "$f_path")
+     echo "f: $f_path t: $f_file e: ${f_file##*.}" >> debug
+     if [[ -f "$f_path" && "${f_file##*.}" == "ts" ]]; then
+	     ffmpeg -nostats -y -i "$f_path" -c:v libx264 -c:a aac "$t_path" &> "${t_path%.*}.con"  
+        echo "Conversion completed from $f_path to $t_path."		
+     else
+        echo "Error: file $f_path does not exist." 
+     fi
+   done
+}
+
+on_file_format() {
+   echo "delete directory" >> debug
+}
+
+on_file_copy() {
+   utils_content_text
+   #UTILs_is_action_authorized "${HTTP_COOKIE#token=}"
+   utils_post_data arr
+   for (( i=0; i<${#arr[@]}; i+=2)); do
+     for (( j=0; j<2; j++)); do
+       IFS="," read key value <<< $(sed 's/^.*,"\(.*\)"\]\t"\(.*\)"$/\1,\2/' <<< ${arr[i+j]})
+       case $j in
+          0)
+	    f_path=$(utils_clean_path "$value")
+	    ;;
+          1)
+	    t_path=$(utils_clean_path "$value")
+	    ;;
+       esac
+     done
+     if [ -f "$f_path" ]; then
+        if cp -f "$f_path" "$t_path"; then
+           echo "copied from $f_path to $t_path."		
+	fi
+     else
+        echo "Error: file $f_path does not exist." 
+     fi
+   done
+}
+
+on_file_move() {
+   utils_content_text
+   #UTILs_is_action_authorized "${HTTP_COOKIE#token=}"
+   utils_post_data arr
+   for (( i=0; i<${#arr[@]}; i+=2)); do
+     for (( j=0; j<2; j++)); do
+       IFS="," read key value <<< $(sed 's/^.*,"\(.*\)"\]\t"\(.*\)"$/\1,\2/' <<< ${arr[i+j]})
+       case $j in
+          0)
+	    f_path=$(utils_clean_path "$value")
+	    ;;
+          1)
+	    t_path=$(utils_clean_path "$value")
+	    ;;
+       esac
+     done
+     if [ -f "$f_path" ]; then
+        if mv -f "$f_path" "$t_path"; then
+           echo "moved from $f_path to $t_path."		
+	fi
+     else
+        echo "Error: file $f_path does not exist." 
+     fi
+   done
+}
+
+on_file_delete() {
+   utils_content_text
+   #UTILs_is_action_authorized "${HTTP_COOKIE#token=}"
+   utils_post_data arr
+   for (( i=0; i<${#arr[@]}; i+=6)); do
+     for (( j=0; j<6; j++)); do
+       IFS="," read key value <<< $(sed 's/^.*,"\(.*\)"\]\t"\(.*\)"$/\1,\2/' <<< ${arr[i+j]})
+       case $j in
+          0)
+	    path=$(utils_clean_path "$value")
+	    ;;
+       esac
+       break;
+     done
+     if [ -f "$path" ]; then
+        if rm -f $path; then
+           echo "file was deleted: $path"		
+	fi
+     else
+        echo "Error: file $path does not exist." 
+     fi
+   done
+}
+
+on_directory_delete() {
+   utils_content_text
+   #UTILs_is_action_authorized "${HTTP_COOKIE#token=}"
+   utils_post_data arr
+   for (( i=0; i<${#arr[@]}; i+=6)); do
+     for (( j=0; j<6; j++)); do
+       IFS="," read key value <<< $(sed 's/^.*,"\(.*\)"\]\t"\(.*\)"$/\1,\2/' <<< ${arr[i+j]})
+       case $j in
+          0) 
+	    path=$(utils_clean_path "$value")
+	    ;;
+       esac
+       break;
+     done
+     if [ -d "$path" ]; then
+        fil=$(ls -B $path | wc -l)
+        if rm -Rf "path"; then
+           echo "$fil files deleted: $path"		
+	fi
+     else
+        echo "Error: directory $path does not exist." 
+     fi
+   done
+}
+
+echo "qs: $QUERY_STRING" > debug
+
+# Parse Request
+if [ -z $QUERY_STRING ]; then
+   on_file_list
+else
+   IFS="&"
+   set -- $QUERY_STRING
+   key="${1%=*}"
+   if [ "$REQUEST_METHOD" = "GET" ]; then
+      if [ ${key} == "list" ]; then
+         on_file_list "${1#*=}" "${2#*=}"
+      elif [ ${key} == "stat" ]; then
+         on_file_stat "${1#*=}"
+      elif [ ${key} == "download" ]; then
+         on_file_download "${1#*=}"
+      else
+         print_error "421 Misdirected Request" "Use only list."
+      fi
+   elif [ "$REQUEST_METHOD" = "POST" ]; then
+      if [[ "$CONTENT_LENGTH" -gt 0 && "$CONTENT_TYPE" != *"multipart/form-data"* ]]; then
+         read -n $CONTENT_LENGTH POST_DATA <&0  
+      fi
+      	 case ${key} in
+         put)
+             if [ ${1#*=} == "copy" ]; then
+                on_file_copy
+             elif [ ${1#*=} == "mp4" ]; then
+                on_file_convert
+	     elif [[ "${1#*=}" == "upload" && "$CONTENT_TYPE" == *"multipart/form-data"* ]]; then
+               if [[ $CONTENT_LENGTH -lt $KB_LIMIT ]]; then
+                  boundary=$(sed 's/.*boundary=\"\(.*\)\"/\1/' <<< ${CONTENT_TYPE})
+                  path=$(mktemp -d)
+	       	  if cat <&0 > "$path/upload_file"; then
+                     on_file_upload "$boundary" "$path/upload_file"
+	          else
+                     rm -Rf "$path"
+                     utils_print_error "HTTP_500 Internal Server Error" "Upload failed."
+		  fi
+	       else
+                  utils_print_error "413 Content Too Large" "$CONTENT_LENGTH is more than $KB_LIMIT."
+	       fi
+	     else
+		utils_print_error "421 Misdirected Request" "Use only line, section or file."
+             fi
+           ;;
+         post)
+	    if [[ "${1#*=}" == "upload" && "$CONTENT_TYPE" == *"multipart/form-data"* ]]; then
+               if [[ $CONTENT_LENGTH -lt $KB_LIMIT ]]; then
+                  boundary=$(sed 's/.*boundary=\"\(.*\)\"/\1/' <<< ${CONTENT_TYPE})
+                  path=$(mktemp -d)
+	       	  if cat <&0 > "$path/upload_file"; then
+                     on_file_upload "$boundary" "$path/upload_file"
+	          else
+                     rm -Rf "$path"
+                     utils_print_error "HTTP_500 Internal Server Error" "Upload failed."
+		  fi
+	       else
+                  utils_print_error "413 Content Too Large" "$CONTENT_LENGTH is more than $KB_LIMIT."
+	       fi
+            else
+              utils_print_error "421 Misdirected Request" "Use only multiform/form-data."
+            fi
+           ;;
+         patch)
+             if [ ${1#*=} == "file" ]; then
+                on_file_move
+             elif [ ${key} == "format" ]; then
+            : 
+             else
+                utils_print_error "421 Misdirected Request" "Use only rename"
+             fi
+           ;;
+         delete)
+             if [ ${1#*=} == "file" ]; then
+                on_file_delete
+            elif [ ${1#*=} == "directory" ]; then
+                 on_directory_delete
+             else
+                utils_print_error "421 Misdirected Request" "Use only line."
+             fi
+           ;;
+         *)
+             utils_print_error "421 Misdirected Request" "Use only put, post, patch, delete."
+          ;;
+        esac
+   else
+      utils_print_error "501 Not Implemented" "Method is not recognized. Use only GET or POST."
+   fi
+fi

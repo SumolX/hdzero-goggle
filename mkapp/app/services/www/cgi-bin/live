@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Includes
+. ./constants
+. ./utils
+
+# Handlers
+on_live_play() {
+    echo "live_play Not Implemented"
+    echo "Status: 200 OK"
+}
+
+# Handlers
+on_live_stop() {
+    echo "live_stop Not Implemented"
+    echo "Status: 200 OK"
+}
+
+# Parse Request
+#if [ -z $QUERY_STRING ]; then
+#else
+    IFS="&"
+    set -- $QUERY_STRING
+    key="${1%=*}"
+    if [ ${key} == "play" ]; then
+        on_live_play "${1#*=}"
+    elif [ ${key} == "stop" ]; then
+        on_live_stop
+    fi
+#fi

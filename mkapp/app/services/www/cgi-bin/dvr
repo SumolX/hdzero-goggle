@@ -1,0 +1,108 @@
+#!/bin/bash
+
+# Includes
+. ./constants
+. ./utils
+
+# Handlers
+on_dvr() {
+    echo "Content-Type: text/html"
+    echo ""
+    body=""
+#    if [ ! -z "$(mount | grep ${SDC_PATH})" ]; then
+        for file in $(ls $MOVIE_PATH/*.ts $MOVIE_PATH/*.mp4 2>/dev/null); do
+            body="$body $(echo "$(ls -l $file)" | awk '{printf "{\"date\":\"%s %s %s\",\"size\":%s,", $6,$7,$8,$5}')"
+            body="$body \"file\":\"${file##*/}\"},"
+        done
+        if [ ! -z "${body}" ]; then
+            body="${body%,}"
+        fi
+#    fi
+    echo "{ \"dvr\":[ $body ] }"
+}
+
+on_dvr_download() {
+    utils_is_action_authorized "${HTTP_COOKIE#token=}"
+    if test "$?" -eq 0 -a -f ${MOVIE_PATH}/$1; then
+        utils_send_binary_file "${MOVIE_PATH}" "$1"
+        echo "Status: 200 OK"
+    else
+        echo "Status: 404 Not Found"
+    fi
+}
+
+on_dvr_rename() {
+    utils_is_action_authorized "${HTTP_COOKIE#token=}"
+    if test "$?" -eq 0 -a -f ${MOVIE_PATH}/$1; then
+        mv ${MOVIE_PATH}/${1%.*}.jpg ${MOVIE_PATH}/${2%.*}.jpg
+        mv ${MOVIE_PATH}/$1 ${MOVIE_PATH}/$2
+        echo "Status: 200 OK"
+    else
+        echo "Status: 404 Not Found"
+    fi
+}
+
+on_dvr_delete() {
+    utils_is_action_authorized "${HTTP_COOKIE#token=}"
+    if test "$?" -eq 0 -a -f ${MOVIE_PATH}/$1; then
+        rm -rf ${MOVIE_PATH}/${1%.*}.*
+        echo "Status: 200 OK"
+    else
+        echo "Status: 404 Not Found"
+    fi
+}
+
+on_dvr_play_recode() {
+    ffmpeg -i ../${MEDIA_PATH}/$1 -start_number 0 -f hls -hls_time 3 -hls_list_size 30 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 -movflags faststart+frag_keyframe+empty_moov ${HDZ_DVR_M3U8} > /dev/null 2>&1 &
+    echo "$!" > ${HDZ_DVR_PATH}/ffmpeg.pid
+    while [[ ! -f "${HDZ_DVR_PATH}/hdz0.m4s" ]]; do
+        sleep 0.1
+    done
+    echo "Status: 200 OK"
+}
+
+on_dvr_play() {
+    duration=$(ffprobe -i ${HTML_PATH}/${MEDIA_PATH}/$1 -show_entries format=duration -v quiet -of csv="p=0")
+    echo "#EXTM3U" > ${HDZ_DVR_M3U8}
+    echo "#EXT-X-VERSION:3" >> ${HDZ_DVR_M3U8}
+    echo "#EXT-X-MEDIA-SEQUENCE:0" >> ${HDZ_DVR_M3U8}
+    echo "#EXT-X-ALLOW-CACHE:YES" >> ${HDZ_DVR_M3U8}
+    echo "#EXT-X-TARGETDURATION:${duration}" >> ${HDZ_DVR_M3U8}
+    echo "#EXTINF:${duration}," >> ${HDZ_DVR_M3U8}
+    echo "${HTML_PATH}/${MEDIA_PATH}/$1" >> ${HDZ_DVR_M3U8}
+    echo "#EXT-X-ENDLIST" >> ${HDZ_DVR_M3U8}
+
+    echo "Status: 200 OK"
+}
+
+on_dvr_stop() {
+    kill -9 $(cat ${HDZ_DVR_PATH}/ffmpeg.pid) > /dev/null 2>&1
+    rm -rf ${HDZ_DVR_PATH}/*
+    echo "Status: 200 OK"
+}
+
+on_dvr_image() {
+    utils_send_image_file "${MOVIE_PATH}" "$1"
+}
+
+# Parse Request
+if [ -z $QUERY_STRING ]; then
+    on_dvr
+else
+    IFS="&"
+    set -- $QUERY_STRING
+    key="${1%=*}"
+    if [ ${key} == "download" ]; then
+        on_dvr_download "${2#*=}"
+    elif [ ${key} == "rename" ]; then
+        on_dvr_rename "${2#*=}" "${3#*=}"
+    elif [ ${key} == "delete" ]; then
+        on_dvr_delete "${2#*=}"
+    elif [ ${key} == "play" ]; then
+        on_dvr_play "${1#*=}"
+    elif [ ${key} == "stop" ]; then
+        on_dvr_stop
+    elif [ ${key} == "image" ]; then
+        on_dvr_image "${1#*=}"
+    fi
+fi

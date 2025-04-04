@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Includes
+. ./utils
+
+# Handlers
+on_status() {
+    if [ ! -z "$(ls ${HDZ_LIVE_M3U8} 2> /dev/null)" ]; then
+        echo "Status: 200 OK"
+    else
+        echo "Status: 503 Service Unavailable"
+    fi
+}
+
+on_status_authenticate() {
+    utils_is_client_authorized $1
+}
+
+on_status_authorize() {
+    utils_is_action_authorized $1
+    if [ "$?" -eq 0 ]; then
+        echo "Status: 200 OK"
+    else
+        echo "Status: 403 Forbidden" 
+    fi
+}
+
+on_status_ip() {
+    echo "Content-Type: text/html"
+    echo ""
+    echo -n "$(ifconfig wlan0 2> /dev/null | grep inet | awk -F ' ' '{print $2}' | cut -f2 -d':')"
+}
+
+# Parse Request
+if [ -z $QUERY_STRING ]; then
+    on_status
+else
+    IFS="&"
+    set -- $QUERY_STRING
+    key="${1%=*}"
+    if [ ${key} == "authenticate" ]; then
+        on_status_authenticate "${1#*=}"
+    elif [ ${key} == "authorize" ]; then
+        on_status_authorize
+    elif [ ${key} == "ip" ]; then
+        on_status_ip
+    fi
+fi

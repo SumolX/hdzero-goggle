@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Includes
+. ./constants
+. ./utils
+
+# Handlers
+on_rstp_play() {
+    echo "rstp_play Not Implemented"
+    echo "Status: 200 OK"
+}
+
+# Handlers
+on_rstp_stop() {
+    echo "rstp_stop Not Implemented"
+    echo "Status: 200 OK"
+}
+
+# Parse Request
+#if [ -z $QUERY_STRING ]; then
+#else
+    IFS="&"
+    set -- $QUERY_STRING
+    key="${1%=*}"
+pl    if [ ${key} == "play" ]; then
+        on_rstp_play "${1#*=}"
+    elif [ ${key} == "stop" ]; then
+        on_rstp_stop
+    fi
+#fi

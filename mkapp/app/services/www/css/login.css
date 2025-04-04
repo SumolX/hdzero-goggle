@@ -1,0 +1,53 @@
+main {
+    max-width: 1520px;
+    margin: 0 auto;
+}
+
+section.login {
+    grid-column: span 3;
+    width: 350px;
+    margin: 100px auto;
+}
+
+.inputcontainer {
+    margin-bottom: 4px;
+}
+
+#usr {
+    pointer-events: none;
+    opacity: .8;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+input[type=password] {
+    color: #ffffff;
+    background-color: #646464;
+    border-radius: 4px;
+    font-size: 1.2em;
+    border-style: none;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.logincontainer {
+    background-color: #313131;
+    border: 1px solid #646464;
+    padding: 10% 10%;
+}
+
+.logincontainer .inputcontainer:first-child label {
+    opacity: .8;
+}
+
+.logincontainer button {
+    margin-top: 14px;
+}
+
+@media only screen and (max-width: 480px) {
+    section.login {
+        width: 250px;
+    }
+}
