@@ -9,7 +9,7 @@
     mkdir -p /tmp/www/dvr    
     cp -a /mnt/app/services/www/* /tmp/www/ && \
     cd /tmp/www && \
-    ln -s /mnt/extsd/movies movies
+    ln -s /mnt/extsd/DCIM/100HDZRO movies
 
     # Invoke Services
     if [ $? -eq 0 ]; then
