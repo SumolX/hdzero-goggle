@@ -52,32 +52,23 @@ on_dvr_delete() {
     fi
 }
 
-on_dvr_play_recode() {
-    ffmpeg -i ${MEDIA_PATH}/$1 -start_number 0 -f hls -hls_time 3 -hls_list_size 30 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 -movflags faststart+frag_keyframe+empty_moov ${HDZ_DVR_M3U8} 2>&1 > /dev/null &
-    echo "$!" > ${HDZ_DVR_PATH}/ffmpeg.pid
-    while [[ ! -f "${HDZ_DVR_PATH}/hdz0.m4s" ]]; do
-        sleep 0.1
-    done
+on_dvr_stop() {
+    killall ffmpeg 2>&1 > /dev/null
+    sleep 1
+    rm -rf ${HDZ_DVR_PATH}/*
     echo "Status: 200 OK"
 }
 
 on_dvr_play() {
-    duration=$(ffprobe -i ${MEDIA_PATH}/$1 -show_entries format=duration -v quiet -of csv="p=0")
-    echo "#EXTM3U" > ${HDZ_DVR_M3U8}
-    echo "#EXT-X-VERSION:3" >> ${HDZ_DVR_M3U8}
-    echo "#EXT-X-MEDIA-SEQUENCE:0" >> ${HDZ_DVR_M3U8}
-    echo "#EXT-X-ALLOW-CACHE:YES" >> ${HDZ_DVR_M3U8}
-    echo "#EXT-X-TARGETDURATION:${duration}" >> ${HDZ_DVR_M3U8}
-    echo "#EXTINF:${duration}," >> ${HDZ_DVR_M3U8}
-    echo "${MEDIA_PATH}/$1" >> ${HDZ_DVR_M3U8}
-    echo "#EXT-X-ENDLIST" >> ${HDZ_DVR_M3U8}
+    ffmpeg -re -i ${MEDIA_PATH}/$1 -start_number 0 -f hls -hls_time 3 -hls_list_size 5 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 -movflags faststart+frag_keyframe+empty_moov ${HDZ_DVR_M3U8} 2>&1 > /dev/null &
 
-    on_dvr_play_recode "$1"
-}
+    until [ -f ${HDZ_DVR_M3U8} ]; do
+        sleep 0.5
+    done;
 
-on_dvr_stop() {
-    kill -9 $(cat ${HDZ_DVR_PATH}/ffmpeg.pid) > /dev/null 2>&1
-    rm -rf ${HDZ_DVR_PATH}/*
+    echo "Content-Type: text/html"
+    echo ""
+    cat ${HDZ_DVR_M3U8}
     echo "Status: 200 OK"
 }
 

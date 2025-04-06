@@ -113,20 +113,26 @@ function getAuthorization() {
 // Player Functionality
 function changeVideoMode(source) {
 
-    player.reset();
+    videoJsPlayer.reset();
     //toggleSelection("");
 
     (async () => {
         const res = await fetch("/cgi-bin/dvr?stop");
         if (source === "stream") {
-            player.src({ type: "application/x-mpegURL", src: "live/hdz.m3u8" });
-            player.play();
+            videoJsPlayer.src({ type: "application/x-mpegURL", src: "live/hdz.m3u8" });
+            videoJsPlayer.play();
         } else if (source === "dvr" && gSelectedDvrFile !== "") {
-            (async () => {
-                const res = await fetch("/cgi-bin/dvr?play=" + gSelectedDvrFile);
-                player.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
-                player.play();
-            })();
+            var ext = gSelectedDvrFile.substring(gSelectedDvrFile.lastIndexOf('.') + 1);
+            if (ext === "mp4") {
+                videoJsPlayer.src({ type: "video/mp4", src: "movies/" + gSelectedDvrFile });
+                videoJsPlayer.play();
+            } else if (ext === "ts") {
+                (async () => {
+                    const res = await fetch("/cgi-bin/dvr?play=" + gSelectedDvrFile);
+                    videoJsPlayer.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
+                    videoJsPlayer.play();
+                })();
+            }
         }
     })();
 }
@@ -139,11 +145,11 @@ function selectVideo() {
     ipFileName.value = fName;
     toggleSelection(fName);
 
-    player.reset;
-    player.poster("movies/" + fName + '.jpg');
-    player.hasStarted(false);
-    player.currentTime(0);
-    player.bigPlayButton.hide();
+    videoJsPlayer.reset;
+    videoJsPlayer.poster("movies/" + fName + '.jpg');
+    videoJsPlayer.hasStarted(false);
+    videoJsPlayer.currentTime(0);
+    videoJsPlayer.bigPlayButton.hide();
 }
 
 // File Listing Functionality
