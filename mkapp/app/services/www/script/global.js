@@ -122,17 +122,11 @@ function changeVideoMode(source) {
             videoJsPlayer.src({ type: "application/x-mpegURL", src: "live/hdz.m3u8" });
             videoJsPlayer.play();
         } else if (source === "dvr" && gSelectedDvrFile !== "") {
-            var ext = gSelectedDvrFile.substring(gSelectedDvrFile.lastIndexOf('.') + 1);
-            if (ext === "mp4") {
-                videoJsPlayer.src({ type: "video/mp4", src: "movies/" + gSelectedDvrFile });
+            (async () => {
+                const res = await fetch("/cgi-bin/dvr?play=" + gSelectedDvrFile);
+                videoJsPlayer.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
                 videoJsPlayer.play();
-            } else if (ext === "ts") {
-                (async () => {
-                    const res = await fetch("/cgi-bin/dvr?play=" + gSelectedDvrFile);
-                    videoJsPlayer.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
-                    videoJsPlayer.play();
-                })();
-            }
+            })();
         }
     })();
 }
