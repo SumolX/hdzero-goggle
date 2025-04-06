@@ -60,10 +60,10 @@ on_dvr_stop() {
 }
 
 on_dvr_play() {
-    ffmpeg -re -i ${MEDIA_PATH}/$1 -start_number 0 -f hls -hls_time 3 -hls_list_size 5 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 -movflags faststart+frag_keyframe+empty_moov ${HDZ_DVR_M3U8} 2>&1 > /dev/null &
+    ffmpeg -re -i ${MEDIA_PATH}/$1 -start_number 0 -f hls -hls_time 2 -hls_list_size 5 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 -movflags faststart+frag_keyframe+empty_moov ${HDZ_DVR_M3U8} 2>&1 > /dev/null &
 
     until [ -f ${HDZ_DVR_M3U8} ]; do
-        sleep 0.5
+        sleep 0.1
     done;
 
     echo "Content-Type: text/html"
