@@ -139,7 +139,7 @@ function selectVideo() {
     ipFileName.value = fName;
     toggleSelection(fName);
 
-    videoJsPlayer.reset;
+    videoJsPlayer.reset();
     videoJsPlayer.poster("movies/" + fName + '.jpg');
     videoJsPlayer.hasStarted(false);
     videoJsPlayer.currentTime(0);
