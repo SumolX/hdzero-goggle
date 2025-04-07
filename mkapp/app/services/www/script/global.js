@@ -240,7 +240,7 @@ function downloadFile() {
     const frFile = getSelectedRow();
 
     (async () => {
-        const res = await fetch('/cgi-bin/dvr?download=&fr=' + frFile, {
+        const res = await fetch('/cgi-bin/dvr?download=' + frFile, {
             headers: { Accept: 'application/x-download' },
         });
 

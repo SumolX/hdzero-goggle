@@ -84,7 +84,7 @@ else
     set -- $QUERY_STRING
     key="${1%=*}"
     if [ ${key} == "download" ]; then
-        on_dvr_download "${2#*=}"
+        on_dvr_download "${1#*=}"
     elif [ ${key} == "rename" ]; then
         on_dvr_rename "${2#*=}" "${3#*=}"
     elif [ ${key} == "delete" ]; then

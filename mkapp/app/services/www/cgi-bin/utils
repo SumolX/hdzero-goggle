@@ -1,12 +1,12 @@
 # Returns success on substring match 
 utils_has_string() {
+    ret=1
     str="$1"
     sub="$2"
     if [ "${str#*"$sub"}" != "$str" ]; then
-        return 0
-    else
-        return 1
+        ret=0
     fi
+    echo $ret
 }
 
 # Transfer binary file to client
@@ -79,7 +79,7 @@ utils_is_client_authorized() {
 
 # Verify if action is allowed
 utils_is_action_authorized() {
-    ret = 1
+    ret=1
     salt="hdzgoggles"
     pw="$(cat /mnt/app/setting.ini | grep "root_pw" | awk -F '=' '{print $2}')"
 
@@ -95,7 +95,7 @@ utils_is_action_authorized() {
     cookie_token="${HTTP_COOKIE#*=}" 
     
     if [ "$hash_token" == "$cookie_token" ]; then
-        ret = 0
+        ret=0
     fi
-    return ret
+    echo $ret
 }
