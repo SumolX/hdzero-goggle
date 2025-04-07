@@ -178,7 +178,7 @@ function toggleSelection(fName) {
     const tbody = document.getElementById('list-content');
 
     if (fName === null) {
-        document.getElementById("videoname").value = "Select DVR Video";
+        document.getElementById("videoname").value = "";
     }
 
     for (var i = 0, row; row = tbody.rows[i]; i++) {
