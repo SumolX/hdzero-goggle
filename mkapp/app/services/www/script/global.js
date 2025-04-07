@@ -112,9 +112,12 @@ function getAuthorization() {
 
 // Player Functionality
 function changeVideoMode(source) {
-
     videoJsPlayer.reset();
-    //toggleSelection("");
+
+    // Allow UI to refresh quickly
+    if (source === "stream") {
+        toggleSelection(null);
+    }
 
     (async () => {
         const res = await fetch("/cgi-bin/dvr?stop");
@@ -173,6 +176,10 @@ function get_list() {
 
 function toggleSelection(fName) {
     const tbody = document.getElementById('list-content');
+
+    if (fName === null) {
+        document.getElementById("videoname").value = "Select DVR Video";
+    }
 
     for (var i = 0, row; row = tbody.rows[i]; i++) {
         if (row.cells[0].innerHTML.split('.')[0] === fName) {
