@@ -131,6 +131,18 @@ static lv_timer_t *page_wifi_apply_settings_pending_timer = NULL;
 static void page_wifi_update_services() {
     FILE *fp = NULL;
 
+    /**
+     *  Host <-> Client switching
+     *  must wipe previous settings.
+     */
+    unlink(WIFI_AP_ON);
+    unlink(WIFI_STA_ON);
+    unlink(WIFI_AP_CFG);
+    unlink(WIFI_DHCP_CFG);
+    unlink(WIFI_STA_CFG);
+    unlink(WIFI_DNS_CFG);
+    unlink(ROOT_PW_SET);
+
     if ((fp = fopen(WIFI_AP_ON, "w"))) {
         fprintf(fp, "#!/bin/sh\n");
         fprintf(fp, "insmod /mnt/app/ko/xradio_mac.ko\n");
@@ -174,7 +186,7 @@ static void page_wifi_update_services() {
         system_exec("chmod +x " WIFI_STA_ON);
     }
 
-    if ((fp = fopen("/tmp/hostapd.conf", "w"))) {
+    if ((fp = fopen(WIFI_AP_CFG, "w"))) {
         fprintf(fp, "interface=wlan0\n");
         fprintf(fp, "driver=nl80211\n");
         fprintf(fp, "ssid=%s\n", g_setting.wifi.ssid[WIFI_MODE_AP]);
@@ -192,7 +204,7 @@ static void page_wifi_update_services() {
         fclose(fp);
     }
 
-    if ((fp = fopen("/tmp/udhcpd.conf", "w"))) {
+    if ((fp = fopen(WIFI_DHCP_CFG, "w"))) {
         int ip[4];
         sscanf(g_setting.wifi.ip_addr, "%d.%d.%d.%d", &ip[3], &ip[2], &ip[1], &ip[0]);
         fprintf(fp, "start\t%d.%d.%d.100\n", ip[3], ip[2], ip[1]);
@@ -208,7 +220,7 @@ static void page_wifi_update_services() {
         fclose(fp);
     }
 
-    if ((fp = fopen("/tmp/wpa_supplicant.conf", "w"))) {
+    if ((fp = fopen(WIFI_STA_CFG, "w"))) {
         fprintf(fp, "ctrl_interface=/var/log/wpa_supplicant\n");
         fprintf(fp, "update_config=1\n");
         fprintf(fp, "network={\n");
@@ -220,7 +232,7 @@ static void page_wifi_update_services() {
 
     if (g_setting.wifi.mode == WIFI_MODE_STA &&
         !g_setting.wifi.dhcp &&
-        (fp = fopen("/tmp/resolv.conf", "w"))) {
+        (fp = fopen(WIFI_DNS_CFG, "w"))) {
         fprintf(fp, "nameserver %s\n", g_setting.wifi.dns);
         fprintf(fp, "options wlan0 trust-ad\n");
         fclose(fp);
