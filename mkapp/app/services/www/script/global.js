@@ -119,19 +119,19 @@ function changeVideoMode(source) {
         toggleSelection(null);
     }
 
-    (async () => {
-        const res = await fetch("/cgi-bin/dvr?stop");
-        if (source === "stream") {
+    if (source === "stream") {
+        (async () => {
+            const res = await fetch("/cgi-bin/live?play");
             videoJsPlayer.src({ type: "application/x-mpegURL", src: "live/hdz.m3u8" });
             videoJsPlayer.play();
-        } else if (source === "dvr" && gSelectedDvrFile !== "") {
-            (async () => {
-                const res = await fetch("/cgi-bin/dvr?play=" + gSelectedDvrFile);
-                videoJsPlayer.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
-                videoJsPlayer.play();
-            })();
-        }
-    })();
+        })();
+    } else if (source === "dvr" && gSelectedDvrFile !== "") {
+        (async () => {
+            const res = await fetch("/cgi-bin/dvr?play=" + gSelectedDvrFile);
+            videoJsPlayer.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
+            videoJsPlayer.play();
+        })();
+    }
 }
 
 function selectVideo() {
@@ -235,7 +235,7 @@ function removeFile() {
     const ext = getSelectedRow().split('.')[1];
     if (result) {
         (async () => {
-            const res = await fetch('/cgi-bin/dvr?delete=&fr=' + frFile + "." + ext, {
+            const res = await fetch('/cgi-bin/dvr?delete=' + frFile + "." + ext, {
                 headers: { Accept: 'application/text' },
             });
             get_list();

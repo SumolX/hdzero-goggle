@@ -165,29 +165,6 @@ if(NOT EMULATOR_BUILD)
 		minIni
 	)
 
-	# hlsProxy application
-	file(GLOB SRC_FILES_HLSPROXY "src/hlsProxy/*.cpp")
-
-	set(HLSPROXY_BUILD_FLAGS "-DNO_OPENSSL=1 -fno-pie -no-pie")
-
-	add_executable(hlsProxy
-		${SRC_FILES_HLSPROXY}
-	)
-	target_include_directories(hlsProxy PRIVATE 
-		src/hlsProxy
-	)
-	set_target_properties(hlsProxy PROPERTIES
-		COMPILE_FLAGS ${HLSPROXY_BUILD_FLAGS}
-		LINK_FLAGS ${HLSPROXY_BUILD_FLAGS}
-	)
-	target_link_libraries(hlsProxy PRIVATE
-		${STANDARD_LIBRARIES}
-
-		log
-		live
-		minIni
-	)
-
 	# image build
 	add_custom_command(
 		OUTPUT ${PROJECT_SOURCE_DIR}/out/${PROJECT_NAME}
@@ -196,13 +173,11 @@ if(NOT EMULATOR_BUILD)
 		COMMAND cp ${PROJECT_NAME} ${PROJECT_SOURCE_DIR}/out/
 		COMMAND cp record ${PROJECT_SOURCE_DIR}/out/
 		COMMAND cp rtspLive ${PROJECT_SOURCE_DIR}/out/
-		COMMAND cp hlsProxy ${PROJECT_SOURCE_DIR}/out/
 		COMMAND cp ${PROJECT_NAME} ${OS_APP_PATH}
 		COMMAND cp record ${RECORD_APP_PATH}
 		COMMAND cp rtspLive ${RECORD_APP_PATH}
-		COMMAND cp hlsProxy ${RECORD_APP_PATH}
 		COMMAND cd ${PROJECT_SOURCE_DIR} && ./mkapp/mkapp_ota.sh
-		DEPENDS ${PROJECT_NAME} record rtspLive hlsProxy
+		DEPENDS ${PROJECT_NAME} record rtspLive
 	)
 	add_custom_target(${PROJECT_NAME}-OTA ALL
 		DEPENDS ${PROJECT_SOURCE_DIR}/out/${PROJECT_NAME}

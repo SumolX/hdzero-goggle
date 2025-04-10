@@ -1,6 +1,6 @@
 /**
  * @license
- * Video.js 8.3.0 <http://videojs.com/>
+ * Video.js 8.23.0 <http://videojs.com/>
  * Copyright Brightcove, Inc. <https://www.brightcove.com/>
  * Available under Apache License Version 2.0
  * <https://github.com/videojs/video.js/blob/main/LICENSE>
@@ -16,7 +16,7 @@
   (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.videojs = factory());
 })(this, (function () { 'use strict';
 
-  var version$5 = "8.3.0";
+  var version$5 = "8.23.0";
 
   /**
    * An Object that contains lifecycle hooks as keys which point to an array
@@ -119,11 +119,7 @@
   // browser API methods
   const apiMap = [['requestFullscreen', 'exitFullscreen', 'fullscreenElement', 'fullscreenEnabled', 'fullscreenchange', 'fullscreenerror', 'fullscreen'],
   // WebKit
-  ['webkitRequestFullscreen', 'webkitExitFullscreen', 'webkitFullscreenElement', 'webkitFullscreenEnabled', 'webkitfullscreenchange', 'webkitfullscreenerror', '-webkit-full-screen'],
-  // Mozilla
-  ['mozRequestFullScreen', 'mozCancelFullScreen', 'mozFullScreenElement', 'mozFullScreenEnabled', 'mozfullscreenchange', 'mozfullscreenerror', '-moz-full-screen'],
-  // Microsoft
-  ['msRequestFullscreen', 'msExitFullscreen', 'msFullscreenElement', 'msFullscreenEnabled', 'MSFullscreenChange', 'MSFullscreenError', '-ms-fullscreen']];
+  ['webkitRequestFullscreen', 'webkitExitFullscreen', 'webkitFullscreenElement', 'webkitFullscreenEnabled', 'webkitfullscreenchange', 'webkitfullscreenerror', '-webkit-full-screen']];
   const specApi = apiMap[0];
   let browserApi;
 
@@ -156,22 +152,30 @@
    * Log messages to the console and history based on the type of message
    *
    * @private
-   * @param  {string} type
+   * @param  {string} name
    *         The name of the console method to use.
    *
-   * @param  {Array} args
+   * @param  {Object} log
    *         The arguments to be passed to the matching console method.
+   *
+   * @param {string} [styles]
+   *        styles for name
    */
-  const LogByTypeFactory = (name, log) => (type, level, args) => {
+  const LogByTypeFactory = (name, log, styles) => (type, level, args) => {
     const lvl = log.levels[level];
     const lvlRegExp = new RegExp(`^(${lvl})$`);
+    let resultName = name;
     if (type !== 'log') {
       // Add the type to the front of the message when it's not "log".
       args.unshift(type.toUpperCase() + ':');
     }
+    if (styles) {
+      resultName = `%c${name}`;
+      args.unshift(styles);
+    }
 
     // Add console prefix after adding to history.
-    args.unshift(name + ':');
+    args.unshift(resultName + ':');
 
     // Add a clone of the args at this point to history.
     if (history) {
@@ -205,7 +209,7 @@
     }
     fn[Array.isArray(args) ? 'apply' : 'call'](window.console, args);
   };
-  function createLogger$1(name) {
+  function createLogger$1(name, delimiter = ':', styles = '') {
     // This is the private tracking variable for logging level.
     let level = 'info';
 
@@ -233,27 +237,51 @@
      * @param    {...*} args
      *           One or more messages or objects that should be logged.
      */
-    const log = function (...args) {
+    function log(...args) {
       logByType('log', level, args);
-    };
+    }
 
     // This is the logByType helper that the logging methods below use
-    logByType = LogByTypeFactory(name, log);
+    logByType = LogByTypeFactory(name, log, styles);
 
     /**
-     * Create a new sublogger which chains the old name to the new name.
+     * Create a new subLogger which chains the old name to the new name.
      *
-     * For example, doing `videojs.log.createLogger('player')` and then using that logger will log the following:
+     * For example, doing `mylogger = videojs.log.createLogger('player')` and then using that logger will log the following:
      * ```js
      *  mylogger('foo');
      *  // > VIDEOJS: player: foo
      * ```
      *
-     * @param {string} name
+     * @param {string} subName
      *        The name to add call the new logger
+     * @param {string} [subDelimiter]
+     *        Optional delimiter
+     * @param {string} [subStyles]
+     *        Optional styles
      * @return {Object}
      */
-    log.createLogger = subname => createLogger$1(name + ': ' + subname);
+    log.createLogger = (subName, subDelimiter, subStyles) => {
+      const resultDelimiter = subDelimiter !== undefined ? subDelimiter : delimiter;
+      const resultStyles = subStyles !== undefined ? subStyles : styles;
+      const resultName = `${name} ${resultDelimiter} ${subName}`;
+      return createLogger$1(resultName, resultDelimiter, resultStyles);
+    };
+
+    /**
+     * Create a new logger.
+     *
+     * @param {string} newName
+     *        The name for the new logger
+     * @param {string} [newDelimiter]
+     *        Optional delimiter
+     * @param {string} [newStyles]
+     *        Optional styles
+     * @return {Object}
+     */
+    log.createNewLogger = (newName, newDelimiter, newStyles) => {
+      return createLogger$1(newName, newDelimiter, newStyles);
+    };
 
     /**
      * Enumeration of available logging levels, where the keys are the level names
@@ -290,7 +318,7 @@
      * If a string matching a key from {@link module:log.levels} is provided, acts
      * as a setter.
      *
-     * @param  {string} [lvl]
+     * @param  {'all'|'debug'|'info'|'warn'|'error'|'off'} [lvl]
      *         Pass a valid level to set a new logging level.
      *
      * @return {string}
@@ -540,6 +568,23 @@
   }
 
   /**
+   * Returns an array of values for a given object
+   *
+   * @param  {Object} source - target object
+   * @return {Array<unknown>} - object values
+   */
+  function values$1(source = {}) {
+    const result = [];
+    for (const key in source) {
+      if (source.hasOwnProperty(key)) {
+        const value = source[key];
+        result.push(value);
+      }
+    }
+    return result;
+  }
+
+  /**
    * Object.defineProperty but "lazy", which means that the value is only set after
    * it is retrieved the first time, rather than being set right away.
    *
@@ -576,6 +621,7 @@
     isObject: isObject$1,
     isPlain: isPlain,
     merge: merge$2,
+    values: values$1,
     defineLazyProperty: defineLazyProperty
   });
 
@@ -676,6 +722,14 @@
   let CHROME_VERSION = null;
 
   /**
+   * Whether or not this is a Chromecast receiver application.
+   *
+   * @static
+   * @type {Boolean}
+   */
+  const IS_CHROMECAST_RECEIVER = Boolean(window.cast && window.cast.framework && window.cast.framework.CastReceiverContext);
+
+  /**
    * The detected Internet Explorer version - or `null`.
    *
    * @static
@@ -720,6 +774,30 @@
   let IS_IPHONE = false;
 
   /**
+   * Whether or not this is a Tizen device.
+   *
+   * @static
+   * @type {Boolean}
+   */
+  let IS_TIZEN = false;
+
+  /**
+   * Whether or not this is a WebOS device.
+   *
+   * @static
+   * @type {Boolean}
+   */
+  let IS_WEBOS = false;
+
+  /**
+   * Whether or not this is a Smart TV (Tizen or WebOS) device.
+   *
+   * @static
+   * @type {Boolean}
+   */
+  let IS_SMART_TV = false;
+
+  /**
    * Whether or not this device is touch-enabled.
    *
    * @static
@@ -728,7 +806,7 @@
    */
   const TOUCH_ENABLED = Boolean(isReal() && ('ontouchstart' in window || window.navigator.maxTouchPoints || window.DocumentTouch && window.document instanceof window.DocumentTouch));
   const UAD = window.navigator && window.navigator.userAgentData;
-  if (UAD) {
+  if (UAD && UAD.platform && UAD.brands) {
     // If userAgentData is present, use it instead of userAgent to avoid warnings
     // Currently only implemented on Chromium
     // userAgentData does not expose Android version, so ANDROID_VERSION remains `null`
@@ -791,7 +869,10 @@
       }
       return version;
     }();
-    IS_SAFARI = /Safari/i.test(USER_AGENT) && !IS_CHROME && !IS_ANDROID && !IS_EDGE;
+    IS_TIZEN = /Tizen/i.test(USER_AGENT);
+    IS_WEBOS = /Web0S/i.test(USER_AGENT);
+    IS_SMART_TV = IS_TIZEN || IS_WEBOS;
+    IS_SAFARI = /Safari/i.test(USER_AGENT) && !IS_CHROME && !IS_ANDROID && !IS_EDGE && !IS_SMART_TV;
     IS_WINDOWS = /Windows/i.test(USER_AGENT);
     IS_IPAD = /iPad/i.test(USER_AGENT) || IS_SAFARI && TOUCH_ENABLED && !/iPhone/i.test(USER_AGENT);
     IS_IPHONE = /iPhone/i.test(USER_AGENT) && !IS_IPAD;
@@ -827,11 +908,15 @@
     get IS_CHROME () { return IS_CHROME; },
     get CHROMIUM_VERSION () { return CHROMIUM_VERSION; },
     get CHROME_VERSION () { return CHROME_VERSION; },
+    IS_CHROMECAST_RECEIVER: IS_CHROMECAST_RECEIVER,
     get IE_VERSION () { return IE_VERSION; },
     get IS_SAFARI () { return IS_SAFARI; },
     get IS_WINDOWS () { return IS_WINDOWS; },
     get IS_IPAD () { return IS_IPAD; },
     get IS_IPHONE () { return IS_IPHONE; },
+    get IS_TIZEN () { return IS_TIZEN; },
+    get IS_WEBOS () { return IS_WEBOS; },
+    get IS_SMART_TV () { return IS_SMART_TV; },
     TOUCH_ENABLED: TOUCH_ENABLED,
     IS_IOS: IS_IOS,
     IS_ANY_SAFARI: IS_ANY_SAFARI
@@ -987,7 +1072,7 @@
   /**
    * Injects text into an element, replacing any existing contents entirely.
    *
-   * @param  {Element} el
+   * @param  {HTMLElement} el
    *         The element to add text content into
    *
    * @param  {string} text
@@ -1084,7 +1169,7 @@
   /**
    * The callback definition for toggleClass.
    *
-   * @callback module:dom~PredicateCallback
+   * @callback PredicateCallback
    * @param    {Element} element
    *           The DOM element of the Component.
    *
@@ -1093,8 +1178,9 @@
    *
    * @return   {boolean|undefined}
    *           If `true` is returned, the `classToToggle` will be added to the
-   *           `element`. If `false`, the `classToToggle` will be removed from
-   *           the `element`. If `undefined`, the callback will be ignored.
+   *           `element`, but not removed. If `false`, the `classToToggle` will be removed from
+   *           the `element`, but not added. If `undefined`, the callback will be ignored.
+   *
    */
 
   /**
@@ -1107,7 +1193,7 @@
    * @param  {string} classToToggle
    *         The class that should be toggled.
    *
-   * @param  {boolean|module:dom~PredicateCallback} [predicate]
+   * @param  {boolean|PredicateCallback} [predicate]
    *         See the return value for {@link module:dom~PredicateCallback}
    *
    * @return {Element}
@@ -1163,16 +1249,17 @@
     // known boolean attributes
     // we can check for matching boolean properties, but not all browsers
     // and not all tags know about these attributes, so, we still want to check them manually
-    const knownBooleans = ',' + 'autoplay,controls,playsinline,loop,muted,default,defaultMuted' + ',';
+    const knownBooleans = ['autoplay', 'controls', 'playsinline', 'loop', 'muted', 'default', 'defaultMuted'];
     if (tag && tag.attributes && tag.attributes.length > 0) {
       const attrs = tag.attributes;
       for (let i = attrs.length - 1; i >= 0; i--) {
         const attrName = attrs[i].name;
+        /** @type {boolean|string} */
         let attrVal = attrs[i].value;
 
         // check for known booleans
         // the matching element property will return a value for typeof
-        if (typeof tag[attrName] === 'boolean' || knownBooleans.indexOf(',' + attrName + ',') !== -1) {
+        if (knownBooleans.includes(attrName)) {
           // the value of an included boolean attribute is typically an empty
           // string ('') which would equal false if we just check for a false value.
           // we also don't want support bad code like autoplay='false'
@@ -1382,7 +1469,13 @@
           translated.x += values[12];
           translated.y += values[13];
         }
-        item = item.parentNode;
+        if (item.assignedSlot && item.assignedSlot.parentElement && window.WebKitCSSMatrix) {
+          const transformValue = window.getComputedStyle(item.assignedSlot.parentElement).transform;
+          const matrix = new window.WebKitCSSMatrix(transformValue);
+          translated.x += matrix.m41;
+          translated.y += matrix.m42;
+        }
+        item = item.parentNode || item.host;
       }
     }
     const position = {};
@@ -1527,7 +1620,7 @@
   /**
    * Check if an event was a single left click.
    *
-   * @param  {Event} event
+   * @param  {MouseEvent} event
    *         Event object.
    *
    * @return {boolean}
@@ -1563,6 +1656,11 @@
     // `mouseup` event on a single left click has
     // `button` and `buttons` equal to 0
     if (event.type === 'mouseup' && event.button === 0 && event.buttons === 0) {
+      return true;
+    }
+
+    // MacOS Sonoma trackpad when "tap to click enabled"
+    if (event.type === 'mousedown' && event.button === 0 && event.buttons === 0) {
       return true;
     }
     if (event.button !== 0 || event.buttons !== 1) {
@@ -1645,6 +1743,32 @@
     return '';
   }
 
+  /**
+   * Copy document style sheets to another window.
+   *
+   * @param    {Window} win
+   *           The window element you want to copy the document style sheets to.
+   *
+   */
+  function copyStyleSheetsToWindow(win) {
+    [...document.styleSheets].forEach(styleSheet => {
+      try {
+        const cssRules = [...styleSheet.cssRules].map(rule => rule.cssText).join('');
+        const style = document.createElement('style');
+        style.textContent = cssRules;
+        win.document.head.appendChild(style);
+      } catch (e) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = styleSheet.type;
+        // For older Safari this has to be the string; on other browsers setting the MediaList works
+        link.media = styleSheet.media.mediaText;
+        link.href = styleSheet.href;
+        win.document.head.appendChild(link);
+      }
+    });
+  }
+
   var Dom = /*#__PURE__*/Object.freeze({
     __proto__: null,
     isReal: isReal,
@@ -1675,7 +1799,8 @@
     isSingleLeftClick: isSingleLeftClick,
     $: $,
     $$: $$,
-    computedStyle: computedStyle
+    computedStyle: computedStyle,
+    copyStyleSheetsToWindow: copyStyleSheetsToWindow
   });
 
   /**
@@ -1922,7 +2047,7 @@
    * @param {Element|Object} elem
    *        Element or object to bind listeners to
    *
-   * @param {string} type
+   * @param {string[]} types
    *        Type of event to bind to.
    *
    * @param {Function} callback
@@ -1967,13 +2092,15 @@
       // IE8 Doesn't like when you mess with native event properties
       // Firefox returns false for event.hasOwnProperty('type') and other props
       //  which makes copying more difficult.
-      // TODO: Probably best to create a whitelist of event props
+
+      // TODO: Probably best to create an allowlist of event props
+      const deprecatedProps = ['layerX', 'layerY', 'keyLocation', 'path', 'webkitMovementX', 'webkitMovementY', 'mozPressure', 'mozInputSource'];
       for (const key in old) {
         // Safari 6.0.3 warns you if you try to copy deprecated layerX/Y
         // Chrome warns you if you try to copy deprecated keyboardEvent.keyLocation
         // and webkitMovementX/Y
         // Lighthouse complains if Event.path is copied
-        if (key !== 'layerX' && key !== 'layerY' && key !== 'keyLocation' && key !== 'webkitMovementX' && key !== 'webkitMovementY' && key !== 'path') {
+        if (!deprecatedProps.includes(key)) {
           // Chrome 32+ warns if you try to copy deprecated returnValue, but
           // we still want to if preventDefault isn't supported (IE8).
           if (!(key === 'returnValue' && old.preventDefault)) {
@@ -2045,7 +2172,6 @@
         /* eslint-enable */
       }
     }
-
     event.fixed_ = true;
     // Returns fixed-up instance
     return event;
@@ -2450,7 +2576,7 @@
    * @return   {Function}
    *           A debounced function.
    */
-  const debounce = function (func, wait, immediate, context = window) {
+  const debounce$1 = function (func, wait, immediate, context = window) {
     let timeout;
     const cancel = () => {
       context.clearTimeout(timeout);
@@ -2485,7 +2611,7 @@
     UPDATE_REFRESH_INTERVAL: UPDATE_REFRESH_INTERVAL,
     bind_: bind_,
     throttle: throttle,
-    debounce: debounce
+    debounce: debounce$1
   });
 
   /**
@@ -2645,7 +2771,7 @@
   /**
    * All event listeners should follow the following format.
    *
-   * @callback EventTarget~EventListener
+   * @callback EventListener
    * @this {EventTarget}
    *
    * @param {Event} event
@@ -2662,7 +2788,7 @@
    *         will have extra functionality. See that function for more information.
    *
    * @property EventTarget.prototype.allowedEvents_
-   * @private
+   * @protected
    */
   EventTarget$2.prototype.allowedEvents_ = {};
 
@@ -2727,7 +2853,7 @@
   /**
    * Adds a callback to run after the evented mixin applied.
    *
-   * @param  {Object} object
+   * @param  {Object} target
    *         An object to Add
    * @param  {Function} callback
    *         The callback to run.
@@ -2859,7 +2985,12 @@
       }
       [type, listener] = args;
     } else {
-      [target, type, listener] = args;
+      // This was `[target, type, listener] = args;` but this block needs more than
+      // one statement to produce minified output compatible with Chrome 53.
+      // See https://github.com/videojs/video.js/pull/8810
+      target = args[0];
+      type = args[1];
+      listener = args[2];
     }
     validateTarget(target, self, fnName);
     validateEventType(type, self, fnName);
@@ -3353,207 +3484,20 @@
     titleCaseEquals: titleCaseEquals
   });
 
-  var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
-
-  function unwrapExports (x) {
-  	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
-  }
-
-  function createCommonjsModule(fn, module) {
-  	return module = { exports: {} }, fn(module, module.exports), module.exports;
-  }
-
-  var keycode = createCommonjsModule(function (module, exports) {
-    // Source: http://jsfiddle.net/vWx8V/
-    // http://stackoverflow.com/questions/5603195/full-list-of-javascript-keycodes
-
-    /**
-     * Conenience method returns corresponding value for given keyName or keyCode.
-     *
-     * @param {Mixed} keyCode {Number} or keyName {String}
-     * @return {Mixed}
-     * @api public
-     */
-
-    function keyCode(searchInput) {
-      // Keyboard Events
-      if (searchInput && 'object' === typeof searchInput) {
-        var hasKeyCode = searchInput.which || searchInput.keyCode || searchInput.charCode;
-        if (hasKeyCode) searchInput = hasKeyCode;
-      }
-
-      // Numbers
-      if ('number' === typeof searchInput) return names[searchInput];
-
-      // Everything else (cast to string)
-      var search = String(searchInput);
-
-      // check codes
-      var foundNamedKey = codes[search.toLowerCase()];
-      if (foundNamedKey) return foundNamedKey;
-
-      // check aliases
-      var foundNamedKey = aliases[search.toLowerCase()];
-      if (foundNamedKey) return foundNamedKey;
-
-      // weird character?
-      if (search.length === 1) return search.charCodeAt(0);
-      return undefined;
-    }
-
-    /**
-     * Compares a keyboard event with a given keyCode or keyName.
-     *
-     * @param {Event} event Keyboard event that should be tested
-     * @param {Mixed} keyCode {Number} or keyName {String}
-     * @return {Boolean}
-     * @api public
-     */
-    keyCode.isEventKey = function isEventKey(event, nameOrCode) {
-      if (event && 'object' === typeof event) {
-        var keyCode = event.which || event.keyCode || event.charCode;
-        if (keyCode === null || keyCode === undefined) {
-          return false;
-        }
-        if (typeof nameOrCode === 'string') {
-          // check codes
-          var foundNamedKey = codes[nameOrCode.toLowerCase()];
-          if (foundNamedKey) {
-            return foundNamedKey === keyCode;
-          }
-
-          // check aliases
-          var foundNamedKey = aliases[nameOrCode.toLowerCase()];
-          if (foundNamedKey) {
-            return foundNamedKey === keyCode;
-          }
-        } else if (typeof nameOrCode === 'number') {
-          return nameOrCode === keyCode;
-        }
-        return false;
-      }
-    };
-    exports = module.exports = keyCode;
-
-    /**
-     * Get by name
-     *
-     *   exports.code['enter'] // => 13
-     */
-
-    var codes = exports.code = exports.codes = {
-      'backspace': 8,
-      'tab': 9,
-      'enter': 13,
-      'shift': 16,
-      'ctrl': 17,
-      'alt': 18,
-      'pause/break': 19,
-      'caps lock': 20,
-      'esc': 27,
-      'space': 32,
-      'page up': 33,
-      'page down': 34,
-      'end': 35,
-      'home': 36,
-      'left': 37,
-      'up': 38,
-      'right': 39,
-      'down': 40,
-      'insert': 45,
-      'delete': 46,
-      'command': 91,
-      'left command': 91,
-      'right command': 93,
-      'numpad *': 106,
-      'numpad +': 107,
-      'numpad -': 109,
-      'numpad .': 110,
-      'numpad /': 111,
-      'num lock': 144,
-      'scroll lock': 145,
-      'my computer': 182,
-      'my calculator': 183,
-      ';': 186,
-      '=': 187,
-      ',': 188,
-      '-': 189,
-      '.': 190,
-      '/': 191,
-      '`': 192,
-      '[': 219,
-      '\\': 220,
-      ']': 221,
-      "'": 222
-    };
-
-    // Helper aliases
-
-    var aliases = exports.aliases = {
-      'windows': 91,
-      '⇧': 16,
-      '⌥': 18,
-      '⌃': 17,
-      '⌘': 91,
-      'ctl': 17,
-      'control': 17,
-      'option': 18,
-      'pause': 19,
-      'break': 19,
-      'caps': 20,
-      'return': 13,
-      'escape': 27,
-      'spc': 32,
-      'spacebar': 32,
-      'pgup': 33,
-      'pgdn': 34,
-      'ins': 45,
-      'del': 46,
-      'cmd': 91
-    };
-
-    /*!
-     * Programatically add the following
-     */
-
-    // lower case chars
-    for (i = 97; i < 123; i++) codes[String.fromCharCode(i)] = i - 32;
-
-    // numbers
-    for (var i = 48; i < 58; i++) codes[i - 48] = i;
-
-    // function keys
-    for (i = 1; i < 13; i++) codes['f' + i] = i + 111;
-
-    // numpad keys
-    for (i = 0; i < 10; i++) codes['numpad ' + i] = i + 96;
-
-    /**
-     * Get by code
-     *
-     *   exports.name[13] // => 'Enter'
-     */
-
-    var names = exports.names = exports.title = {}; // title for backward compat
-
-    // Create reverse mapping
-    for (i in codes) names[codes[i]] = i;
-
-    // Add aliases
-    for (var alias in aliases) {
-      codes[alias] = aliases[alias];
-    }
-  });
-  keycode.code;
-  keycode.codes;
-  keycode.aliases;
-  keycode.names;
-  keycode.title;
-
   /**
    * Player Component - Base class for all UI objects
    *
    * @file component.js
+   */
+
+  /** @import Player from './player' */
+
+  /**
+   * A callback to be called if and when the component is ready.
+   * `this` will be the Component instance.
+   *
+   * @callback ReadyCallback
+   * @returns  {void}
    */
 
   /**
@@ -3566,17 +3510,9 @@
    */
   class Component$1 {
     /**
-     * A callback that is called when a component is ready. Does not have any
-     * parameters and any callback value will be ignored.
-     *
-     * @callback ReadyCallback
-     * @this Component
-     */
-
-    /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -3683,7 +3619,6 @@
      * @param {Function} fn
      *        The function to call with `EventTarget`s
      */
-    on(type, fn) {}
 
     /**
      * Removes an `event listener` for a specific event from an instance of `EventTarget`.
@@ -3693,10 +3628,9 @@
      * @param {string|string[]} type
      *        An event name or an array of event names.
      *
-     * @param {Function} fn
-     *        The function to remove.
+     * @param {Function} [fn]
+     *        The function to remove. If not specified, all listeners managed by Video.js will be removed.
      */
-    off(type, fn) {}
 
     /**
      * This function will add an `event listener` that gets triggered only once. After the
@@ -3709,7 +3643,6 @@
      * @param {Function} fn
      *        The function to be called once for each event name.
      */
-    one(type, fn) {}
 
     /**
      * This function will add an `event listener` that gets triggered only once and is
@@ -3723,7 +3656,6 @@
      * @param {Function} fn
      *        The function to be called once for each event name.
      */
-    any(type, fn) {}
 
     /**
      * This function causes an event to happen. This will then cause any `event listeners`
@@ -3740,8 +3672,10 @@
      * @param {string|Event|Object} event
      *        The name of the event, an `Event`, or an object with a key of type set to
      *        an event name.
+     *
+     * @param {Object} [hash]
+     *        Optionally extra argument to pass through to an event listener
      */
-    trigger(event) {}
 
     /**
      * Dispose of the `Component` and all child components.
@@ -3819,7 +3753,7 @@
     /**
      * Return the {@link Player} that the `Component` has attached to.
      *
-     * @return { import('./player').default }
+     * @return {Player}
      *         The player that this `Component` has attached to.
      */
     player() {
@@ -4043,8 +3977,54 @@
     }
 
     /**
-     * Add a child `Component` inside the current `Component`.
+     * Adds an SVG icon element to another element or component.
      *
+     * @param {string} iconName
+     *        The name of icon. A list of all the icon names can be found at 'sandbox/svg-icons.html'
+     *
+     * @param {Element} [el=this.el()]
+     *        Element to set the title on. Defaults to the current Component's element.
+     *
+     * @return {Element}
+     *        The newly created icon element.
+     */
+    setIcon(iconName, el = this.el()) {
+      // TODO: In v9 of video.js, we will want to remove font icons entirely.
+      // This means this check, as well as the others throughout the code, and
+      // the unecessary CSS for font icons, will need to be removed.
+      // See https://github.com/videojs/video.js/pull/8260 as to which components
+      // need updating.
+      if (!this.player_.options_.experimentalSvgIcons) {
+        return;
+      }
+      const xmlnsURL = 'http://www.w3.org/2000/svg';
+
+      // The below creates an element in the format of:
+      // <span><svg><use>....</use></svg></span>
+      const iconContainer = createEl('span', {
+        className: 'vjs-icon-placeholder vjs-svg-icon'
+      }, {
+        'aria-hidden': 'true'
+      });
+      const svgEl = document.createElementNS(xmlnsURL, 'svg');
+      svgEl.setAttributeNS(null, 'viewBox', '0 0 512 512');
+      const useEl = document.createElementNS(xmlnsURL, 'use');
+      svgEl.appendChild(useEl);
+      useEl.setAttributeNS(null, 'href', `#vjs-icon-${iconName}`);
+      iconContainer.appendChild(svgEl);
+
+      // Replace a pre-existing icon if one exists.
+      if (this.iconIsSet_) {
+        el.replaceChild(iconContainer, el.querySelector('.vjs-icon-placeholder'));
+      } else {
+        el.appendChild(iconContainer);
+      }
+      this.iconIsSet_ = true;
+      return iconContainer;
+    }
+
+    /**
+     * Add a child `Component` inside the current `Component`.
      *
      * @param {string|Component} child
      *        The name or instance of a child to add.
@@ -4055,6 +4035,7 @@
      *
      * @param {number} [index=this.children_.length]
      *        The index to attempt to add a child into.
+     *
      *
      * @return {Component}
      *         The `Component` that gets added as a child. When using a string the
@@ -4273,9 +4254,6 @@
      *
      * @param {ReadyCallback} fn
      *        Function that gets called when the `Component` is ready.
-     *
-     * @return {Component}
-     *         Returns itself; method can be chained.
      */
     ready(fn, sync = false) {
       if (!fn) {
@@ -4409,10 +4387,10 @@
      * - `classToToggle` gets removed when {@link Component#hasClass} would return true.
      *
      * @param  {string} classToToggle
-     *         The class to add or remove based on (@link Component#hasClass}
+     *         The class to add or remove. Passed to DOMTokenList's toggle()
      *
-     * @param  {boolean|Dom~predicate} [predicate]
-     *         An {@link Dom~predicate} function or a boolean
+     * @param  {boolean|Dom.PredicateCallback} [predicate]
+     *         A boolean or function that returns a boolean. Passed to DOMTokenList's toggle().
      */
     toggleClass(classToToggle, predicate) {
       toggleClass(this.el_, classToToggle, predicate);
@@ -4510,9 +4488,8 @@
      * @param {boolean} [skipListeners]
      *        Skip the componentresize event trigger
      *
-     * @return {number|string}
-     *         The width when getting, zero if there is no width. Can be a string
-     *           postpixed with '%' or 'px'.
+     * @return {number|undefined}
+     *         The width when getting, zero if there is no width
      */
     width(num, skipListeners) {
       return this.dimension('width', num, skipListeners);
@@ -4528,9 +4505,8 @@
      * @param {boolean} [skipListeners]
      *        Skip the componentresize event trigger
      *
-     * @return {number|string}
-     *         The width when getting, zero if there is no width. Can be a string
-     *         postpixed with '%' or 'px'.
+     * @return {number|undefined}
+     *         The height when getting, zero if there is no height
      */
     height(num, skipListeners) {
       return this.dimension('height', num, skipListeners);
@@ -4576,7 +4552,7 @@
      * @param  {boolean} [skipListeners]
      *         Skip componentresize event trigger
      *
-     * @return {number}
+     * @return {number|undefined}
      *         The dimension when getting or 0 if unset
      */
     dimension(widthOrHeight, num, skipListeners) {
@@ -4714,6 +4690,48 @@
     }
 
     /**
+     * Retrieves the position and size information of the component's element.
+     *
+     * @return {Object} An object with `boundingClientRect` and `center` properties.
+     *         - `boundingClientRect`: An object with properties `x`, `y`, `width`,
+     *           `height`, `top`, `right`, `bottom`, and `left`, representing
+     *           the bounding rectangle of the element.
+     *         - `center`: An object with properties `x` and `y`, representing
+     *           the center point of the element. `width` and `height` are set to 0.
+     */
+    getPositions() {
+      const rect = this.el_.getBoundingClientRect();
+
+      // Creating objects that mirror DOMRectReadOnly for boundingClientRect and center
+      const boundingClientRect = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left
+      };
+
+      // Calculating the center position
+      const center = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        width: 0,
+        height: 0,
+        top: rect.top + rect.height / 2,
+        right: rect.left + rect.width / 2,
+        bottom: rect.top + rect.height / 2,
+        left: rect.left + rect.width / 2
+      };
+      return {
+        boundingClientRect,
+        center
+      };
+    }
+
+    /**
      * Set the focus to this component
      */
     focus() {
@@ -4737,8 +4755,8 @@
     handleKeyDown(event) {
       if (this.player_) {
         // We only stop propagation here because we want unhandled events to fall
-        // back to the browser. Exclude Tab for focus trapping.
-        if (!keycode.isEventKey(event, 'Tab')) {
+        // back to the browser. Exclude Tab for focus trapping, exclude also when spatialNavigation is enabled.
+        if (event.key !== 'Tab' && !(this.player_.options_.playerOptions.spatialNavigation && this.player_.options_.playerOptions.spatialNavigation.enabled)) {
           event.stopPropagation();
         }
         this.player_.handleKeyDown(event);
@@ -4751,7 +4769,7 @@
      * delegates to `handleKeyDown`. This means anyone calling `handleKeyPress`
      * will not see their method calls stop working.
      *
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      *        The event that caused this function to be called.
      */
     handleKeyPress(event) {
@@ -4763,7 +4781,7 @@
      * support toggling the controls through a tap on the video. They get enabled
      * because every sub-component would have extra overhead otherwise.
      *
-     * @private
+     * @protected
      * @fires Component#tap
      * @listens Component#touchstart
      * @listens Component#touchmove
@@ -5079,7 +5097,7 @@
      */
     requestNamedAnimationFrame(name, fn) {
       if (this.namedRafs_.has(name)) {
-        return;
+        this.cancelNamedAnimationFrame(name);
       }
       this.clearTimersOnDispose_();
       fn = bind_(this, fn);
@@ -5158,6 +5176,150 @@
     }
 
     /**
+      * Decide whether an element is actually disabled or not.
+      *
+      * @function isActuallyDisabled
+      * @param element {Node}
+      * @return {boolean}
+      *
+      * @see {@link https://html.spec.whatwg.org/multipage/semantics-other.html#concept-element-disabled}
+      */
+    getIsDisabled() {
+      return Boolean(this.el_.disabled);
+    }
+
+    /**
+      * Decide whether the element is expressly inert or not.
+      *
+      * @see {@link https://html.spec.whatwg.org/multipage/interaction.html#expressly-inert}
+      * @function isExpresslyInert
+      * @param element {Node}
+      * @return {boolean}
+      */
+    getIsExpresslyInert() {
+      return this.el_.inert && !this.el_.ownerDocument.documentElement.inert;
+    }
+
+    /**
+     * Determine whether or not this component can be considered as focusable component.
+     *
+     * @param {HTMLElement} el - The HTML element representing the component.
+     * @return {boolean}
+     *         If the component can be focused, will be `true`. Otherwise, `false`.
+     */
+    getIsFocusable(el) {
+      const element = el || this.el_;
+      return element.tabIndex >= 0 && !(this.getIsDisabled() || this.getIsExpresslyInert());
+    }
+
+    /**
+     * Determine whether or not this component is currently visible/enabled/etc...
+     *
+     * @param {HTMLElement} el - The HTML element representing the component.
+     * @return {boolean}
+     *         If the component can is currently visible & enabled, will be `true`. Otherwise, `false`.
+     */
+    getIsAvailableToBeFocused(el) {
+      /**
+       * Decide the style property of this element is specified whether it's visible or not.
+       *
+       * @function isVisibleStyleProperty
+       * @param element {CSSStyleDeclaration}
+       * @return {boolean}
+       */
+      function isVisibleStyleProperty(element) {
+        const elementStyle = window.getComputedStyle(element, null);
+        const thisVisibility = elementStyle.getPropertyValue('visibility');
+        const thisDisplay = elementStyle.getPropertyValue('display');
+        const invisibleStyle = ['hidden', 'collapse'];
+        return thisDisplay !== 'none' && !invisibleStyle.includes(thisVisibility);
+      }
+
+      /**
+       * Decide whether the element is being rendered or not.
+       * 1. If an element has the style as "visibility: hidden | collapse" or "display: none", it is not being rendered.
+       * 2. If an element has the style as "opacity: 0", it is not being rendered.(that is, invisible).
+       * 3. If width and height of an element are explicitly set to 0, it is not being rendered.
+       * 4. If a parent element is hidden, an element itself is not being rendered.
+       * (CSS visibility property and display property are inherited.)
+       *
+       * @see {@link https://html.spec.whatwg.org/multipage/rendering.html#being-rendered}
+       * @function isBeingRendered
+       * @param element {Node}
+       * @return {boolean}
+       */
+      function isBeingRendered(element) {
+        if (!isVisibleStyleProperty(element.parentElement)) {
+          return false;
+        }
+        if (!isVisibleStyleProperty(element) || element.style.opacity === '0' || window.getComputedStyle(element).height === '0px' || window.getComputedStyle(element).width === '0px') {
+          return false;
+        }
+        return true;
+      }
+
+      /**
+       * Determine if the element is visible for the user or not.
+       * 1. If an element sum of its offsetWidth, offsetHeight, height and width is less than 1 is not visible.
+       * 2. If elementCenter.x is less than is not visible.
+       * 3. If elementCenter.x is more than the document's width is not visible.
+       * 4. If elementCenter.y is less than 0 is not visible.
+       * 5. If elementCenter.y is the document's height is not visible.
+       *
+       * @function isVisible
+       * @param element {Node}
+       * @return {boolean}
+       */
+      function isVisible(element) {
+        if (element.offsetWidth + element.offsetHeight + element.getBoundingClientRect().height + element.getBoundingClientRect().width === 0) {
+          return false;
+        }
+
+        // Define elementCenter object with props of x and y
+        // x: Left position relative to the viewport plus element's width (no margin) divided between 2.
+        // y: Top position relative to the viewport plus element's height (no margin) divided between 2.
+        const elementCenter = {
+          x: element.getBoundingClientRect().left + element.offsetWidth / 2,
+          y: element.getBoundingClientRect().top + element.offsetHeight / 2
+        };
+        if (elementCenter.x < 0) {
+          return false;
+        }
+        if (elementCenter.x > (document.documentElement.clientWidth || window.innerWidth)) {
+          return false;
+        }
+        if (elementCenter.y < 0) {
+          return false;
+        }
+        if (elementCenter.y > (document.documentElement.clientHeight || window.innerHeight)) {
+          return false;
+        }
+        let pointContainer = document.elementFromPoint(elementCenter.x, elementCenter.y);
+        while (pointContainer) {
+          if (pointContainer === element) {
+            return true;
+          }
+          if (pointContainer.parentNode) {
+            pointContainer = pointContainer.parentNode;
+          } else {
+            return false;
+          }
+        }
+      }
+
+      // If no DOM element was passed as argument use this component's element.
+      if (!el) {
+        el = this.el();
+      }
+
+      // If element is visible, is being rendered & either does not have a parent element or its tabIndex is not negative.
+      if (isVisible(el) && isBeingRendered(el) && (!el.parentElement || el.tabIndex >= 0)) {
+        return true;
+      }
+      return false;
+    }
+
+    /**
      * Register a `Component` with `videojs` given the name and the component.
      *
      * > NOTE: {@link Tech}s should not be registered as a `Component`. {@link Tech}s
@@ -5205,10 +5367,14 @@
 
         // If we have players that were disposed, then their name will still be
         // in Players.players. So, we must loop through and verify that the value
-        // for each item is not null. This allows registration of the Player component
+        // for each item is null. This allows registration of the Player component
         // after all players have been disposed or before any were created.
-        if (players && playerNames.length > 0 && playerNames.map(pname => players[pname]).every(Boolean)) {
-          throw new Error('Can not register Player component after player has been created.');
+        if (players && playerNames.length > 0) {
+          for (let i = 0; i < playerNames.length; i++) {
+            if (players[playerNames[i]] !== null) {
+              throw new Error('Can not register Player component after player has been created.');
+            }
+          }
         }
       }
       Component$1.components_[name] = ComponentToRegister;
@@ -5222,7 +5388,7 @@
      * @param {string} name
      *        The Name of the component to get.
      *
-     * @return {Component}
+     * @return {typeof Component}
      *         The `Component` that got registered under the given name.
      */
     static getComponent(name) {
@@ -5479,10 +5645,12 @@
    * @module buffer
    */
 
+  /** @import { TimeRange } from './time' */
+
   /**
    * Compute the percentage of the media that has been buffered.
    *
-   * @param { import('./time').TimeRange } buffered
+   * @param {TimeRange} buffered
    *        The current `TimeRanges` object representing buffered time ranges
    *
    * @param {number} duration
@@ -5586,6 +5754,21 @@
   MediaError.prototype.status = null;
 
   /**
+   * An object containing an error type, as well as other information regarding the error.
+   *
+   * @typedef {{errorType: string, [key: string]: any}} ErrorMetadata
+   */
+
+  /**
+   * An optional object to give more detail about the error. This can be used to give
+   * a higher level of specificity to an error versus the more generic MediaError codes.
+   * `metadata` expects an `errorType` string that should align with the values from videojs.Error.
+   *
+   * @type {ErrorMetadata}
+   */
+  MediaError.prototype.metadata = null;
+
+  /**
    * Errors indexed by the W3C standard. The order **CANNOT CHANGE**! See the
    * specification listed under {@link MediaError} for more information.
    *
@@ -5614,25 +5797,113 @@
     5: 'The media is encrypted and we do not have the keys to decrypt it.'
   };
 
-  // Add types as properties on MediaError
-  // e.g. MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
-  for (let errNum = 0; errNum < MediaError.errorTypes.length; errNum++) {
-    MediaError[MediaError.errorTypes[errNum]] = errNum;
-    // values should be accessible on both the class and instance
-    MediaError.prototype[MediaError.errorTypes[errNum]] = errNum;
-  }
+  /**
+   * W3C error code for any custom error.
+   *
+   * @member MediaError#MEDIA_ERR_CUSTOM
+   * @constant {number}
+   * @default 0
+   */
+  MediaError.MEDIA_ERR_CUSTOM = 0;
 
-  var tuple = SafeParseTuple;
-  function SafeParseTuple(obj, reviver) {
-    var json;
-    var error = null;
-    try {
-      json = JSON.parse(obj, reviver);
-    } catch (err) {
-      error = err;
-    }
-    return [error, json];
-  }
+  /**
+   * W3C error code for any custom error.
+   *
+   * @member MediaError.MEDIA_ERR_CUSTOM
+   * @constant {number}
+   * @default 0
+   */
+  MediaError.prototype.MEDIA_ERR_CUSTOM = 0;
+
+  /**
+   * W3C error code for media error aborted.
+   *
+   * @member MediaError#MEDIA_ERR_ABORTED
+   * @constant {number}
+   * @default 1
+   */
+  MediaError.MEDIA_ERR_ABORTED = 1;
+
+  /**
+   * W3C error code for media error aborted.
+   *
+   * @member MediaError.MEDIA_ERR_ABORTED
+   * @constant {number}
+   * @default 1
+   */
+  MediaError.prototype.MEDIA_ERR_ABORTED = 1;
+
+  /**
+   * W3C error code for any network error.
+   *
+   * @member MediaError#MEDIA_ERR_NETWORK
+   * @constant {number}
+   * @default 2
+   */
+  MediaError.MEDIA_ERR_NETWORK = 2;
+
+  /**
+   * W3C error code for any network error.
+   *
+   * @member MediaError.MEDIA_ERR_NETWORK
+   * @constant {number}
+   * @default 2
+   */
+  MediaError.prototype.MEDIA_ERR_NETWORK = 2;
+
+  /**
+   * W3C error code for any decoding error.
+   *
+   * @member MediaError#MEDIA_ERR_DECODE
+   * @constant {number}
+   * @default 3
+   */
+  MediaError.MEDIA_ERR_DECODE = 3;
+
+  /**
+   * W3C error code for any decoding error.
+   *
+   * @member MediaError.MEDIA_ERR_DECODE
+   * @constant {number}
+   * @default 3
+   */
+  MediaError.prototype.MEDIA_ERR_DECODE = 3;
+
+  /**
+   * W3C error code for any time that a source is not supported.
+   *
+   * @member MediaError#MEDIA_ERR_SRC_NOT_SUPPORTED
+   * @constant {number}
+   * @default 4
+   */
+  MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
+
+  /**
+   * W3C error code for any time that a source is not supported.
+   *
+   * @member MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+   * @constant {number}
+   * @default 4
+   */
+  MediaError.prototype.MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
+
+  /**
+   * W3C error code for any time that a source is encrypted.
+   *
+   * @member MediaError#MEDIA_ERR_ENCRYPTED
+   * @constant {number}
+   * @default 5
+   */
+  MediaError.MEDIA_ERR_ENCRYPTED = 5;
+
+  /**
+   * W3C error code for any time that a source is encrypted.
+   *
+   * @member MediaError.MEDIA_ERR_ENCRYPTED
+   * @constant {number}
+   * @default 5
+   */
+  MediaError.prototype.MEDIA_ERR_ENCRYPTED = 5;
 
   /**
    * Returns whether an object is `Promise`-like (i.e. has a `then` method).
@@ -5669,6 +5940,8 @@
    * @module text-track-list-converter
    */
 
+  /** @import Tech from '../tech/tech' */
+
   /**
    * Examine a single {@link TextTrack} and return a JSON-compatible javascript object that
    * represents the {@link TextTrack}'s state.
@@ -5680,7 +5953,7 @@
    *         A serializable javascript representation of the TextTrack.
    * @private
    */
-  const trackToJson_ = function (track) {
+  const trackToJson = function (track) {
     const ret = ['kind', 'label', 'language', 'id', 'inBandMetadataTrackDispatchType', 'mode', 'src'].reduce((acc, prop, i) => {
       if (track[prop]) {
         acc[prop] = track[prop];
@@ -5704,7 +5977,7 @@
    * state of all {@link TextTrack}s currently configured. The return array is compatible with
    * {@link text-track-list-converter:jsonToTextTracks}.
    *
-   * @param { import('../tech/tech').default } tech
+   * @param {Tech} tech
    *        The tech object to query
    *
    * @return {Array}
@@ -5715,7 +5988,7 @@
     const trackEls = tech.$$('track');
     const trackObjs = Array.prototype.map.call(trackEls, t => t.track);
     const tracks = Array.prototype.map.call(trackEls, function (trackEl) {
-      const json = trackToJson_(trackEl.track);
+      const json = trackToJson(trackEl.track);
       if (trackEl.src) {
         json.src = trackEl.src;
       }
@@ -5723,7 +5996,7 @@
     });
     return tracks.concat(Array.prototype.filter.call(tech.textTracks(), function (track) {
       return trackObjs.indexOf(track) === -1;
-    }).map(trackToJson_));
+    }).map(trackToJson));
   };
 
   /**
@@ -5749,12 +6022,16 @@
   var textTrackConverter = {
     textTracksToJson,
     jsonToTextTracks,
-    trackToJson_
+    trackToJson
   };
 
   /**
    * @file modal-dialog.js
    */
+
+  /** @import Player from './player' */
+  /** @import { ContentDescriptor } from './utils/dom' */
+
   const MODAL_CLASS_NAME = 'vjs-modal-dialog';
 
   /**
@@ -5768,15 +6045,15 @@
    */
   class ModalDialog extends Component$1 {
     /**
-     * Create an instance of this class.
+     * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
      *        The key/value store of player options.
      *
-     * @param { import('./utils/dom').ContentDescriptor} [options.content=undefined]
+     * @param {ContentDescriptor} [options.content=undefined]
      *        Provide customized content for this modal.
      *
      * @param {string} [options.description]
@@ -5842,7 +6119,8 @@
         'aria-describedby': `${this.id()}_description`,
         'aria-hidden': 'true',
         'aria-label': this.label(),
-        'role': 'dialog'
+        'role': 'dialog',
+        'aria-live': 'polite'
       });
     }
     dispose() {
@@ -5896,48 +6174,52 @@
      * @fires ModalDialog#modalopen
      */
     open() {
-      if (!this.opened_) {
-        const player = this.player();
-
-        /**
-          * Fired just before a `ModalDialog` is opened.
-          *
-          * @event ModalDialog#beforemodalopen
-          * @type {Event}
-          */
-        this.trigger('beforemodalopen');
-        this.opened_ = true;
-
-        // Fill content if the modal has never opened before and
-        // never been filled.
-        if (this.options_.fillAlways || !this.hasBeenOpened_ && !this.hasBeenFilled_) {
+      if (this.opened_) {
+        if (this.options_.fillAlways) {
           this.fill();
         }
-
-        // If the player was playing, pause it and take note of its previously
-        // playing state.
-        this.wasPlaying_ = !player.paused();
-        if (this.options_.pauseOnOpen && this.wasPlaying_) {
-          player.pause();
-        }
-        this.on('keydown', this.handleKeyDown_);
-
-        // Hide controls and note if they were enabled.
-        this.hadControls_ = player.controls();
-        player.controls(false);
-        this.show();
-        this.conditionalFocus_();
-        this.el().setAttribute('aria-hidden', 'false');
-
-        /**
-          * Fired just after a `ModalDialog` is opened.
-          *
-          * @event ModalDialog#modalopen
-          * @type {Event}
-          */
-        this.trigger('modalopen');
-        this.hasBeenOpened_ = true;
+        return;
       }
+      const player = this.player();
+
+      /**
+        * Fired just before a `ModalDialog` is opened.
+        *
+        * @event ModalDialog#beforemodalopen
+        * @type {Event}
+        */
+      this.trigger('beforemodalopen');
+      this.opened_ = true;
+
+      // Fill content if the modal has never opened before and
+      // never been filled.
+      if (this.options_.fillAlways || !this.hasBeenOpened_ && !this.hasBeenFilled_) {
+        this.fill();
+      }
+
+      // If the player was playing, pause it and take note of its previously
+      // playing state.
+      this.wasPlaying_ = !player.paused();
+      if (this.options_.pauseOnOpen && this.wasPlaying_) {
+        player.pause();
+      }
+      this.on('keydown', this.handleKeyDown_);
+
+      // Hide controls and note if they were enabled.
+      this.hadControls_ = player.controls();
+      player.controls(false);
+      this.show();
+      this.conditionalFocus_();
+      this.el().setAttribute('aria-hidden', 'false');
+
+      /**
+        * Fired just after a `ModalDialog` is opened.
+        *
+        * @event ModalDialog#modalopen
+        * @type {Event}
+        */
+      this.trigger('modalopen');
+      this.hasBeenOpened_ = true;
     }
 
     /**
@@ -5992,8 +6274,13 @@
         *
         * @event ModalDialog#modalclose
         * @type {Event}
+        *
+        * @property {boolean} [bubbles=true]
         */
-      this.trigger('modalclose');
+      this.trigger({
+        type: 'modalclose',
+        bubbles: true
+      });
       this.conditionalBlur_();
       if (this.options_.temporary) {
         this.dispose();
@@ -6052,7 +6339,7 @@
      * @fires ModalDialog#beforemodalfill
      * @fires ModalDialog#modalfill
      *
-     * @param { import('./utils/dom').ContentDescriptor} [content]
+     * @param {ContentDescriptor} [content]
      *        The same rules apply to this as apply to the `content` option.
      */
     fillWith(content) {
@@ -6094,6 +6381,14 @@
       if (closeButton) {
         parentEl.appendChild(closeButton.el_);
       }
+
+      /**
+       * Fired after `ModalDialog` is re-filled with content & close button is appended.
+       *
+       * @event ModalDialog#aftermodalfill
+       * @type {Event}
+       */
+      this.trigger('aftermodalfill');
     }
 
     /**
@@ -6128,12 +6423,12 @@
      * This does not update the DOM or fill the modal, but it is called during
      * that process.
      *
-     * @param  { import('./utils/dom').ContentDescriptor} [value]
+     * @param  {ContentDescriptor} [value]
      *         If defined, sets the internal content value to be used on the
      *         next call(s) to `fill`. This value is normalized before being
      *         inserted. To "clear" the internal content value, pass `null`.
      *
-     * @return { import('./utils/dom').ContentDescriptor}
+     * @return {ContentDescriptor}
      *         The current content of the modal dialog
      */
     content(value) {
@@ -6176,16 +6471,28 @@
      * @listens keydown
      */
     handleKeyDown(event) {
+      /**
+       * Fired a custom keyDown event that bubbles.
+       *
+       * @event ModalDialog#modalKeydown
+       * @type {Event}
+       */
+      this.trigger({
+        type: 'modalKeydown',
+        originalEvent: event,
+        target: this,
+        bubbles: true
+      });
       // Do not allow keydowns to reach out of the modal dialog.
       event.stopPropagation();
-      if (keycode.isEventKey(event, 'Escape') && this.closeable()) {
+      if (event.key === 'Escape' && this.closeable()) {
         event.preventDefault();
         this.close();
         return;
       }
 
       // exit early if it isn't a tab key
-      if (!keycode.isEventKey(event, 'Tab')) {
+      if (event.key !== 'Tab') {
         return;
       }
       const focusableEls = this.focusableEls_();
@@ -6238,6 +6545,8 @@
    * @file track-list.js
    */
 
+  /** @import Track from './track' */
+
   /**
    * Common functionaliy between {@link TextTrackList}, {@link AudioTrackList}, and
    * {@link VideoTrackList}
@@ -6248,7 +6557,7 @@
     /**
      * Create an instance of this class
      *
-     * @param { import('./track').default[] } tracks
+     * @param { Track[] } tracks
      *        A list of tracks to initialize the list with.
      *
      * @abstract
@@ -6276,7 +6585,7 @@
     /**
      * Add a {@link Track} to the `TrackList`
      *
-     * @param { import('./track').default } track
+     * @param {Track} track
      *        The audio, video, or text track to add to the list.
      *
      * @fires TrackList#addtrack
@@ -6332,7 +6641,7 @@
     /**
      * Remove a {@link Track} from the `TrackList`
      *
-     * @param { import('./track').default } rtrack
+     * @param {Track} rtrack
      *        The audio, video, or text track to remove from the list.
      *
      * @fires TrackList#removetrack
@@ -6373,7 +6682,7 @@
      *
      * @param {string} id - the id of the track to get
      * @method getTrackById
-     * @return { import('./track').default }
+     * @return {Track}
      * @private
      */
     getTrackById(id) {
@@ -6400,7 +6709,7 @@
    * Events that can be called with on + eventName. See {@link EventHandler}.
    *
    * @property {Object} TrackList#allowedEvents_
-   * @private
+   * @protected
    */
   TrackList.prototype.allowedEvents_ = {
     change: 'change',
@@ -6418,6 +6727,8 @@
    * @file audio-track-list.js
    */
 
+  /** @import AudioTrack from './audio-track' */
+
   /**
    * Anywhere we call this function we diverge from the spec
    * as we only support one enabled audiotrack at a time
@@ -6425,7 +6736,7 @@
    * @param {AudioTrackList} list
    *        list to work on
    *
-   * @param { import('./audio-track').default } track
+   * @param {AudioTrack} track
    *        The track to skip
    *
    * @private
@@ -6469,7 +6780,7 @@
     /**
      * Add an {@link AudioTrack} to the `AudioTrackList`.
      *
-     * @param { import('./audio-track').default } track
+     * @param {AudioTrack} track
      *        The AudioTrack to add to the list
      *
      * @fires TrackList#addtrack
@@ -6515,13 +6826,15 @@
    * @file video-track-list.js
    */
 
+  /** @import VideoTrack from './video-track' */
+
   /**
    * Un-select all other {@link VideoTrack}s that are selected.
    *
    * @param {VideoTrackList} list
    *        list to work on
    *
-   * @param { import('./video-track').default } track
+   * @param {VideoTrack} track
    *        The track to skip
    *
    * @private
@@ -6581,7 +6894,7 @@
     /**
      * Add a {@link VideoTrack} to the `VideoTrackList`.
      *
-     * @param { import('./video-track').default } track
+     * @param {VideoTrack} track
      *        The VideoTrack to add to the list
      *
      * @fires TrackList#addtrack
@@ -6624,6 +6937,8 @@
    * @file text-track-list.js
    */
 
+  /** @import TextTrack from './text-track' */
+
   /**
    * The current list of {@link TextTrack} for a media file.
    *
@@ -6634,7 +6949,7 @@
     /**
      * Add a {@link TextTrack} to the `TextTrackList`
      *
-     * @param { import('./text-track').default } track
+     * @param {TextTrack} track
      *        The text track to add to the list.
      *
      * @fires TrackList#addtrack
@@ -6670,6 +6985,16 @@
           rtrack.removeEventListener('modechange', this.triggerSelectedlanguagechange_);
         }
       }
+    }
+
+    /**
+     * Creates a serializable array of objects that contains serialized copies
+     * of each text track.
+     *
+     * @return {Object[]} A serializable list of objects for the text track list
+     */
+    toJSON() {
+      return this.tracks_.map(track => track.toJSON());
     }
   }
 
@@ -7063,74 +7388,17 @@
    */
 
   /**
-   * @typedef {Object} url:URLObject
-   *
-   * @property {string} protocol
-   *           The protocol of the url that was parsed.
-   *
-   * @property {string} hostname
-   *           The hostname of the url that was parsed.
-   *
-   * @property {string} port
-   *           The port of the url that was parsed.
-   *
-   * @property {string} pathname
-   *           The pathname of the url that was parsed.
-   *
-   * @property {string} search
-   *           The search query of the url that was parsed.
-   *
-   * @property {string} hash
-   *           The hash of the url that was parsed.
-   *
-   * @property {string} host
-   *           The host of the url that was parsed.
-   */
-
-  /**
    * Resolve and parse the elements of a URL.
    *
    * @function
-   * @param    {String} url
+   * @param    {string} url
    *           The url to parse
    *
-   * @return   {url:URLObject}
+   * @return   {URL}
    *           An object of url details
    */
   const parseUrl = function (url) {
-    // This entire method can be replace with URL once we are able to drop IE11
-
-    const props = ['protocol', 'hostname', 'port', 'pathname', 'search', 'hash', 'host'];
-
-    // add the url to an anchor and let the browser parse the URL
-    const a = document.createElement('a');
-    a.href = url;
-
-    // Copy the specific URL properties to a new object
-    // This is also needed for IE because the anchor loses its
-    // properties when it's removed from the dom
-    const details = {};
-    for (let i = 0; i < props.length; i++) {
-      details[props[i]] = a[props[i]];
-    }
-
-    // IE adds the port to the host property unlike everyone else. If
-    // a port identifier is added for standard ports, strip it.
-    if (details.protocol === 'http:') {
-      details.host = details.host.replace(/:80$/, '');
-    }
-    if (details.protocol === 'https:') {
-      details.host = details.host.replace(/:443$/, '');
-    }
-    if (!details.protocol) {
-      details.protocol = window.location.protocol;
-    }
-
-    /* istanbul ignore if */
-    if (!details.host) {
-      details.host = window.location.host;
-    }
-    return details;
+    return new URL(url, document.baseURI);
   };
 
   /**
@@ -7142,18 +7410,9 @@
    *
    * @return   {string}
    *           Absolute URL
-   *
-   * @see      http://stackoverflow.com/questions/470832/getting-an-absolute-url-from-a-relative-one-ie6-issue
    */
   const getAbsoluteURL = function (url) {
-    // Check if absolute URL
-    if (!url.match(/^https?:\/\//)) {
-      // Add the url to an anchor and let the browser parse it to convert to an absolute url
-      const a = document.createElement('a');
-      a.href = url;
-      url = a.href;
-    }
-    return url;
+    return new URL(url, document.baseURI).href;
   };
 
   /**
@@ -7170,11 +7429,9 @@
    */
   const getFileExtension = function (path) {
     if (typeof path === 'string') {
-      const splitPathRe = /^(\/?)([\s\S]*?)((?:\.{1,2}|[^\/]+?)(\.([^\.\/\?]+)))(?:[\/]*|[\?].*)$/;
-      const pathParts = splitPathRe.exec(path);
-      if (pathParts) {
-        return pathParts.pop().toLowerCase();
-      }
+      const cleanPath = path.split('?')[0].replace(/\/+$/, '');
+      const match = cleanPath.match(/\.([^.\/]+)$/);
+      return match ? match[1].toLowerCase() : '';
     }
     return '';
   };
@@ -7186,28 +7443,14 @@
    * @param    {string} url
    *           The url to check.
    *
-   * @param    {Object} [winLoc]
+   * @param    {URL} [winLoc]
    *           the domain to check the url against, defaults to window.location
-   *
-   * @param    {string} [winLoc.protocol]
-   *           The window location protocol defaults to window.location.protocol
-   *
-   * @param    {string} [winLoc.host]
-   *           The window location host defaults to window.location.host
    *
    * @return   {boolean}
    *           Whether it is a cross domain request or not.
    */
   const isCrossOrigin = function (url, winLoc = window.location) {
-    const urlInfo = parseUrl(url);
-
-    // IE8 protocol relative urls will return ':' for protocol
-    const srcProtocol = urlInfo.protocol === ':' ? winLoc.protocol : urlInfo.protocol;
-
-    // Check if url is for another domain/origin
-    // IE8 doesn't know location.origin, so we won't rely on it here
-    const crossOrigin = srcProtocol + urlInfo.host !== winLoc.protocol + winLoc.host;
-    return crossOrigin;
+    return parseUrl(url).origin !== winLoc.origin;
   };
 
   var Url = /*#__PURE__*/Object.freeze({
@@ -7217,6 +7460,16 @@
     getFileExtension: getFileExtension,
     isCrossOrigin: isCrossOrigin
   });
+
+  var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+  function unwrapExports (x) {
+  	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+  }
+
+  function createCommonjsModule(fn, module) {
+  	return module = { exports: {} }, fn(module, module.exports), module.exports;
+  }
 
   var win;
   if (typeof window !== "undefined") {
@@ -7232,18 +7485,13 @@
 
   var _extends_1 = createCommonjsModule(function (module) {
     function _extends() {
-      module.exports = _extends = Object.assign ? Object.assign.bind() : function (target) {
-        for (var i = 1; i < arguments.length; i++) {
-          var source = arguments[i];
-          for (var key in source) {
-            if (Object.prototype.hasOwnProperty.call(source, key)) {
-              target[key] = source[key];
-            }
-          }
+      return (module.exports = _extends = Object.assign ? Object.assign.bind() : function (n) {
+        for (var e = 1; e < arguments.length; e++) {
+          var t = arguments[e];
+          for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
         }
-        return target;
-      }, module.exports.__esModule = true, module.exports["default"] = module.exports;
-      return _extends.apply(this, arguments);
+        return n;
+      }, module.exports.__esModule = true, module.exports["default"] = module.exports), _extends.apply(null, arguments);
     }
     module.exports = _extends, module.exports.__esModule = true, module.exports["default"] = module.exports;
   });
@@ -7260,6 +7508,217 @@
     // IE8 and below
     fn === window.setTimeout || fn === window.alert || fn === window.confirm || fn === window.prompt);
   }
+
+  function _createForOfIteratorHelperLoose(o, allowArrayLike) {
+    var it = typeof Symbol !== "undefined" && o[Symbol.iterator] || o["@@iterator"];
+    if (it) return (it = it.call(o)).next.bind(it);
+    if (Array.isArray(o) || (it = _unsupportedIterableToArray(o)) || allowArrayLike && o && typeof o.length === "number") {
+      if (it) o = it;
+      var i = 0;
+      return function () {
+        if (i >= o.length) return {
+          done: true
+        };
+        return {
+          done: false,
+          value: o[i++]
+        };
+      };
+    }
+    throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
+  }
+  function _unsupportedIterableToArray(o, minLen) {
+    if (!o) return;
+    if (typeof o === "string") return _arrayLikeToArray(o, minLen);
+    var n = Object.prototype.toString.call(o).slice(8, -1);
+    if (n === "Object" && o.constructor) n = o.constructor.name;
+    if (n === "Map" || n === "Set") return Array.from(o);
+    if (n === "Arguments" || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(n)) return _arrayLikeToArray(o, minLen);
+  }
+  function _arrayLikeToArray(arr, len) {
+    if (len == null || len > arr.length) len = arr.length;
+    for (var i = 0, arr2 = new Array(len); i < len; i++) {
+      arr2[i] = arr[i];
+    }
+    return arr2;
+  }
+  var InterceptorsStorage = /*#__PURE__*/function () {
+    function InterceptorsStorage() {
+      this.typeToInterceptorsMap_ = new Map();
+      this.enabled_ = false;
+    }
+    var _proto = InterceptorsStorage.prototype;
+    _proto.getIsEnabled = function getIsEnabled() {
+      return this.enabled_;
+    };
+    _proto.enable = function enable() {
+      this.enabled_ = true;
+    };
+    _proto.disable = function disable() {
+      this.enabled_ = false;
+    };
+    _proto.reset = function reset() {
+      this.typeToInterceptorsMap_ = new Map();
+      this.enabled_ = false;
+    };
+    _proto.addInterceptor = function addInterceptor(type, interceptor) {
+      if (!this.typeToInterceptorsMap_.has(type)) {
+        this.typeToInterceptorsMap_.set(type, new Set());
+      }
+      var interceptorsSet = this.typeToInterceptorsMap_.get(type);
+      if (interceptorsSet.has(interceptor)) {
+        // already have this interceptor
+        return false;
+      }
+      interceptorsSet.add(interceptor);
+      return true;
+    };
+    _proto.removeInterceptor = function removeInterceptor(type, interceptor) {
+      var interceptorsSet = this.typeToInterceptorsMap_.get(type);
+      if (interceptorsSet && interceptorsSet.has(interceptor)) {
+        interceptorsSet.delete(interceptor);
+        return true;
+      }
+      return false;
+    };
+    _proto.clearInterceptorsByType = function clearInterceptorsByType(type) {
+      var interceptorsSet = this.typeToInterceptorsMap_.get(type);
+      if (!interceptorsSet) {
+        return false;
+      }
+      this.typeToInterceptorsMap_.delete(type);
+      this.typeToInterceptorsMap_.set(type, new Set());
+      return true;
+    };
+    _proto.clear = function clear() {
+      if (!this.typeToInterceptorsMap_.size) {
+        return false;
+      }
+      this.typeToInterceptorsMap_ = new Map();
+      return true;
+    };
+    _proto.getForType = function getForType(type) {
+      return this.typeToInterceptorsMap_.get(type) || new Set();
+    };
+    _proto.execute = function execute(type, payload) {
+      var interceptors = this.getForType(type);
+      for (var _iterator = _createForOfIteratorHelperLoose(interceptors), _step; !(_step = _iterator()).done;) {
+        var interceptor = _step.value;
+        try {
+          payload = interceptor(payload);
+        } catch (e) {//ignore
+        }
+      }
+      return payload;
+    };
+    return InterceptorsStorage;
+  }();
+  var interceptors = InterceptorsStorage;
+
+  var RetryManager = /*#__PURE__*/function () {
+    function RetryManager() {
+      this.maxAttempts_ = 1;
+      this.delayFactor_ = 0.1;
+      this.fuzzFactor_ = 0.1;
+      this.initialDelay_ = 1000;
+      this.enabled_ = false;
+    }
+    var _proto = RetryManager.prototype;
+    _proto.getIsEnabled = function getIsEnabled() {
+      return this.enabled_;
+    };
+    _proto.enable = function enable() {
+      this.enabled_ = true;
+    };
+    _proto.disable = function disable() {
+      this.enabled_ = false;
+    };
+    _proto.reset = function reset() {
+      this.maxAttempts_ = 1;
+      this.delayFactor_ = 0.1;
+      this.fuzzFactor_ = 0.1;
+      this.initialDelay_ = 1000;
+      this.enabled_ = false;
+    };
+    _proto.getMaxAttempts = function getMaxAttempts() {
+      return this.maxAttempts_;
+    };
+    _proto.setMaxAttempts = function setMaxAttempts(maxAttempts) {
+      this.maxAttempts_ = maxAttempts;
+    };
+    _proto.getDelayFactor = function getDelayFactor() {
+      return this.delayFactor_;
+    };
+    _proto.setDelayFactor = function setDelayFactor(delayFactor) {
+      this.delayFactor_ = delayFactor;
+    };
+    _proto.getFuzzFactor = function getFuzzFactor() {
+      return this.fuzzFactor_;
+    };
+    _proto.setFuzzFactor = function setFuzzFactor(fuzzFactor) {
+      this.fuzzFactor_ = fuzzFactor;
+    };
+    _proto.getInitialDelay = function getInitialDelay() {
+      return this.initialDelay_;
+    };
+    _proto.setInitialDelay = function setInitialDelay(initialDelay) {
+      this.initialDelay_ = initialDelay;
+    };
+    _proto.createRetry = function createRetry(_temp) {
+      var _ref = _temp === void 0 ? {} : _temp,
+        maxAttempts = _ref.maxAttempts,
+        delayFactor = _ref.delayFactor,
+        fuzzFactor = _ref.fuzzFactor,
+        initialDelay = _ref.initialDelay;
+      return new Retry({
+        maxAttempts: maxAttempts || this.maxAttempts_,
+        delayFactor: delayFactor || this.delayFactor_,
+        fuzzFactor: fuzzFactor || this.fuzzFactor_,
+        initialDelay: initialDelay || this.initialDelay_
+      });
+    };
+    return RetryManager;
+  }();
+  var Retry = /*#__PURE__*/function () {
+    function Retry(options) {
+      this.maxAttempts_ = options.maxAttempts;
+      this.delayFactor_ = options.delayFactor;
+      this.fuzzFactor_ = options.fuzzFactor;
+      this.currentDelay_ = options.initialDelay;
+      this.currentAttempt_ = 1;
+    }
+    var _proto2 = Retry.prototype;
+    _proto2.moveToNextAttempt = function moveToNextAttempt() {
+      this.currentAttempt_++;
+      var delayDelta = this.currentDelay_ * this.delayFactor_;
+      this.currentDelay_ = this.currentDelay_ + delayDelta;
+    };
+    _proto2.shouldRetry = function shouldRetry() {
+      return this.currentAttempt_ < this.maxAttempts_;
+    };
+    _proto2.getCurrentDelay = function getCurrentDelay() {
+      return this.currentDelay_;
+    };
+    _proto2.getCurrentMinPossibleDelay = function getCurrentMinPossibleDelay() {
+      return (1 - this.fuzzFactor_) * this.currentDelay_;
+    };
+    _proto2.getCurrentMaxPossibleDelay = function getCurrentMaxPossibleDelay() {
+      return (1 + this.fuzzFactor_) * this.currentDelay_;
+    }
+    /**
+     * For example fuzzFactor is 0.1
+     * This means ±10% deviation
+     * So if we have delay as 1000
+     * This function can generate any value from 900 to 1100
+     */;
+    _proto2.getCurrentFuzzedDelay = function getCurrentFuzzedDelay() {
+      var lowValue = this.getCurrentMinPossibleDelay();
+      var highValue = this.getCurrentMaxPossibleDelay();
+      return lowValue + Math.random() * (highValue - lowValue);
+    };
+    return Retry;
+  }();
+  var retry = RetryManager;
 
   var httpResponseHandler = function httpResponseHandler(callback, decodeResponseBody) {
     if (decodeResponseBody === void 0) {
@@ -7310,6 +7769,9 @@
   var httpHandler = httpResponseHandler;
 
   createXHR.httpHandler = httpHandler;
+  createXHR.requestInterceptorsStorage = new interceptors();
+  createXHR.responseInterceptorsStorage = new interceptors();
+  createXHR.retryManager = new retry();
   /**
    * @license
    * slighly modified parse-headers 2.0.2 <https://github.com/kesla/parse-headers/>
@@ -7384,6 +7846,24 @@
   function _createXHR(options) {
     if (typeof options.callback === "undefined") {
       throw new Error("callback argument missing");
+    } // call all registered request interceptors for a given request type:
+
+    if (options.requestType && createXHR.requestInterceptorsStorage.getIsEnabled()) {
+      var requestInterceptorPayload = {
+        uri: options.uri || options.url,
+        headers: options.headers || {},
+        body: options.body,
+        metadata: options.metadata || {},
+        retry: options.retry,
+        timeout: options.timeout
+      };
+      var updatedPayload = createXHR.requestInterceptorsStorage.execute(options.requestType, requestInterceptorPayload);
+      options.uri = updatedPayload.uri;
+      options.headers = updatedPayload.headers;
+      options.body = updatedPayload.body;
+      options.metadata = updatedPayload.metadata;
+      options.retry = updatedPayload.retry;
+      options.timeout = updatedPayload.timeout;
     }
     var called = false;
     var callback = function cbOnce(err, response, body) {
@@ -7393,7 +7873,9 @@
       }
     };
     function readystatechange() {
-      if (xhr.readyState === 4) {
+      // do not call load 2 times when response interceptors are enabled
+      // why do we even need this 2nd load?
+      if (xhr.readyState === 4 && !createXHR.responseInterceptorsStorage.getIsEnabled()) {
         setTimeout(loadFunc, 0);
       }
     }
@@ -7414,10 +7896,33 @@
     }
     function errorFunc(evt) {
       clearTimeout(timeoutTimer);
+      clearTimeout(options.retryTimeout);
       if (!(evt instanceof Error)) {
         evt = new Error("" + (evt || "Unknown XMLHttpRequest Error"));
       }
-      evt.statusCode = 0;
+      evt.statusCode = 0; // we would like to retry on error:
+
+      if (!aborted && createXHR.retryManager.getIsEnabled() && options.retry && options.retry.shouldRetry()) {
+        options.retryTimeout = setTimeout(function () {
+          options.retry.moveToNextAttempt(); // we want to re-use the same options and the same xhr object:
+
+          options.xhr = xhr;
+          _createXHR(options);
+        }, options.retry.getCurrentFuzzedDelay());
+        return;
+      } // call all registered response interceptors for a given request type:
+
+      if (options.requestType && createXHR.responseInterceptorsStorage.getIsEnabled()) {
+        var responseInterceptorPayload = {
+          headers: failureResponse.headers || {},
+          body: failureResponse.body,
+          responseUrl: xhr.responseURL,
+          responseType: xhr.responseType
+        };
+        var _updatedPayload = createXHR.responseInterceptorsStorage.execute(options.requestType, responseInterceptorPayload);
+        failureResponse.body = _updatedPayload.body;
+        failureResponse.headers = _updatedPayload.headers;
+      }
       return callback(evt, failureResponse);
     } // will load the data & process the response in a special response object
 
@@ -7425,6 +7930,7 @@
       if (aborted) return;
       var status;
       clearTimeout(timeoutTimer);
+      clearTimeout(options.retryTimeout);
       if (options.useXDR && xhr.status === undefined) {
         //IE8 CORS GET successful response doesn't have a status field, but body is fine
         status = 200;
@@ -7448,6 +7954,18 @@
         }
       } else {
         err = new Error("Internal XMLHttpRequest Error");
+      } // call all registered response interceptors for a given request type:
+
+      if (options.requestType && createXHR.responseInterceptorsStorage.getIsEnabled()) {
+        var responseInterceptorPayload = {
+          headers: response.headers || {},
+          body: response.body,
+          responseUrl: xhr.responseURL,
+          responseType: xhr.responseType
+        };
+        var _updatedPayload2 = createXHR.responseInterceptorsStorage.execute(options.requestType, responseInterceptorPayload);
+        response.body = _updatedPayload2.body;
+        response.headers = _updatedPayload2.headers;
       }
       return callback(err, response, response.body);
     }
@@ -7494,6 +8012,7 @@
     };
     xhr.onabort = function () {
       aborted = true;
+      clearTimeout(options.retryTimeout);
     };
     xhr.ontimeout = errorFunc;
     xhr.open(method, uri, !sync, options.username, options.password); //has to be after open
@@ -7556,6 +8075,8 @@
   /**
    * @file text-track.js
    */
+
+  /** @import Tech from '../tech/tech' */
 
   /**
    * Takes a webvtt file contents and parses it into cues
@@ -7658,7 +8179,7 @@
      * @param {Object} options={}
      *        Object of option names and values
      *
-     * @param { import('../tech/tech').default } options.tech
+     * @param {Tech} options.tech
      *        A reference to the tech that owns this TextTrack.
      *
      * @param {TextTrack~Kind} [options.kind='subtitles']
@@ -7888,7 +8409,9 @@
      */
     addCue(originalCue) {
       let cue = originalCue;
-      if (window.vttjs && !(originalCue instanceof window.vttjs.VTTCue)) {
+
+      // Testing if the cue is a VTTCue in a way that survives minification
+      if (!('getCueAsHTML' in cue)) {
         cue = new window.vttjs.VTTCue(originalCue.startTime, originalCue.endTime, originalCue.text);
         for (const prop in originalCue) {
           if (!(prop in cue)) {
@@ -7908,6 +8431,16 @@
       }
       this.cues_.push(cue);
       this.cues.setCues_(this.cues_);
+    }
+
+    /**
+     * Creates a copy of the text track and makes it serializable
+     * by removing circular dependencies.
+     *
+     * @return {Object} The track information as a serializable object
+     */
+    toJSON() {
+      return textTrackConverter.trackToJson(this);
     }
 
     /**
@@ -7931,6 +8464,8 @@
 
   /**
    * cuechange - One or more cues in the track have become active or stopped being active.
+   *
+   * @protected
    */
   TextTrack.prototype.allowedEvents_ = {
     cuechange: 'cuechange'
@@ -8099,6 +8634,8 @@
    * @file html-track-element.js
    */
 
+  /** @import Tech from '../tech/tech' */
+
   /**
    * A single track represented in the DOM.
    *
@@ -8112,7 +8649,7 @@
      * @param {Object} options={}
      *        Object of option names and values
      *
-     * @param { import('../tech/tech').default } options.tech
+     * @param {Tech} options.tech
      *        A reference to the tech that owns this HTMLTrackElement.
      *
      * @param {TextTrack~Kind} [options.kind='subtitles']
@@ -8189,6 +8726,10 @@
       });
     }
   }
+
+  /**
+   * @protected
+   */
   HTMLTrackElement.prototype.allowedEvents_ = {
     load: 'load'
   };
@@ -8272,11 +8813,1715 @@
   NORMAL.names = Object.keys(NORMAL);
   ALL.names = [].concat(REMOTE.names).concat(NORMAL.names);
 
-  var vtt = {};
+  var minDoc = {};
+
+  var topLevel = typeof commonjsGlobal !== 'undefined' ? commonjsGlobal : typeof window !== 'undefined' ? window : {};
+  var doccy;
+  if (typeof document !== 'undefined') {
+    doccy = document;
+  } else {
+    doccy = topLevel['__GLOBAL_DOCUMENT_CACHE@4'];
+    if (!doccy) {
+      doccy = topLevel['__GLOBAL_DOCUMENT_CACHE@4'] = minDoc;
+    }
+  }
+  var document_1 = doccy;
+
+  /**
+   * Copyright 2013 vtt.js Contributors
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+
+  /* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+  /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+
+  var _objCreate = Object.create || function () {
+    function F() {}
+    return function (o) {
+      if (arguments.length !== 1) {
+        throw new Error('Object.create shim only accepts one parameter.');
+      }
+      F.prototype = o;
+      return new F();
+    };
+  }();
+
+  // Creates a new ParserError object from an errorData object. The errorData
+  // object should have default code and message properties. The default message
+  // property can be overriden by passing in a message parameter.
+  // See ParsingError.Errors below for acceptable errors.
+  function ParsingError(errorData, message) {
+    this.name = "ParsingError";
+    this.code = errorData.code;
+    this.message = message || errorData.message;
+  }
+  ParsingError.prototype = _objCreate(Error.prototype);
+  ParsingError.prototype.constructor = ParsingError;
+
+  // ParsingError metadata for acceptable ParsingErrors.
+  ParsingError.Errors = {
+    BadSignature: {
+      code: 0,
+      message: "Malformed WebVTT signature."
+    },
+    BadTimeStamp: {
+      code: 1,
+      message: "Malformed time stamp."
+    }
+  };
+
+  // Try to parse input as a time stamp.
+  function parseTimeStamp(input) {
+    function computeSeconds(h, m, s, f) {
+      return (h | 0) * 3600 + (m | 0) * 60 + (s | 0) + (f | 0) / 1000;
+    }
+    var m = input.match(/^(\d+):(\d{1,2})(:\d{1,2})?\.(\d{3})/);
+    if (!m) {
+      return null;
+    }
+    if (m[3]) {
+      // Timestamp takes the form of [hours]:[minutes]:[seconds].[milliseconds]
+      return computeSeconds(m[1], m[2], m[3].replace(":", ""), m[4]);
+    } else if (m[1] > 59) {
+      // Timestamp takes the form of [hours]:[minutes].[milliseconds]
+      // First position is hours as it's over 59.
+      return computeSeconds(m[1], m[2], 0, m[4]);
+    } else {
+      // Timestamp takes the form of [minutes]:[seconds].[milliseconds]
+      return computeSeconds(0, m[1], m[2], m[4]);
+    }
+  }
+
+  // A settings object holds key/value pairs and will ignore anything but the first
+  // assignment to a specific key.
+  function Settings() {
+    this.values = _objCreate(null);
+  }
+  Settings.prototype = {
+    // Only accept the first assignment to any key.
+    set: function (k, v) {
+      if (!this.get(k) && v !== "") {
+        this.values[k] = v;
+      }
+    },
+    // Return the value for a key, or a default value.
+    // If 'defaultKey' is passed then 'dflt' is assumed to be an object with
+    // a number of possible default values as properties where 'defaultKey' is
+    // the key of the property that will be chosen; otherwise it's assumed to be
+    // a single value.
+    get: function (k, dflt, defaultKey) {
+      if (defaultKey) {
+        return this.has(k) ? this.values[k] : dflt[defaultKey];
+      }
+      return this.has(k) ? this.values[k] : dflt;
+    },
+    // Check whether we have a value for a key.
+    has: function (k) {
+      return k in this.values;
+    },
+    // Accept a setting if its one of the given alternatives.
+    alt: function (k, v, a) {
+      for (var n = 0; n < a.length; ++n) {
+        if (v === a[n]) {
+          this.set(k, v);
+          break;
+        }
+      }
+    },
+    // Accept a setting if its a valid (signed) integer.
+    integer: function (k, v) {
+      if (/^-?\d+$/.test(v)) {
+        // integer
+        this.set(k, parseInt(v, 10));
+      }
+    },
+    // Accept a setting if its a valid percentage.
+    percent: function (k, v) {
+      if (v.match(/^([\d]{1,3})(\.[\d]*)?%$/)) {
+        v = parseFloat(v);
+        if (v >= 0 && v <= 100) {
+          this.set(k, v);
+          return true;
+        }
+      }
+      return false;
+    }
+  };
+
+  // Helper function to parse input into groups separated by 'groupDelim', and
+  // interprete each group as a key/value pair separated by 'keyValueDelim'.
+  function parseOptions(input, callback, keyValueDelim, groupDelim) {
+    var groups = groupDelim ? input.split(groupDelim) : [input];
+    for (var i in groups) {
+      if (typeof groups[i] !== "string") {
+        continue;
+      }
+      var kv = groups[i].split(keyValueDelim);
+      if (kv.length !== 2) {
+        continue;
+      }
+      var k = kv[0].trim();
+      var v = kv[1].trim();
+      callback(k, v);
+    }
+  }
+  function parseCue(input, cue, regionList) {
+    // Remember the original input if we need to throw an error.
+    var oInput = input;
+    // 4.1 WebVTT timestamp
+    function consumeTimeStamp() {
+      var ts = parseTimeStamp(input);
+      if (ts === null) {
+        throw new ParsingError(ParsingError.Errors.BadTimeStamp, "Malformed timestamp: " + oInput);
+      }
+      // Remove time stamp from input.
+      input = input.replace(/^[^\sa-zA-Z-]+/, "");
+      return ts;
+    }
+
+    // 4.4.2 WebVTT cue settings
+    function consumeCueSettings(input, cue) {
+      var settings = new Settings();
+      parseOptions(input, function (k, v) {
+        switch (k) {
+          case "region":
+            // Find the last region we parsed with the same region id.
+            for (var i = regionList.length - 1; i >= 0; i--) {
+              if (regionList[i].id === v) {
+                settings.set(k, regionList[i].region);
+                break;
+              }
+            }
+            break;
+          case "vertical":
+            settings.alt(k, v, ["rl", "lr"]);
+            break;
+          case "line":
+            var vals = v.split(","),
+              vals0 = vals[0];
+            settings.integer(k, vals0);
+            settings.percent(k, vals0) ? settings.set("snapToLines", false) : null;
+            settings.alt(k, vals0, ["auto"]);
+            if (vals.length === 2) {
+              settings.alt("lineAlign", vals[1], ["start", "center", "end"]);
+            }
+            break;
+          case "position":
+            vals = v.split(",");
+            settings.percent(k, vals[0]);
+            if (vals.length === 2) {
+              settings.alt("positionAlign", vals[1], ["start", "center", "end"]);
+            }
+            break;
+          case "size":
+            settings.percent(k, v);
+            break;
+          case "align":
+            settings.alt(k, v, ["start", "center", "end", "left", "right"]);
+            break;
+        }
+      }, /:/, /\s/);
+
+      // Apply default values for any missing fields.
+      cue.region = settings.get("region", null);
+      cue.vertical = settings.get("vertical", "");
+      try {
+        cue.line = settings.get("line", "auto");
+      } catch (e) {}
+      cue.lineAlign = settings.get("lineAlign", "start");
+      cue.snapToLines = settings.get("snapToLines", true);
+      cue.size = settings.get("size", 100);
+      // Safari still uses the old middle value and won't accept center
+      try {
+        cue.align = settings.get("align", "center");
+      } catch (e) {
+        cue.align = settings.get("align", "middle");
+      }
+      try {
+        cue.position = settings.get("position", "auto");
+      } catch (e) {
+        cue.position = settings.get("position", {
+          start: 0,
+          left: 0,
+          center: 50,
+          middle: 50,
+          end: 100,
+          right: 100
+        }, cue.align);
+      }
+      cue.positionAlign = settings.get("positionAlign", {
+        start: "start",
+        left: "start",
+        center: "center",
+        middle: "center",
+        end: "end",
+        right: "end"
+      }, cue.align);
+    }
+    function skipWhitespace() {
+      input = input.replace(/^\s+/, "");
+    }
+
+    // 4.1 WebVTT cue timings.
+    skipWhitespace();
+    cue.startTime = consumeTimeStamp(); // (1) collect cue start time
+    skipWhitespace();
+    if (input.substr(0, 3) !== "-->") {
+      // (3) next characters must match "-->"
+      throw new ParsingError(ParsingError.Errors.BadTimeStamp, "Malformed time stamp (time stamps must be separated by '-->'): " + oInput);
+    }
+    input = input.substr(3);
+    skipWhitespace();
+    cue.endTime = consumeTimeStamp(); // (5) collect cue end time
+
+    // 4.1 WebVTT cue settings list.
+    skipWhitespace();
+    consumeCueSettings(input, cue);
+  }
+
+  // When evaluating this file as part of a Webpack bundle for server
+  // side rendering, `document` is an empty object.
+  var TEXTAREA_ELEMENT = document_1.createElement && document_1.createElement("textarea");
+  var TAG_NAME = {
+    c: "span",
+    i: "i",
+    b: "b",
+    u: "u",
+    ruby: "ruby",
+    rt: "rt",
+    v: "span",
+    lang: "span"
+  };
+
+  // 5.1 default text color
+  // 5.2 default text background color is equivalent to text color with bg_ prefix
+  var DEFAULT_COLOR_CLASS = {
+    white: 'rgba(255,255,255,1)',
+    lime: 'rgba(0,255,0,1)',
+    cyan: 'rgba(0,255,255,1)',
+    red: 'rgba(255,0,0,1)',
+    yellow: 'rgba(255,255,0,1)',
+    magenta: 'rgba(255,0,255,1)',
+    blue: 'rgba(0,0,255,1)',
+    black: 'rgba(0,0,0,1)'
+  };
+  var TAG_ANNOTATION = {
+    v: "title",
+    lang: "lang"
+  };
+  var NEEDS_PARENT = {
+    rt: "ruby"
+  };
+
+  // Parse content into a document fragment.
+  function parseContent(window, input) {
+    function nextToken() {
+      // Check for end-of-string.
+      if (!input) {
+        return null;
+      }
+
+      // Consume 'n' characters from the input.
+      function consume(result) {
+        input = input.substr(result.length);
+        return result;
+      }
+      var m = input.match(/^([^<]*)(<[^>]*>?)?/);
+      // If there is some text before the next tag, return it, otherwise return
+      // the tag.
+      return consume(m[1] ? m[1] : m[2]);
+    }
+    function unescape(s) {
+      TEXTAREA_ELEMENT.innerHTML = s;
+      s = TEXTAREA_ELEMENT.textContent;
+      TEXTAREA_ELEMENT.textContent = "";
+      return s;
+    }
+    function shouldAdd(current, element) {
+      return !NEEDS_PARENT[element.localName] || NEEDS_PARENT[element.localName] === current.localName;
+    }
+
+    // Create an element for this tag.
+    function createElement(type, annotation) {
+      var tagName = TAG_NAME[type];
+      if (!tagName) {
+        return null;
+      }
+      var element = window.document.createElement(tagName);
+      var name = TAG_ANNOTATION[type];
+      if (name && annotation) {
+        element[name] = annotation.trim();
+      }
+      return element;
+    }
+    var rootDiv = window.document.createElement("div"),
+      current = rootDiv,
+      t,
+      tagStack = [];
+    while ((t = nextToken()) !== null) {
+      if (t[0] === '<') {
+        if (t[1] === "/") {
+          // If the closing tag matches, move back up to the parent node.
+          if (tagStack.length && tagStack[tagStack.length - 1] === t.substr(2).replace(">", "")) {
+            tagStack.pop();
+            current = current.parentNode;
+          }
+          // Otherwise just ignore the end tag.
+          continue;
+        }
+        var ts = parseTimeStamp(t.substr(1, t.length - 2));
+        var node;
+        if (ts) {
+          // Timestamps are lead nodes as well.
+          node = window.document.createProcessingInstruction("timestamp", ts);
+          current.appendChild(node);
+          continue;
+        }
+        var m = t.match(/^<([^.\s/0-9>]+)(\.[^\s\\>]+)?([^>\\]+)?(\\?)>?$/);
+        // If we can't parse the tag, skip to the next tag.
+        if (!m) {
+          continue;
+        }
+        // Try to construct an element, and ignore the tag if we couldn't.
+        node = createElement(m[1], m[3]);
+        if (!node) {
+          continue;
+        }
+        // Determine if the tag should be added based on the context of where it
+        // is placed in the cuetext.
+        if (!shouldAdd(current, node)) {
+          continue;
+        }
+        // Set the class list (as a list of classes, separated by space).
+        if (m[2]) {
+          var classes = m[2].split('.');
+          classes.forEach(function (cl) {
+            var bgColor = /^bg_/.test(cl);
+            // slice out `bg_` if it's a background color
+            var colorName = bgColor ? cl.slice(3) : cl;
+            if (DEFAULT_COLOR_CLASS.hasOwnProperty(colorName)) {
+              var propName = bgColor ? 'background-color' : 'color';
+              var propValue = DEFAULT_COLOR_CLASS[colorName];
+              node.style[propName] = propValue;
+            }
+          });
+          node.className = classes.join(' ');
+        }
+        // Append the node to the current node, and enter the scope of the new
+        // node.
+        tagStack.push(m[1]);
+        current.appendChild(node);
+        current = node;
+        continue;
+      }
+
+      // Text nodes are leaf nodes.
+      current.appendChild(window.document.createTextNode(unescape(t)));
+    }
+    return rootDiv;
+  }
+
+  // This is a list of all the Unicode characters that have a strong
+  // right-to-left category. What this means is that these characters are
+  // written right-to-left for sure. It was generated by pulling all the strong
+  // right-to-left characters out of the Unicode data table. That table can
+  // found at: http://www.unicode.org/Public/UNIDATA/UnicodeData.txt
+  var strongRTLRanges = [[0x5be, 0x5be], [0x5c0, 0x5c0], [0x5c3, 0x5c3], [0x5c6, 0x5c6], [0x5d0, 0x5ea], [0x5f0, 0x5f4], [0x608, 0x608], [0x60b, 0x60b], [0x60d, 0x60d], [0x61b, 0x61b], [0x61e, 0x64a], [0x66d, 0x66f], [0x671, 0x6d5], [0x6e5, 0x6e6], [0x6ee, 0x6ef], [0x6fa, 0x70d], [0x70f, 0x710], [0x712, 0x72f], [0x74d, 0x7a5], [0x7b1, 0x7b1], [0x7c0, 0x7ea], [0x7f4, 0x7f5], [0x7fa, 0x7fa], [0x800, 0x815], [0x81a, 0x81a], [0x824, 0x824], [0x828, 0x828], [0x830, 0x83e], [0x840, 0x858], [0x85e, 0x85e], [0x8a0, 0x8a0], [0x8a2, 0x8ac], [0x200f, 0x200f], [0xfb1d, 0xfb1d], [0xfb1f, 0xfb28], [0xfb2a, 0xfb36], [0xfb38, 0xfb3c], [0xfb3e, 0xfb3e], [0xfb40, 0xfb41], [0xfb43, 0xfb44], [0xfb46, 0xfbc1], [0xfbd3, 0xfd3d], [0xfd50, 0xfd8f], [0xfd92, 0xfdc7], [0xfdf0, 0xfdfc], [0xfe70, 0xfe74], [0xfe76, 0xfefc], [0x10800, 0x10805], [0x10808, 0x10808], [0x1080a, 0x10835], [0x10837, 0x10838], [0x1083c, 0x1083c], [0x1083f, 0x10855], [0x10857, 0x1085f], [0x10900, 0x1091b], [0x10920, 0x10939], [0x1093f, 0x1093f], [0x10980, 0x109b7], [0x109be, 0x109bf], [0x10a00, 0x10a00], [0x10a10, 0x10a13], [0x10a15, 0x10a17], [0x10a19, 0x10a33], [0x10a40, 0x10a47], [0x10a50, 0x10a58], [0x10a60, 0x10a7f], [0x10b00, 0x10b35], [0x10b40, 0x10b55], [0x10b58, 0x10b72], [0x10b78, 0x10b7f], [0x10c00, 0x10c48], [0x1ee00, 0x1ee03], [0x1ee05, 0x1ee1f], [0x1ee21, 0x1ee22], [0x1ee24, 0x1ee24], [0x1ee27, 0x1ee27], [0x1ee29, 0x1ee32], [0x1ee34, 0x1ee37], [0x1ee39, 0x1ee39], [0x1ee3b, 0x1ee3b], [0x1ee42, 0x1ee42], [0x1ee47, 0x1ee47], [0x1ee49, 0x1ee49], [0x1ee4b, 0x1ee4b], [0x1ee4d, 0x1ee4f], [0x1ee51, 0x1ee52], [0x1ee54, 0x1ee54], [0x1ee57, 0x1ee57], [0x1ee59, 0x1ee59], [0x1ee5b, 0x1ee5b], [0x1ee5d, 0x1ee5d], [0x1ee5f, 0x1ee5f], [0x1ee61, 0x1ee62], [0x1ee64, 0x1ee64], [0x1ee67, 0x1ee6a], [0x1ee6c, 0x1ee72], [0x1ee74, 0x1ee77], [0x1ee79, 0x1ee7c], [0x1ee7e, 0x1ee7e], [0x1ee80, 0x1ee89], [0x1ee8b, 0x1ee9b], [0x1eea1, 0x1eea3], [0x1eea5, 0x1eea9], [0x1eeab, 0x1eebb], [0x10fffd, 0x10fffd]];
+  function isStrongRTLChar(charCode) {
+    for (var i = 0; i < strongRTLRanges.length; i++) {
+      var currentRange = strongRTLRanges[i];
+      if (charCode >= currentRange[0] && charCode <= currentRange[1]) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function determineBidi(cueDiv) {
+    var nodeStack = [],
+      text = "",
+      charCode;
+    if (!cueDiv || !cueDiv.childNodes) {
+      return "ltr";
+    }
+    function pushNodes(nodeStack, node) {
+      for (var i = node.childNodes.length - 1; i >= 0; i--) {
+        nodeStack.push(node.childNodes[i]);
+      }
+    }
+    function nextTextNode(nodeStack) {
+      if (!nodeStack || !nodeStack.length) {
+        return null;
+      }
+      var node = nodeStack.pop(),
+        text = node.textContent || node.innerText;
+      if (text) {
+        // TODO: This should match all unicode type B characters (paragraph
+        // separator characters). See issue #115.
+        var m = text.match(/^.*(\n|\r)/);
+        if (m) {
+          nodeStack.length = 0;
+          return m[0];
+        }
+        return text;
+      }
+      if (node.tagName === "ruby") {
+        return nextTextNode(nodeStack);
+      }
+      if (node.childNodes) {
+        pushNodes(nodeStack, node);
+        return nextTextNode(nodeStack);
+      }
+    }
+    pushNodes(nodeStack, cueDiv);
+    while (text = nextTextNode(nodeStack)) {
+      for (var i = 0; i < text.length; i++) {
+        charCode = text.charCodeAt(i);
+        if (isStrongRTLChar(charCode)) {
+          return "rtl";
+        }
+      }
+    }
+    return "ltr";
+  }
+  function computeLinePos(cue) {
+    if (typeof cue.line === "number" && (cue.snapToLines || cue.line >= 0 && cue.line <= 100)) {
+      return cue.line;
+    }
+    if (!cue.track || !cue.track.textTrackList || !cue.track.textTrackList.mediaElement) {
+      return -1;
+    }
+    var track = cue.track,
+      trackList = track.textTrackList,
+      count = 0;
+    for (var i = 0; i < trackList.length && trackList[i] !== track; i++) {
+      if (trackList[i].mode === "showing") {
+        count++;
+      }
+    }
+    return ++count * -1;
+  }
+  function StyleBox() {}
+
+  // Apply styles to a div. If there is no div passed then it defaults to the
+  // div on 'this'.
+  StyleBox.prototype.applyStyles = function (styles, div) {
+    div = div || this.div;
+    for (var prop in styles) {
+      if (styles.hasOwnProperty(prop)) {
+        div.style[prop] = styles[prop];
+      }
+    }
+  };
+  StyleBox.prototype.formatStyle = function (val, unit) {
+    return val === 0 ? 0 : val + unit;
+  };
+
+  // Constructs the computed display state of the cue (a div). Places the div
+  // into the overlay which should be a block level element (usually a div).
+  function CueStyleBox(window, cue, styleOptions) {
+    StyleBox.call(this);
+    this.cue = cue;
+
+    // Parse our cue's text into a DOM tree rooted at 'cueDiv'. This div will
+    // have inline positioning and will function as the cue background box.
+    this.cueDiv = parseContent(window, cue.text);
+    var styles = {
+      color: "rgba(255, 255, 255, 1)",
+      backgroundColor: "rgba(0, 0, 0, 0.8)",
+      position: "relative",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      display: "inline",
+      writingMode: cue.vertical === "" ? "horizontal-tb" : cue.vertical === "lr" ? "vertical-lr" : "vertical-rl",
+      unicodeBidi: "plaintext"
+    };
+    this.applyStyles(styles, this.cueDiv);
+
+    // Create an absolutely positioned div that will be used to position the cue
+    // div. Note, all WebVTT cue-setting alignments are equivalent to the CSS
+    // mirrors of them except middle instead of center on Safari.
+    this.div = window.document.createElement("div");
+    styles = {
+      direction: determineBidi(this.cueDiv),
+      writingMode: cue.vertical === "" ? "horizontal-tb" : cue.vertical === "lr" ? "vertical-lr" : "vertical-rl",
+      unicodeBidi: "plaintext",
+      textAlign: cue.align === "middle" ? "center" : cue.align,
+      font: styleOptions.font,
+      whiteSpace: "pre-line",
+      position: "absolute"
+    };
+    this.applyStyles(styles);
+    this.div.appendChild(this.cueDiv);
+
+    // Calculate the distance from the reference edge of the viewport to the text
+    // position of the cue box. The reference edge will be resolved later when
+    // the box orientation styles are applied.
+    var textPos = 0;
+    switch (cue.positionAlign) {
+      case "start":
+      case "line-left":
+        textPos = cue.position;
+        break;
+      case "center":
+        textPos = cue.position - cue.size / 2;
+        break;
+      case "end":
+      case "line-right":
+        textPos = cue.position - cue.size;
+        break;
+    }
+
+    // Horizontal box orientation; textPos is the distance from the left edge of the
+    // area to the left edge of the box and cue.size is the distance extending to
+    // the right from there.
+    if (cue.vertical === "") {
+      this.applyStyles({
+        left: this.formatStyle(textPos, "%"),
+        width: this.formatStyle(cue.size, "%")
+      });
+      // Vertical box orientation; textPos is the distance from the top edge of the
+      // area to the top edge of the box and cue.size is the height extending
+      // downwards from there.
+    } else {
+      this.applyStyles({
+        top: this.formatStyle(textPos, "%"),
+        height: this.formatStyle(cue.size, "%")
+      });
+    }
+    this.move = function (box) {
+      this.applyStyles({
+        top: this.formatStyle(box.top, "px"),
+        bottom: this.formatStyle(box.bottom, "px"),
+        left: this.formatStyle(box.left, "px"),
+        right: this.formatStyle(box.right, "px"),
+        height: this.formatStyle(box.height, "px"),
+        width: this.formatStyle(box.width, "px")
+      });
+    };
+  }
+  CueStyleBox.prototype = _objCreate(StyleBox.prototype);
+  CueStyleBox.prototype.constructor = CueStyleBox;
+
+  // Represents the co-ordinates of an Element in a way that we can easily
+  // compute things with such as if it overlaps or intersects with another Element.
+  // Can initialize it with either a StyleBox or another BoxPosition.
+  function BoxPosition(obj) {
+    // Either a BoxPosition was passed in and we need to copy it, or a StyleBox
+    // was passed in and we need to copy the results of 'getBoundingClientRect'
+    // as the object returned is readonly. All co-ordinate values are in reference
+    // to the viewport origin (top left).
+    var lh, height, width, top;
+    if (obj.div) {
+      height = obj.div.offsetHeight;
+      width = obj.div.offsetWidth;
+      top = obj.div.offsetTop;
+      var rects = (rects = obj.div.childNodes) && (rects = rects[0]) && rects.getClientRects && rects.getClientRects();
+      obj = obj.div.getBoundingClientRect();
+      // In certain cases the outter div will be slightly larger then the sum of
+      // the inner div's lines. This could be due to bold text, etc, on some platforms.
+      // In this case we should get the average line height and use that. This will
+      // result in the desired behaviour.
+      lh = rects ? Math.max(rects[0] && rects[0].height || 0, obj.height / rects.length) : 0;
+    }
+    this.left = obj.left;
+    this.right = obj.right;
+    this.top = obj.top || top;
+    this.height = obj.height || height;
+    this.bottom = obj.bottom || top + (obj.height || height);
+    this.width = obj.width || width;
+    this.lineHeight = lh !== undefined ? lh : obj.lineHeight;
+  }
+
+  // Move the box along a particular axis. Optionally pass in an amount to move
+  // the box. If no amount is passed then the default is the line height of the
+  // box.
+  BoxPosition.prototype.move = function (axis, toMove) {
+    toMove = toMove !== undefined ? toMove : this.lineHeight;
+    switch (axis) {
+      case "+x":
+        this.left += toMove;
+        this.right += toMove;
+        break;
+      case "-x":
+        this.left -= toMove;
+        this.right -= toMove;
+        break;
+      case "+y":
+        this.top += toMove;
+        this.bottom += toMove;
+        break;
+      case "-y":
+        this.top -= toMove;
+        this.bottom -= toMove;
+        break;
+    }
+  };
+
+  // Check if this box overlaps another box, b2.
+  BoxPosition.prototype.overlaps = function (b2) {
+    return this.left < b2.right && this.right > b2.left && this.top < b2.bottom && this.bottom > b2.top;
+  };
+
+  // Check if this box overlaps any other boxes in boxes.
+  BoxPosition.prototype.overlapsAny = function (boxes) {
+    for (var i = 0; i < boxes.length; i++) {
+      if (this.overlaps(boxes[i])) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check if this box is within another box.
+  BoxPosition.prototype.within = function (container) {
+    return this.top >= container.top && this.bottom <= container.bottom && this.left >= container.left && this.right <= container.right;
+  };
+
+  // Check if this box is entirely within the container or it is overlapping
+  // on the edge opposite of the axis direction passed. For example, if "+x" is
+  // passed and the box is overlapping on the left edge of the container, then
+  // return true.
+  BoxPosition.prototype.overlapsOppositeAxis = function (container, axis) {
+    switch (axis) {
+      case "+x":
+        return this.left < container.left;
+      case "-x":
+        return this.right > container.right;
+      case "+y":
+        return this.top < container.top;
+      case "-y":
+        return this.bottom > container.bottom;
+    }
+  };
+
+  // Find the percentage of the area that this box is overlapping with another
+  // box.
+  BoxPosition.prototype.intersectPercentage = function (b2) {
+    var x = Math.max(0, Math.min(this.right, b2.right) - Math.max(this.left, b2.left)),
+      y = Math.max(0, Math.min(this.bottom, b2.bottom) - Math.max(this.top, b2.top)),
+      intersectArea = x * y;
+    return intersectArea / (this.height * this.width);
+  };
+
+  // Convert the positions from this box to CSS compatible positions using
+  // the reference container's positions. This has to be done because this
+  // box's positions are in reference to the viewport origin, whereas, CSS
+  // values are in referecne to their respective edges.
+  BoxPosition.prototype.toCSSCompatValues = function (reference) {
+    return {
+      top: this.top - reference.top,
+      bottom: reference.bottom - this.bottom,
+      left: this.left - reference.left,
+      right: reference.right - this.right,
+      height: this.height,
+      width: this.width
+    };
+  };
+
+  // Get an object that represents the box's position without anything extra.
+  // Can pass a StyleBox, HTMLElement, or another BoxPositon.
+  BoxPosition.getSimpleBoxPosition = function (obj) {
+    var height = obj.div ? obj.div.offsetHeight : obj.tagName ? obj.offsetHeight : 0;
+    var width = obj.div ? obj.div.offsetWidth : obj.tagName ? obj.offsetWidth : 0;
+    var top = obj.div ? obj.div.offsetTop : obj.tagName ? obj.offsetTop : 0;
+    obj = obj.div ? obj.div.getBoundingClientRect() : obj.tagName ? obj.getBoundingClientRect() : obj;
+    var ret = {
+      left: obj.left,
+      right: obj.right,
+      top: obj.top || top,
+      height: obj.height || height,
+      bottom: obj.bottom || top + (obj.height || height),
+      width: obj.width || width
+    };
+    return ret;
+  };
+
+  // Move a StyleBox to its specified, or next best, position. The containerBox
+  // is the box that contains the StyleBox, such as a div. boxPositions are
+  // a list of other boxes that the styleBox can't overlap with.
+  function moveBoxToLinePosition(window, styleBox, containerBox, boxPositions) {
+    // Find the best position for a cue box, b, on the video. The axis parameter
+    // is a list of axis, the order of which, it will move the box along. For example:
+    // Passing ["+x", "-x"] will move the box first along the x axis in the positive
+    // direction. If it doesn't find a good position for it there it will then move
+    // it along the x axis in the negative direction.
+    function findBestPosition(b, axis) {
+      var bestPosition,
+        specifiedPosition = new BoxPosition(b),
+        percentage = 1; // Highest possible so the first thing we get is better.
+
+      for (var i = 0; i < axis.length; i++) {
+        while (b.overlapsOppositeAxis(containerBox, axis[i]) || b.within(containerBox) && b.overlapsAny(boxPositions)) {
+          b.move(axis[i]);
+        }
+        // We found a spot where we aren't overlapping anything. This is our
+        // best position.
+        if (b.within(containerBox)) {
+          return b;
+        }
+        var p = b.intersectPercentage(containerBox);
+        // If we're outside the container box less then we were on our last try
+        // then remember this position as the best position.
+        if (percentage > p) {
+          bestPosition = new BoxPosition(b);
+          percentage = p;
+        }
+        // Reset the box position to the specified position.
+        b = new BoxPosition(specifiedPosition);
+      }
+      return bestPosition || specifiedPosition;
+    }
+    var boxPosition = new BoxPosition(styleBox),
+      cue = styleBox.cue,
+      linePos = computeLinePos(cue),
+      axis = [];
+
+    // If we have a line number to align the cue to.
+    if (cue.snapToLines) {
+      var size;
+      switch (cue.vertical) {
+        case "":
+          axis = ["+y", "-y"];
+          size = "height";
+          break;
+        case "rl":
+          axis = ["+x", "-x"];
+          size = "width";
+          break;
+        case "lr":
+          axis = ["-x", "+x"];
+          size = "width";
+          break;
+      }
+      var step = boxPosition.lineHeight,
+        position = step * Math.round(linePos),
+        maxPosition = containerBox[size] + step,
+        initialAxis = axis[0];
+
+      // If the specified intial position is greater then the max position then
+      // clamp the box to the amount of steps it would take for the box to
+      // reach the max position.
+      if (Math.abs(position) > maxPosition) {
+        position = position < 0 ? -1 : 1;
+        position *= Math.ceil(maxPosition / step) * step;
+      }
+
+      // If computed line position returns negative then line numbers are
+      // relative to the bottom of the video instead of the top. Therefore, we
+      // need to increase our initial position by the length or width of the
+      // video, depending on the writing direction, and reverse our axis directions.
+      if (linePos < 0) {
+        position += cue.vertical === "" ? containerBox.height : containerBox.width;
+        axis = axis.reverse();
+      }
+
+      // Move the box to the specified position. This may not be its best
+      // position.
+      boxPosition.move(initialAxis, position);
+    } else {
+      // If we have a percentage line value for the cue.
+      var calculatedPercentage = boxPosition.lineHeight / containerBox.height * 100;
+      switch (cue.lineAlign) {
+        case "center":
+          linePos -= calculatedPercentage / 2;
+          break;
+        case "end":
+          linePos -= calculatedPercentage;
+          break;
+      }
+
+      // Apply initial line position to the cue box.
+      switch (cue.vertical) {
+        case "":
+          styleBox.applyStyles({
+            top: styleBox.formatStyle(linePos, "%")
+          });
+          break;
+        case "rl":
+          styleBox.applyStyles({
+            left: styleBox.formatStyle(linePos, "%")
+          });
+          break;
+        case "lr":
+          styleBox.applyStyles({
+            right: styleBox.formatStyle(linePos, "%")
+          });
+          break;
+      }
+      axis = ["+y", "-x", "+x", "-y"];
+
+      // Get the box position again after we've applied the specified positioning
+      // to it.
+      boxPosition = new BoxPosition(styleBox);
+    }
+    var bestPosition = findBestPosition(boxPosition, axis);
+    styleBox.move(bestPosition.toCSSCompatValues(containerBox));
+  }
+  function WebVTT$1() {
+    // Nothing
+  }
+
+  // Helper to allow strings to be decoded instead of the default binary utf8 data.
+  WebVTT$1.StringDecoder = function () {
+    return {
+      decode: function (data) {
+        if (!data) {
+          return "";
+        }
+        if (typeof data !== "string") {
+          throw new Error("Error - expected string data.");
+        }
+        return decodeURIComponent(encodeURIComponent(data));
+      }
+    };
+  };
+  WebVTT$1.convertCueToDOMTree = function (window, cuetext) {
+    if (!window || !cuetext) {
+      return null;
+    }
+    return parseContent(window, cuetext);
+  };
+  var FONT_SIZE_PERCENT = 0.05;
+  var FONT_STYLE = "sans-serif";
+  var CUE_BACKGROUND_PADDING = "1.5%";
+
+  // Runs the processing model over the cues and regions passed to it.
+  // @param overlay A block level element (usually a div) that the computed cues
+  //                and regions will be placed into.
+  WebVTT$1.processCues = function (window, cues, overlay) {
+    if (!window || !cues || !overlay) {
+      return null;
+    }
+
+    // Remove all previous children.
+    while (overlay.firstChild) {
+      overlay.removeChild(overlay.firstChild);
+    }
+    var paddedOverlay = window.document.createElement("div");
+    paddedOverlay.style.position = "absolute";
+    paddedOverlay.style.left = "0";
+    paddedOverlay.style.right = "0";
+    paddedOverlay.style.top = "0";
+    paddedOverlay.style.bottom = "0";
+    paddedOverlay.style.margin = CUE_BACKGROUND_PADDING;
+    overlay.appendChild(paddedOverlay);
+
+    // Determine if we need to compute the display states of the cues. This could
+    // be the case if a cue's state has been changed since the last computation or
+    // if it has not been computed yet.
+    function shouldCompute(cues) {
+      for (var i = 0; i < cues.length; i++) {
+        if (cues[i].hasBeenReset || !cues[i].displayState) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // We don't need to recompute the cues' display states. Just reuse them.
+    if (!shouldCompute(cues)) {
+      for (var i = 0; i < cues.length; i++) {
+        paddedOverlay.appendChild(cues[i].displayState);
+      }
+      return;
+    }
+    var boxPositions = [],
+      containerBox = BoxPosition.getSimpleBoxPosition(paddedOverlay),
+      fontSize = Math.round(containerBox.height * FONT_SIZE_PERCENT * 100) / 100;
+    var styleOptions = {
+      font: fontSize + "px " + FONT_STYLE
+    };
+    (function () {
+      var styleBox, cue;
+      for (var i = 0; i < cues.length; i++) {
+        cue = cues[i];
+
+        // Compute the intial position and styles of the cue div.
+        styleBox = new CueStyleBox(window, cue, styleOptions);
+        paddedOverlay.appendChild(styleBox.div);
+
+        // Move the cue div to it's correct line position.
+        moveBoxToLinePosition(window, styleBox, containerBox, boxPositions);
+
+        // Remember the computed div so that we don't have to recompute it later
+        // if we don't have too.
+        cue.displayState = styleBox.div;
+        boxPositions.push(BoxPosition.getSimpleBoxPosition(styleBox));
+      }
+    })();
+  };
+  WebVTT$1.Parser = function (window, vttjs, decoder) {
+    if (!decoder) {
+      decoder = vttjs;
+      vttjs = {};
+    }
+    if (!vttjs) {
+      vttjs = {};
+    }
+    this.window = window;
+    this.vttjs = vttjs;
+    this.state = "INITIAL";
+    this.buffer = "";
+    this.decoder = decoder || new TextDecoder("utf8");
+    this.regionList = [];
+  };
+  WebVTT$1.Parser.prototype = {
+    // If the error is a ParsingError then report it to the consumer if
+    // possible. If it's not a ParsingError then throw it like normal.
+    reportOrThrowError: function (e) {
+      if (e instanceof ParsingError) {
+        this.onparsingerror && this.onparsingerror(e);
+      } else {
+        throw e;
+      }
+    },
+    parse: function (data) {
+      var self = this;
+
+      // If there is no data then we won't decode it, but will just try to parse
+      // whatever is in buffer already. This may occur in circumstances, for
+      // example when flush() is called.
+      if (data) {
+        // Try to decode the data that we received.
+        self.buffer += self.decoder.decode(data, {
+          stream: true
+        });
+      }
+      function collectNextLine() {
+        var buffer = self.buffer;
+        var pos = 0;
+        while (pos < buffer.length && buffer[pos] !== '\r' && buffer[pos] !== '\n') {
+          ++pos;
+        }
+        var line = buffer.substr(0, pos);
+        // Advance the buffer early in case we fail below.
+        if (buffer[pos] === '\r') {
+          ++pos;
+        }
+        if (buffer[pos] === '\n') {
+          ++pos;
+        }
+        self.buffer = buffer.substr(pos);
+        return line;
+      }
+
+      // 3.4 WebVTT region and WebVTT region settings syntax
+      function parseRegion(input) {
+        var settings = new Settings();
+        parseOptions(input, function (k, v) {
+          switch (k) {
+            case "id":
+              settings.set(k, v);
+              break;
+            case "width":
+              settings.percent(k, v);
+              break;
+            case "lines":
+              settings.integer(k, v);
+              break;
+            case "regionanchor":
+            case "viewportanchor":
+              var xy = v.split(',');
+              if (xy.length !== 2) {
+                break;
+              }
+              // We have to make sure both x and y parse, so use a temporary
+              // settings object here.
+              var anchor = new Settings();
+              anchor.percent("x", xy[0]);
+              anchor.percent("y", xy[1]);
+              if (!anchor.has("x") || !anchor.has("y")) {
+                break;
+              }
+              settings.set(k + "X", anchor.get("x"));
+              settings.set(k + "Y", anchor.get("y"));
+              break;
+            case "scroll":
+              settings.alt(k, v, ["up"]);
+              break;
+          }
+        }, /=/, /\s/);
+
+        // Create the region, using default values for any values that were not
+        // specified.
+        if (settings.has("id")) {
+          var region = new (self.vttjs.VTTRegion || self.window.VTTRegion)();
+          region.width = settings.get("width", 100);
+          region.lines = settings.get("lines", 3);
+          region.regionAnchorX = settings.get("regionanchorX", 0);
+          region.regionAnchorY = settings.get("regionanchorY", 100);
+          region.viewportAnchorX = settings.get("viewportanchorX", 0);
+          region.viewportAnchorY = settings.get("viewportanchorY", 100);
+          region.scroll = settings.get("scroll", "");
+          // Register the region.
+          self.onregion && self.onregion(region);
+          // Remember the VTTRegion for later in case we parse any VTTCues that
+          // reference it.
+          self.regionList.push({
+            id: settings.get("id"),
+            region: region
+          });
+        }
+      }
+
+      // draft-pantos-http-live-streaming-20
+      // https://tools.ietf.org/html/draft-pantos-http-live-streaming-20#section-3.5
+      // 3.5 WebVTT
+      function parseTimestampMap(input) {
+        var settings = new Settings();
+        parseOptions(input, function (k, v) {
+          switch (k) {
+            case "MPEGT":
+              settings.integer(k + 'S', v);
+              break;
+            case "LOCA":
+              settings.set(k + 'L', parseTimeStamp(v));
+              break;
+          }
+        }, /[^\d]:/, /,/);
+        self.ontimestampmap && self.ontimestampmap({
+          "MPEGTS": settings.get("MPEGTS"),
+          "LOCAL": settings.get("LOCAL")
+        });
+      }
+
+      // 3.2 WebVTT metadata header syntax
+      function parseHeader(input) {
+        if (input.match(/X-TIMESTAMP-MAP/)) {
+          // This line contains HLS X-TIMESTAMP-MAP metadata
+          parseOptions(input, function (k, v) {
+            switch (k) {
+              case "X-TIMESTAMP-MAP":
+                parseTimestampMap(v);
+                break;
+            }
+          }, /=/);
+        } else {
+          parseOptions(input, function (k, v) {
+            switch (k) {
+              case "Region":
+                // 3.3 WebVTT region metadata header syntax
+                parseRegion(v);
+                break;
+            }
+          }, /:/);
+        }
+      }
+
+      // 5.1 WebVTT file parsing.
+      try {
+        var line;
+        if (self.state === "INITIAL") {
+          // We can't start parsing until we have the first line.
+          if (!/\r\n|\n/.test(self.buffer)) {
+            return this;
+          }
+          line = collectNextLine();
+          var m = line.match(/^WEBVTT([ \t].*)?$/);
+          if (!m || !m[0]) {
+            throw new ParsingError(ParsingError.Errors.BadSignature);
+          }
+          self.state = "HEADER";
+        }
+        var alreadyCollectedLine = false;
+        while (self.buffer) {
+          // We can't parse a line until we have the full line.
+          if (!/\r\n|\n/.test(self.buffer)) {
+            return this;
+          }
+          if (!alreadyCollectedLine) {
+            line = collectNextLine();
+          } else {
+            alreadyCollectedLine = false;
+          }
+          switch (self.state) {
+            case "HEADER":
+              // 13-18 - Allow a header (metadata) under the WEBVTT line.
+              if (/:/.test(line)) {
+                parseHeader(line);
+              } else if (!line) {
+                // An empty line terminates the header and starts the body (cues).
+                self.state = "ID";
+              }
+              continue;
+            case "NOTE":
+              // Ignore NOTE blocks.
+              if (!line) {
+                self.state = "ID";
+              }
+              continue;
+            case "ID":
+              // Check for the start of NOTE blocks.
+              if (/^NOTE($|[ \t])/.test(line)) {
+                self.state = "NOTE";
+                break;
+              }
+              // 19-29 - Allow any number of line terminators, then initialize new cue values.
+              if (!line) {
+                continue;
+              }
+              self.cue = new (self.vttjs.VTTCue || self.window.VTTCue)(0, 0, "");
+              // Safari still uses the old middle value and won't accept center
+              try {
+                self.cue.align = "center";
+              } catch (e) {
+                self.cue.align = "middle";
+              }
+              self.state = "CUE";
+              // 30-39 - Check if self line contains an optional identifier or timing data.
+              if (line.indexOf("-->") === -1) {
+                self.cue.id = line;
+                continue;
+              }
+            // Process line as start of a cue.
+            /*falls through*/
+            case "CUE":
+              // 40 - Collect cue timings and settings.
+              try {
+                parseCue(line, self.cue, self.regionList);
+              } catch (e) {
+                self.reportOrThrowError(e);
+                // In case of an error ignore rest of the cue.
+                self.cue = null;
+                self.state = "BADCUE";
+                continue;
+              }
+              self.state = "CUETEXT";
+              continue;
+            case "CUETEXT":
+              var hasSubstring = line.indexOf("-->") !== -1;
+              // 34 - If we have an empty line then report the cue.
+              // 35 - If we have the special substring '-->' then report the cue,
+              // but do not collect the line as we need to process the current
+              // one as a new cue.
+              if (!line || hasSubstring && (alreadyCollectedLine = true)) {
+                // We are done parsing self cue.
+                self.oncue && self.oncue(self.cue);
+                self.cue = null;
+                self.state = "ID";
+                continue;
+              }
+              if (self.cue.text) {
+                self.cue.text += "\n";
+              }
+              self.cue.text += line.replace(/\u2028/g, '\n').replace(/u2029/g, '\n');
+              continue;
+            case "BADCUE":
+              // BADCUE
+              // 54-62 - Collect and discard the remaining cue.
+              if (!line) {
+                self.state = "ID";
+              }
+              continue;
+          }
+        }
+      } catch (e) {
+        self.reportOrThrowError(e);
+
+        // If we are currently parsing a cue, report what we have.
+        if (self.state === "CUETEXT" && self.cue && self.oncue) {
+          self.oncue(self.cue);
+        }
+        self.cue = null;
+        // Enter BADWEBVTT state if header was not parsed correctly otherwise
+        // another exception occurred so enter BADCUE state.
+        self.state = self.state === "INITIAL" ? "BADWEBVTT" : "BADCUE";
+      }
+      return this;
+    },
+    flush: function () {
+      var self = this;
+      try {
+        // Finish decoding the stream.
+        self.buffer += self.decoder.decode();
+        // Synthesize the end of the current cue or region.
+        if (self.cue || self.state === "HEADER") {
+          self.buffer += "\n\n";
+          self.parse();
+        }
+        // If we've flushed, parsed, and we're still on the INITIAL state then
+        // that means we don't have enough of the stream to parse the first
+        // line.
+        if (self.state === "INITIAL") {
+          throw new ParsingError(ParsingError.Errors.BadSignature);
+        }
+      } catch (e) {
+        self.reportOrThrowError(e);
+      }
+      self.onflush && self.onflush();
+      return this;
+    }
+  };
+  var vtt = WebVTT$1;
+
+  /**
+   * Copyright 2013 vtt.js Contributors
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+
+  var autoKeyword = "auto";
+  var directionSetting = {
+    "": 1,
+    "lr": 1,
+    "rl": 1
+  };
+  var alignSetting = {
+    "start": 1,
+    "center": 1,
+    "end": 1,
+    "left": 1,
+    "right": 1,
+    "auto": 1,
+    "line-left": 1,
+    "line-right": 1
+  };
+  function findDirectionSetting(value) {
+    if (typeof value !== "string") {
+      return false;
+    }
+    var dir = directionSetting[value.toLowerCase()];
+    return dir ? value.toLowerCase() : false;
+  }
+  function findAlignSetting(value) {
+    if (typeof value !== "string") {
+      return false;
+    }
+    var align = alignSetting[value.toLowerCase()];
+    return align ? value.toLowerCase() : false;
+  }
+  function VTTCue(startTime, endTime, text) {
+    /**
+     * Shim implementation specific properties. These properties are not in
+     * the spec.
+     */
+
+    // Lets us know when the VTTCue's data has changed in such a way that we need
+    // to recompute its display state. This lets us compute its display state
+    // lazily.
+    this.hasBeenReset = false;
+
+    /**
+     * VTTCue and TextTrackCue properties
+     * http://dev.w3.org/html5/webvtt/#vttcue-interface
+     */
+
+    var _id = "";
+    var _pauseOnExit = false;
+    var _startTime = startTime;
+    var _endTime = endTime;
+    var _text = text;
+    var _region = null;
+    var _vertical = "";
+    var _snapToLines = true;
+    var _line = "auto";
+    var _lineAlign = "start";
+    var _position = "auto";
+    var _positionAlign = "auto";
+    var _size = 100;
+    var _align = "center";
+    Object.defineProperties(this, {
+      "id": {
+        enumerable: true,
+        get: function () {
+          return _id;
+        },
+        set: function (value) {
+          _id = "" + value;
+        }
+      },
+      "pauseOnExit": {
+        enumerable: true,
+        get: function () {
+          return _pauseOnExit;
+        },
+        set: function (value) {
+          _pauseOnExit = !!value;
+        }
+      },
+      "startTime": {
+        enumerable: true,
+        get: function () {
+          return _startTime;
+        },
+        set: function (value) {
+          if (typeof value !== "number") {
+            throw new TypeError("Start time must be set to a number.");
+          }
+          _startTime = value;
+          this.hasBeenReset = true;
+        }
+      },
+      "endTime": {
+        enumerable: true,
+        get: function () {
+          return _endTime;
+        },
+        set: function (value) {
+          if (typeof value !== "number") {
+            throw new TypeError("End time must be set to a number.");
+          }
+          _endTime = value;
+          this.hasBeenReset = true;
+        }
+      },
+      "text": {
+        enumerable: true,
+        get: function () {
+          return _text;
+        },
+        set: function (value) {
+          _text = "" + value;
+          this.hasBeenReset = true;
+        }
+      },
+      "region": {
+        enumerable: true,
+        get: function () {
+          return _region;
+        },
+        set: function (value) {
+          _region = value;
+          this.hasBeenReset = true;
+        }
+      },
+      "vertical": {
+        enumerable: true,
+        get: function () {
+          return _vertical;
+        },
+        set: function (value) {
+          var setting = findDirectionSetting(value);
+          // Have to check for false because the setting an be an empty string.
+          if (setting === false) {
+            throw new SyntaxError("Vertical: an invalid or illegal direction string was specified.");
+          }
+          _vertical = setting;
+          this.hasBeenReset = true;
+        }
+      },
+      "snapToLines": {
+        enumerable: true,
+        get: function () {
+          return _snapToLines;
+        },
+        set: function (value) {
+          _snapToLines = !!value;
+          this.hasBeenReset = true;
+        }
+      },
+      "line": {
+        enumerable: true,
+        get: function () {
+          return _line;
+        },
+        set: function (value) {
+          if (typeof value !== "number" && value !== autoKeyword) {
+            throw new SyntaxError("Line: an invalid number or illegal string was specified.");
+          }
+          _line = value;
+          this.hasBeenReset = true;
+        }
+      },
+      "lineAlign": {
+        enumerable: true,
+        get: function () {
+          return _lineAlign;
+        },
+        set: function (value) {
+          var setting = findAlignSetting(value);
+          if (!setting) {
+            console.warn("lineAlign: an invalid or illegal string was specified.");
+          } else {
+            _lineAlign = setting;
+            this.hasBeenReset = true;
+          }
+        }
+      },
+      "position": {
+        enumerable: true,
+        get: function () {
+          return _position;
+        },
+        set: function (value) {
+          if (value < 0 || value > 100) {
+            throw new Error("Position must be between 0 and 100.");
+          }
+          _position = value;
+          this.hasBeenReset = true;
+        }
+      },
+      "positionAlign": {
+        enumerable: true,
+        get: function () {
+          return _positionAlign;
+        },
+        set: function (value) {
+          var setting = findAlignSetting(value);
+          if (!setting) {
+            console.warn("positionAlign: an invalid or illegal string was specified.");
+          } else {
+            _positionAlign = setting;
+            this.hasBeenReset = true;
+          }
+        }
+      },
+      "size": {
+        enumerable: true,
+        get: function () {
+          return _size;
+        },
+        set: function (value) {
+          if (value < 0 || value > 100) {
+            throw new Error("Size must be between 0 and 100.");
+          }
+          _size = value;
+          this.hasBeenReset = true;
+        }
+      },
+      "align": {
+        enumerable: true,
+        get: function () {
+          return _align;
+        },
+        set: function (value) {
+          var setting = findAlignSetting(value);
+          if (!setting) {
+            throw new SyntaxError("align: an invalid or illegal alignment string was specified.");
+          }
+          _align = setting;
+          this.hasBeenReset = true;
+        }
+      }
+    });
+
+    /**
+     * Other <track> spec defined properties
+     */
+
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/the-video-element.html#text-track-cue-display-state
+    this.displayState = undefined;
+  }
+
+  /**
+   * VTTCue methods
+   */
+
+  VTTCue.prototype.getCueAsHTML = function () {
+    // Assume WebVTT.convertCueToDOMTree is on the global.
+    return WebVTT.convertCueToDOMTree(window, this.text);
+  };
+  var vttcue = VTTCue;
+
+  /**
+   * Copyright 2013 vtt.js Contributors
+   *
+   * Licensed under the Apache License, Version 2.0 (the "License");
+   * you may not use this file except in compliance with the License.
+   * You may obtain a copy of the License at
+   *
+   *   http://www.apache.org/licenses/LICENSE-2.0
+   *
+   * Unless required by applicable law or agreed to in writing, software
+   * distributed under the License is distributed on an "AS IS" BASIS,
+   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   * See the License for the specific language governing permissions and
+   * limitations under the License.
+   */
+
+  var scrollSetting = {
+    "": true,
+    "up": true
+  };
+  function findScrollSetting(value) {
+    if (typeof value !== "string") {
+      return false;
+    }
+    var scroll = scrollSetting[value.toLowerCase()];
+    return scroll ? value.toLowerCase() : false;
+  }
+  function isValidPercentValue(value) {
+    return typeof value === "number" && value >= 0 && value <= 100;
+  }
+
+  // VTTRegion shim http://dev.w3.org/html5/webvtt/#vttregion-interface
+  function VTTRegion() {
+    var _width = 100;
+    var _lines = 3;
+    var _regionAnchorX = 0;
+    var _regionAnchorY = 100;
+    var _viewportAnchorX = 0;
+    var _viewportAnchorY = 100;
+    var _scroll = "";
+    Object.defineProperties(this, {
+      "width": {
+        enumerable: true,
+        get: function () {
+          return _width;
+        },
+        set: function (value) {
+          if (!isValidPercentValue(value)) {
+            throw new Error("Width must be between 0 and 100.");
+          }
+          _width = value;
+        }
+      },
+      "lines": {
+        enumerable: true,
+        get: function () {
+          return _lines;
+        },
+        set: function (value) {
+          if (typeof value !== "number") {
+            throw new TypeError("Lines must be set to a number.");
+          }
+          _lines = value;
+        }
+      },
+      "regionAnchorY": {
+        enumerable: true,
+        get: function () {
+          return _regionAnchorY;
+        },
+        set: function (value) {
+          if (!isValidPercentValue(value)) {
+            throw new Error("RegionAnchorX must be between 0 and 100.");
+          }
+          _regionAnchorY = value;
+        }
+      },
+      "regionAnchorX": {
+        enumerable: true,
+        get: function () {
+          return _regionAnchorX;
+        },
+        set: function (value) {
+          if (!isValidPercentValue(value)) {
+            throw new Error("RegionAnchorY must be between 0 and 100.");
+          }
+          _regionAnchorX = value;
+        }
+      },
+      "viewportAnchorY": {
+        enumerable: true,
+        get: function () {
+          return _viewportAnchorY;
+        },
+        set: function (value) {
+          if (!isValidPercentValue(value)) {
+            throw new Error("ViewportAnchorY must be between 0 and 100.");
+          }
+          _viewportAnchorY = value;
+        }
+      },
+      "viewportAnchorX": {
+        enumerable: true,
+        get: function () {
+          return _viewportAnchorX;
+        },
+        set: function (value) {
+          if (!isValidPercentValue(value)) {
+            throw new Error("ViewportAnchorX must be between 0 and 100.");
+          }
+          _viewportAnchorX = value;
+        }
+      },
+      "scroll": {
+        enumerable: true,
+        get: function () {
+          return _scroll;
+        },
+        set: function (value) {
+          var setting = findScrollSetting(value);
+          // Have to check for false as an empty string is a legal value.
+          if (setting === false) {
+            console.warn("Scroll: an invalid or illegal string was specified.");
+          } else {
+            _scroll = setting;
+          }
+        }
+      }
+    });
+  }
+  var vttregion = VTTRegion;
+
+  var browserIndex = createCommonjsModule(function (module) {
+    /**
+     * Copyright 2013 vtt.js Contributors
+     *
+     * Licensed under the Apache License, Version 2.0 (the "License");
+     * you may not use this file except in compliance with the License.
+     * You may obtain a copy of the License at
+     *
+     *   http://www.apache.org/licenses/LICENSE-2.0
+     *
+     * Unless required by applicable law or agreed to in writing, software
+     * distributed under the License is distributed on an "AS IS" BASIS,
+     * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     * See the License for the specific language governing permissions and
+     * limitations under the License.
+     */
+
+    // Default exports for Node. Export the extended versions of VTTCue and
+    // VTTRegion in Node since we likely want the capability to convert back and
+    // forth between JSON. If we don't then it's not that big of a deal since we're
+    // off browser.
+
+    var vttjs = module.exports = {
+      WebVTT: vtt,
+      VTTCue: vttcue,
+      VTTRegion: vttregion
+    };
+    window_1.vttjs = vttjs;
+    window_1.WebVTT = vttjs.WebVTT;
+    var cueShim = vttjs.VTTCue;
+    var regionShim = vttjs.VTTRegion;
+    var nativeVTTCue = window_1.VTTCue;
+    var nativeVTTRegion = window_1.VTTRegion;
+    vttjs.shim = function () {
+      window_1.VTTCue = cueShim;
+      window_1.VTTRegion = regionShim;
+    };
+    vttjs.restore = function () {
+      window_1.VTTCue = nativeVTTCue;
+      window_1.VTTRegion = nativeVTTRegion;
+    };
+    if (!window_1.VTTCue) {
+      vttjs.shim();
+    }
+  });
+  browserIndex.WebVTT;
+  browserIndex.VTTCue;
+  browserIndex.VTTRegion;
 
   /**
    * @file tech.js
    */
+
+  /** @import { TimeRange } from '../utils/time' */
 
   /**
    * An Object containing a structure like: `{src: 'url', type: 'mimetype'}` or string
@@ -8284,7 +10529,7 @@
    * * `var SourceObject = {src: 'http://ex.com/video.mp4', type: 'video/mp4'};`
      * `var SourceString = 'http://example.com/some-video.mp4';`
    *
-   * @typedef {Object|string} Tech~SourceObject
+   * @typedef {Object|string} SourceObject
    *
    * @property {string} src
    *           The url to the source
@@ -8515,7 +10760,7 @@
     /**
      * Get and create a `TimeRange` object for buffering.
      *
-     * @return { import('../utils/time').TimeRange }
+     * @return {TimeRange}
      *         The time range object that was created.
      */
     buffered() {
@@ -8850,7 +11095,7 @@
         // load via require if available and vtt.js script location was not passed in
         // as an option. novtt builds will turn the above require call into an empty object
         // which will cause this if check to always fail.
-        if (!this.options_['vtt.js'] && isPlain(vtt) && Object.keys(vtt).length > 0) {
+        if (!this.options_['vtt.js'] && isPlain(browserIndex) && Object.keys(browserIndex).length > 0) {
           this.trigger('vttjsloaded');
           return;
         }
@@ -9484,7 +11729,7 @@
      *
      * TODO: Answer question: should 'probably' be prioritized over 'maybe'
      *
-     * @param {Tech~SourceObject} source
+     * @param {SourceObject} source
      *        The source object
      *
      * @param {Object} options
@@ -9509,7 +11754,7 @@
     /**
      * Check if the tech can support the given source.
      *
-     * @param {Tech~SourceObject} srcObj
+     * @param {SourceObject} srcObj
      *        The source object
      *
      * @param {Object} options
@@ -9564,7 +11809,7 @@
      * and source handlers.
      * Should never be called unless a source handler was found.
      *
-     * @param {Tech~SourceObject} source
+     * @param {SourceObject} source
      *        A source object with src and type keys
      */
     _Tech.prototype.setSource = function (source) {
@@ -9630,6 +11875,10 @@
    * @file middleware.js
    * @module middleware
    */
+
+  /** @import Player from '../player' */
+  /** @import Tech from '../tech/tech' */
+
   const middlewares = {};
   const middlewareInstances = {};
   const TERMINATOR = {};
@@ -9652,7 +11901,7 @@
    * passed in as an argument.
    *
    * @callback MiddlewareFactory
-   * @param { import('../player').default } player
+   * @param {Player} player
    *        A Video.js player.
    */
 
@@ -9677,7 +11926,7 @@
    * matching middlewares and calling `setSource` on each, passing along the
    * previous returned value each time.
    *
-   * @param  { import('../player').default } player
+   * @param  {Player} player
    *         A {@link Player} instance.
    *
    * @param  {Tech~SourceObject} src
@@ -9696,7 +11945,7 @@
    * @param {Object[]} middleware
    *        An array of middleware instances.
    *
-   * @param { import('../tech/tech').default } tech
+   * @param {Tech} tech
    *        A Video.js tech.
    */
   function setTech(middleware, tech) {
@@ -9710,7 +11959,7 @@
    * @param  {Object[]} middleware
    *         An array of middleware instances.
    *
-   * @param  { import('../tech/tech').default } tech
+   * @param  {Tech} tech
    *         The current tech.
    *
    * @param  {string} method
@@ -9730,7 +11979,7 @@
    * @param  {Object[]} middleware
    *         An array of middleware instances.
    *
-   * @param  { import('../tech/tech').default } tech
+   * @param  {Tech} tech
    *         The current tech.
    *
    * @param  {string} method
@@ -9756,7 +12005,7 @@
    * @param  {Object[]} middleware
    *         An array of middleware instances.
    *
-   * @param  { import('../tech/tech').default } tech
+   * @param  {Tech} tech
    *         The current tech.
    *
    * @param  {string} method
@@ -9841,11 +12090,13 @@
   /**
    * Clear the middleware cache for a player.
    *
-   * @param  { import('../player').default } player
+   * @param  {Player} player
    *         A {@link Player} instance.
    */
   function clearCacheForPlayer(player) {
-    middlewareInstances[player.id()] = null;
+    if (middlewareInstances.hasOwnProperty(player.id())) {
+      delete middlewareInstances[player.id()];
+    }
   }
 
   /**
@@ -9916,6 +12167,8 @@
     }
   }
 
+  /** @import Player from '../player' */
+
   /**
    * Mimetypes
    *
@@ -9966,7 +12219,7 @@
    * Find the mime type of a given source string if possible. Uses the player
    * source cache.
    *
-   * @param { import('../player').default } player
+   * @param {Player} player
    *        The player object
    *
    * @param {string} src
@@ -10067,9 +12320,664 @@
     return src;
   }
 
+  var icons = "<svg xmlns=\"http://www.w3.org/2000/svg\">\n  <defs>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-play\">\n      <path d=\"M16 10v28l22-14z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-pause\">\n      <path d=\"M12 38h8V10h-8v28zm16-28v28h8V10h-8z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-audio\">\n      <path d=\"M24 2C14.06 2 6 10.06 6 20v14c0 3.31 2.69 6 6 6h6V24h-8v-4c0-7.73 6.27-14 14-14s14 6.27 14 14v4h-8v16h6c3.31 0 6-2.69 6-6V20c0-9.94-8.06-18-18-18z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-captions\">\n      <path d=\"M38 8H10c-2.21 0-4 1.79-4 4v24c0 2.21 1.79 4 4 4h28c2.21 0 4-1.79 4-4V12c0-2.21-1.79-4-4-4zM22 22h-3v-1h-4v6h4v-1h3v2a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2zm14 0h-3v-1h-4v6h4v-1h3v2a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-subtitles\">\n      <path d=\"M40 8H8c-2.21 0-4 1.79-4 4v24c0 2.21 1.79 4 4 4h32c2.21 0 4-1.79 4-4V12c0-2.21-1.79-4-4-4zM8 24h8v4H8v-4zm20 12H8v-4h20v4zm12 0h-8v-4h8v4zm0-8H20v-4h20v4z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-fullscreen-enter\">\n      <path d=\"M14 28h-4v10h10v-4h-6v-6zm-4-8h4v-6h6v-4H10v10zm24 14h-6v4h10V28h-4v6zm-6-24v4h6v6h4V10H28z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-fullscreen-exit\">\n      <path d=\"M10 32h6v6h4V28H10v4zm6-16h-6v4h10V10h-4v6zm12 22h4v-6h6v-4H28v10zm4-22v-6h-4v10h10v-4h-6z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-play-circle\">\n      <path d=\"M20 33l12-9-12-9v18zm4-29C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.82 0-16-7.18-16-16S15.18 8 24 8s16 7.18 16 16-7.18 16-16 16z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-volume-mute\">\n      <path d=\"M33 24c0-3.53-2.04-6.58-5-8.05v4.42l4.91 4.91c.06-.42.09-.85.09-1.28zm5 0c0 1.88-.41 3.65-1.08 5.28l3.03 3.03C41.25 29.82 42 27 42 24c0-8.56-5.99-15.72-14-17.54v4.13c5.78 1.72 10 7.07 10 13.41zM8.55 6L6 8.55 15.45 18H6v12h8l10 10V26.55l8.51 8.51c-1.34 1.03-2.85 1.86-4.51 2.36v4.13a17.94 17.94 0 0 0 7.37-3.62L39.45 42 42 39.45l-18-18L8.55 6zM24 8l-4.18 4.18L24 16.36V8z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-volume-low\">\n      <path d=\"M14 18v12h8l10 10V8L22 18h-8z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-volume-medium\">\n      <path d=\"M37 24c0-3.53-2.04-6.58-5-8.05v16.11c2.96-1.48 5-4.53 5-8.06zm-27-6v12h8l10 10V8L18 18h-8z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-volume-high\">\n      <path d=\"M6 18v12h8l10 10V8L14 18H6zm27 6c0-3.53-2.04-6.58-5-8.05v16.11c2.96-1.48 5-4.53 5-8.06zM28 6.46v4.13c5.78 1.72 10 7.07 10 13.41s-4.22 11.69-10 13.41v4.13c8.01-1.82 14-8.97 14-17.54S36.01 8.28 28 6.46z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-spinner\">\n      <path d=\"M18.8 21l9.53-16.51C26.94 4.18 25.49 4 24 4c-4.8 0-9.19 1.69-12.64 4.51l7.33 12.69.11-.2zm24.28-3c-1.84-5.85-6.3-10.52-11.99-12.68L23.77 18h19.31zm.52 2H28.62l.58 1 9.53 16.5C41.99 33.94 44 29.21 44 24c0-1.37-.14-2.71-.4-4zm-26.53 4l-7.8-13.5C6.01 14.06 4 18.79 4 24c0 1.37.14 2.71.4 4h14.98l-2.31-4zM4.92 30c1.84 5.85 6.3 10.52 11.99 12.68L24.23 30H4.92zm22.54 0l-7.8 13.51c1.4.31 2.85.49 4.34.49 4.8 0 9.19-1.69 12.64-4.51L29.31 26.8 27.46 30z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 24 24\" id=\"vjs-icon-hd\">\n      <path d=\"M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-chapters\">\n      <path d=\"M6 26h4v-4H6v4zm0 8h4v-4H6v4zm0-16h4v-4H6v4zm8 8h28v-4H14v4zm0 8h28v-4H14v4zm0-20v4h28v-4H14z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 40 40\" id=\"vjs-icon-downloading\">\n      <path d=\"M18.208 36.875q-3.208-.292-5.979-1.729-2.771-1.438-4.812-3.729-2.042-2.292-3.188-5.229-1.146-2.938-1.146-6.23 0-6.583 4.334-11.416 4.333-4.834 10.833-5.5v3.166q-5.167.75-8.583 4.646Q6.25 14.75 6.25 19.958q0 5.209 3.396 9.104 3.396 3.896 8.562 4.646zM20 28.417L11.542 20l2.083-2.083 4.917 4.916v-11.25h2.916v11.25l4.875-4.916L28.417 20zm1.792 8.458v-3.167q1.833-.25 3.541-.958 1.709-.708 3.167-1.875l2.333 2.292q-1.958 1.583-4.25 2.541-2.291.959-4.791 1.167zm6.791-27.792q-1.541-1.125-3.25-1.854-1.708-.729-3.541-1.021V3.042q2.5.25 4.77 1.208 2.271.958 4.271 2.5zm4.584 21.584l-2.25-2.25q1.166-1.5 1.854-3.209.687-1.708.937-3.541h3.209q-.292 2.5-1.229 4.791-.938 2.292-2.521 4.209zm.541-12.417q-.291-1.833-.958-3.562-.667-1.73-1.833-3.188l2.375-2.208q1.541 1.916 2.458 4.208.917 2.292 1.167 4.75z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-file-download\">\n      <path d=\"M10.8 40.55q-1.35 0-2.375-1T7.4 37.15v-7.7h3.4v7.7h26.35v-7.7h3.4v7.7q0 1.4-1 2.4t-2.4 1zM24 32.1L13.9 22.05l2.45-2.45 5.95 5.95V7.15h3.4v18.4l5.95-5.95 2.45 2.45z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-file-download-done\">\n      <path d=\"M9.8 40.5v-3.45h28.4v3.45zm9.2-9.05L7.4 19.85l2.45-2.35L19 26.65l19.2-19.2 2.4 2.4z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-file-download-off\">\n      <path d=\"M4.9 4.75L43.25 43.1 41 45.3l-4.75-4.75q-.05.05-.075.025-.025-.025-.075-.025H10.8q-1.35 0-2.375-1T7.4 37.15v-7.7h3.4v7.7h22.05l-7-7-1.85 1.8L13.9 21.9l1.85-1.85L2.7 7zm26.75 14.7l2.45 2.45-3.75 3.8-2.45-2.5zM25.7 7.15V21.1l-3.4-3.45V7.15z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-share\">\n      <path d=\"M36 32.17c-1.52 0-2.89.59-3.93 1.54L17.82 25.4c.11-.45.18-.92.18-1.4s-.07-.95-.18-1.4l14.1-8.23c1.07 1 2.5 1.62 4.08 1.62 3.31 0 6-2.69 6-6s-2.69-6-6-6-6 2.69-6 6c0 .48.07.95.18 1.4l-14.1 8.23c-1.07-1-2.5-1.62-4.08-1.62-3.31 0-6 2.69-6 6s2.69 6 6 6c1.58 0 3.01-.62 4.08-1.62l14.25 8.31c-.1.42-.16.86-.16 1.31A5.83 5.83 0 1 0 36 32.17z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-cog\">\n      <path d=\"M38.86 25.95c.08-.64.14-1.29.14-1.95s-.06-1.31-.14-1.95l4.23-3.31c.38-.3.49-.84.24-1.28l-4-6.93c-.25-.43-.77-.61-1.22-.43l-4.98 2.01c-1.03-.79-2.16-1.46-3.38-1.97L29 4.84c-.09-.47-.5-.84-1-.84h-8c-.5 0-.91.37-.99.84l-.75 5.3a14.8 14.8 0 0 0-3.38 1.97L9.9 10.1a1 1 0 0 0-1.22.43l-4 6.93c-.25.43-.14.97.24 1.28l4.22 3.31C9.06 22.69 9 23.34 9 24s.06 1.31.14 1.95l-4.22 3.31c-.38.3-.49.84-.24 1.28l4 6.93c.25.43.77.61 1.22.43l4.98-2.01c1.03.79 2.16 1.46 3.38 1.97l.75 5.3c.08.47.49.84.99.84h8c.5 0 .91-.37.99-.84l.75-5.3a14.8 14.8 0 0 0 3.38-1.97l4.98 2.01a1 1 0 0 0 1.22-.43l4-6.93c.25-.43.14-.97-.24-1.28l-4.22-3.31zM24 31c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-square\">\n      <path d=\"M36 8H12c-2.21 0-4 1.79-4 4v24c0 2.21 1.79 4 4 4h24c2.21 0 4-1.79 4-4V12c0-2.21-1.79-4-4-4zm0 28H12V12h24v24z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-circle\">\n      <circle cx=\"24\" cy=\"24\" r=\"20\"></circle>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-circle-outline\">\n      <path d=\"M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.82 0-16-7.18-16-16S15.18 8 24 8s16 7.18 16 16-7.18 16-16 16z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-circle-inner-circle\">\n      <path d=\"M24 4C12.97 4 4 12.97 4 24s8.97 20 20 20 20-8.97 20-20S35.03 4 24 4zm0 36c-8.82 0-16-7.18-16-16S15.18 8 24 8s16 7.18 16 16-7.18 16-16 16zm6-16c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6 6 2.69 6 6z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-cancel\">\n      <path d=\"M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm10 27.17L31.17 34 24 26.83 16.83 34 14 31.17 21.17 24 14 16.83 16.83 14 24 21.17 31.17 14 34 16.83 26.83 24 34 31.17z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-replay\">\n      <path d=\"M24 10V2L14 12l10 10v-8c6.63 0 12 5.37 12 12s-5.37 12-12 12-12-5.37-12-12H8c0 8.84 7.16 16 16 16s16-7.16 16-16-7.16-16-16-16z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-repeat\">\n      <path d=\"M14 14h20v6l8-8-8-8v6H10v12h4v-8zm20 20H14v-6l-8 8 8 8v-6h24V26h-4v8z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 96 48 48\" id=\"vjs-icon-replay-5\">\n      <path d=\"M17.689 98l-8.697 8.696 8.697 8.697 2.486-2.485-4.32-4.319h1.302c4.93 0 9.071 1.722 12.424 5.165 3.352 3.443 5.029 7.638 5.029 12.584h3.55c0-2.958-.553-5.73-1.658-8.313-1.104-2.583-2.622-4.841-4.555-6.774-1.932-1.932-4.19-3.45-6.773-4.555-2.584-1.104-5.355-1.657-8.313-1.657H15.5l4.615-4.615zm-8.08 21.659v13.861h11.357v5.008H9.609V143h12.7c.834 0 1.55-.298 2.146-.894.596-.597.895-1.31.895-2.145v-7.781c0-.835-.299-1.55-.895-2.147a2.929 2.929 0 0 0-2.147-.894h-8.227v-5.096H25.35v-4.384z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 96 48 48\" id=\"vjs-icon-replay-10\">\n      <path d=\"M42.315 125.63c0-4.997-1.694-9.235-5.08-12.713-3.388-3.479-7.571-5.218-12.552-5.218h-1.315l4.363 4.363-2.51 2.51-8.787-8.786L25.221 97l2.45 2.45-4.662 4.663h1.375c2.988 0 5.788.557 8.397 1.673 2.61 1.116 4.892 2.65 6.844 4.602 1.953 1.953 3.487 4.234 4.602 6.844 1.116 2.61 1.674 5.41 1.674 8.398zM8.183 142v-19.657H3.176V117.8h9.643V142zm13.63 0c-1.156 0-2.127-.393-2.912-1.178-.778-.778-1.168-1.746-1.168-2.902v-16.04c0-1.156.393-2.127 1.178-2.912.779-.779 1.746-1.168 2.902-1.168h7.696c1.156 0 2.126.392 2.911 1.177.779.78 1.168 1.747 1.168 2.903v16.04c0 1.156-.392 2.127-1.177 2.912-.779.779-1.746 1.168-2.902 1.168zm.556-4.636h6.583v-15.02H22.37z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 96 48 48\" id=\"vjs-icon-replay-30\">\n      <path d=\"M26.047 97l-8.733 8.732 8.733 8.733 2.496-2.494-4.336-4.338h1.307c4.95 0 9.108 1.73 12.474 5.187 3.367 3.458 5.051 7.668 5.051 12.635h3.565c0-2.97-.556-5.751-1.665-8.346-1.109-2.594-2.633-4.862-4.574-6.802-1.94-1.941-4.208-3.466-6.803-4.575-2.594-1.109-5.375-1.664-8.345-1.664H23.85l4.634-4.634zM2.555 117.531v4.688h10.297v5.25H5.873v4.687h6.979v5.156H2.555V142H13.36c1.061 0 1.95-.395 2.668-1.186.718-.79 1.076-1.772 1.076-2.94v-16.218c0-1.168-.358-2.149-1.076-2.94-.717-.79-1.607-1.185-2.668-1.185zm22.482.14c-1.149 0-2.11.39-2.885 1.165-.78.78-1.172 1.744-1.172 2.893v15.943c0 1.149.388 2.11 1.163 2.885.78.78 1.745 1.172 2.894 1.172h7.649c1.148 0 2.11-.388 2.884-1.163.78-.78 1.17-1.745 1.17-2.894v-15.943c0-1.15-.386-2.111-1.16-2.885-.78-.78-1.746-1.172-2.894-1.172zm.553 4.518h6.545v14.93H25.59z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 96 48 48\" id=\"vjs-icon-forward-5\">\n      <path d=\"M29.508 97l-2.431 2.43 4.625 4.625h-1.364c-2.965 0-5.742.554-8.332 1.66-2.589 1.107-4.851 2.629-6.788 4.566-1.937 1.937-3.458 4.2-4.565 6.788-1.107 2.59-1.66 5.367-1.66 8.331h3.557c0-4.957 1.68-9.16 5.04-12.611 3.36-3.45 7.51-5.177 12.451-5.177h1.304l-4.326 4.33 2.49 2.49 8.715-8.716zm-9.783 21.61v13.89h11.382v5.018H19.725V142h12.727a2.93 2.93 0 0 0 2.15-.896 2.93 2.93 0 0 0 .896-2.15v-7.798c0-.837-.299-1.554-.896-2.152a2.93 2.93 0 0 0-2.15-.896h-8.245V123h11.29v-4.392z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 96 48 48\" id=\"vjs-icon-forward-10\">\n      <path d=\"M23.119 97l-2.386 2.383 4.538 4.538h-1.339c-2.908 0-5.633.543-8.173 1.63-2.54 1.085-4.76 2.577-6.66 4.478-1.9 1.9-3.392 4.12-4.478 6.66-1.085 2.54-1.629 5.264-1.629 8.172h3.49c0-4.863 1.648-8.986 4.944-12.372 3.297-3.385 7.368-5.078 12.216-5.078h1.279l-4.245 4.247 2.443 2.442 8.55-8.55zm-9.52 21.45v4.42h4.871V142h4.513v-23.55zm18.136 0c-1.125 0-2.066.377-2.824 1.135-.764.764-1.148 1.709-1.148 2.834v15.612c0 1.124.38 2.066 1.139 2.824.764.764 1.708 1.145 2.833 1.145h7.489c1.125 0 2.066-.378 2.824-1.136.764-.764 1.145-1.709 1.145-2.833v-15.612c0-1.125-.378-2.067-1.136-2.825-.764-.764-1.708-1.145-2.833-1.145zm.54 4.42h6.408v14.617h-6.407z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 96 48 48\" id=\"vjs-icon-forward-30\">\n      <path d=\"M25.549 97l-2.437 2.434 4.634 4.635H26.38c-2.97 0-5.753.555-8.347 1.664-2.594 1.109-4.861 2.633-6.802 4.574-1.94 1.94-3.465 4.207-4.574 6.802-1.109 2.594-1.664 5.377-1.664 8.347h3.565c0-4.967 1.683-9.178 5.05-12.636 3.366-3.458 7.525-5.187 12.475-5.187h1.307l-4.335 4.338 2.495 2.494 8.732-8.732zm-11.553 20.53v4.689h10.297v5.249h-6.978v4.688h6.978v5.156H13.996V142h10.808c1.06 0 1.948-.395 2.666-1.186.718-.79 1.077-1.771 1.077-2.94v-16.217c0-1.169-.36-2.15-1.077-2.94-.718-.79-1.605-1.186-2.666-1.186zm21.174.168c-1.149 0-2.11.389-2.884 1.163-.78.78-1.172 1.745-1.172 2.894v15.942c0 1.15.388 2.11 1.162 2.885.78.78 1.745 1.17 2.894 1.17h7.649c1.149 0 2.11-.386 2.885-1.16.78-.78 1.17-1.746 1.17-2.895v-15.942c0-1.15-.387-2.11-1.161-2.885-.78-.78-1.745-1.172-2.894-1.172zm.552 4.516h6.542v14.931h-6.542z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 512 512\" id=\"vjs-icon-audio-description\">\n      <g fill-rule=\"evenodd\"><path d=\"M227.29 381.351V162.993c50.38-1.017 89.108-3.028 117.631 17.126 27.374 19.342 48.734 56.965 44.89 105.325-4.067 51.155-41.335 94.139-89.776 98.475-24.085 2.155-71.972 0-71.972 0s-.84-1.352-.773-2.568m48.755-54.804c31.43 1.26 53.208-16.633 56.495-45.386 4.403-38.51-21.188-63.552-58.041-60.796v103.612c-.036 1.466.575 2.22 1.546 2.57\"></path><path d=\"M383.78 381.328c13.336 3.71 17.387-11.06 23.215-21.408 12.722-22.571 22.294-51.594 22.445-84.774.221-47.594-18.343-82.517-35.6-106.182h-8.51c-.587 3.874 2.226 7.315 3.865 10.276 13.166 23.762 25.367 56.553 25.54 94.194.2 43.176-14.162 79.278-30.955 107.894\"></path><path d=\"M425.154 381.328c13.336 3.71 17.384-11.061 23.215-21.408 12.721-22.571 22.291-51.594 22.445-84.774.221-47.594-18.343-82.517-35.6-106.182h-8.511c-.586 3.874 2.226 7.315 3.866 10.276 13.166 23.762 25.367 56.553 25.54 94.194.2 43.176-14.162 79.278-30.955 107.894\"></path><path d=\"M466.26 381.328c13.337 3.71 17.385-11.061 23.216-21.408 12.722-22.571 22.292-51.594 22.445-84.774.221-47.594-18.343-82.517-35.6-106.182h-8.51c-.587 3.874 2.225 7.315 3.865 10.276 13.166 23.762 25.367 56.553 25.54 94.194.2 43.176-14.162 79.278-30.955 107.894M4.477 383.005H72.58l18.573-28.484 64.169-.135s.065 19.413.065 28.62h48.756V160.307h-58.816c-5.653 9.537-140.85 222.697-140.85 222.697zm152.667-145.282v71.158l-40.453-.27 40.453-70.888z\"></path></g>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-next-item\">\n      <path d=\"M12 36l17-12-17-12v24zm20-24v24h4V12h-4z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-previous-item\">\n      <path d=\"M12 12h4v24h-4zm7 12l17 12V12z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-shuffle\">\n      <path d=\"M21.17 18.34L10.83 8 8 10.83l10.34 10.34 2.83-2.83zM29 8l4.09 4.09L8 37.17 10.83 40l25.09-25.09L40 19V8H29zm.66 18.83l-2.83 2.83 6.26 6.26L29 40h11V29l-4.09 4.09-6.25-6.26z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-cast\">\n      <path d=\"M42 6H6c-2.21 0-4 1.79-4 4v6h4v-6h36v28H28v4h14c2.21 0 4-1.79 4-4V10c0-2.21-1.79-4-4-4zM2 36v6h6c0-3.31-2.69-6-6-6zm0-8v4c5.52 0 10 4.48 10 10h4c0-7.73-6.27-14-14-14zm0-8v4c9.94 0 18 8.06 18 18h4c0-12.15-9.85-22-22-22z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 48 48\" id=\"vjs-icon-picture-in-picture-enter\">\n      <path d=\"M38 22H22v11.99h16V22zm8 16V9.96C46 7.76 44.2 6 42 6H6C3.8 6 2 7.76 2 9.96V38c0 2.2 1.8 4 4 4h36c2.2 0 4-1.8 4-4zm-4 .04H6V9.94h36v28.1z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 22 18\" id=\"vjs-icon-picture-in-picture-exit\">\n      <path d=\"M18 4H4v10h14V4zm4 12V1.98C22 .88 21.1 0 20 0H2C.9 0 0 .88 0 1.98V16c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H2V1.97h18v14.05z\"></path>\n      <path fill=\"none\" d=\"M-1-3h24v24H-1z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 1792 1792\" id=\"vjs-icon-facebook\">\n      <path d=\"M1343 12v264h-157q-86 0-116 36t-30 108v189h293l-39 296h-254v759H734V905H479V609h255V391q0-186 104-288.5T1115 0q147 0 228 12z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 1792 1792\" id=\"vjs-icon-linkedin\">\n      <path d=\"M477 625v991H147V625h330zm21-306q1 73-50.5 122T312 490h-2q-82 0-132-49t-50-122q0-74 51.5-122.5T314 148t133 48.5T498 319zm1166 729v568h-329v-530q0-105-40.5-164.5T1168 862q-63 0-105.5 34.5T999 982q-11 30-11 81v553H659q2-399 2-647t-1-296l-1-48h329v144h-2q20-32 41-56t56.5-52 87-43.5T1285 602q171 0 275 113.5t104 332.5z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 1200 1227\" id=\"vjs-icon-twitter\">\n      <path d=\"M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.137 519.284H714.163ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.854V687.828Z\"/>\n    </symbol>\n    <symbol viewBox=\"0 0 1792 1792\" id=\"vjs-icon-tumblr\">\n      <path d=\"M1328 1329l80 237q-23 35-111 66t-177 32q-104 2-190.5-26T787 1564t-95-106-55.5-120-16.5-118V676H452V461q72-26 129-69.5t91-90 58-102 34-99T779 12q1-5 4.5-8.5T791 0h244v424h333v252h-334v518q0 30 6.5 56t22.5 52.5 49.5 41.5 81.5 14q78-2 134-29z\"></path>\n    </symbol>\n    <symbol viewBox=\"0 0 1792 1792\" id=\"vjs-icon-pinterest\">\n      <path d=\"M1664 896q0 209-103 385.5T1281.5 1561 896 1664q-111 0-218-32 59-93 78-164 9-34 54-211 20 39 73 67.5t114 28.5q121 0 216-68.5t147-188.5 52-270q0-114-59.5-214T1180 449t-255-63q-105 0-196 29t-154.5 77-109 110.5-67 129.5T377 866q0 104 40 183t117 111q30 12 38-20 2-7 8-31t8-30q6-23-11-43-51-61-51-151 0-151 104.5-259.5T904 517q151 0 235.5 82t84.5 213q0 170-68.5 289T980 1220q-61 0-98-43.5T859 1072q8-35 26.5-93.5t30-103T927 800q0-50-27-83t-77-33q-62 0-105 57t-43 142q0 73 25 122l-99 418q-17 70-13 177-206-91-333-281T128 896q0-209 103-385.5T510.5 231 896 128t385.5 103T1561 510.5 1664 896z\"></path>\n    </symbol>\n  </defs>\n</svg>";
+
+  // /**
+
+  // Determine the keycode for the 'back' key based on the platform
+  const backKeyCode = IS_TIZEN ? 10009 : IS_WEBOS ? 461 : 8;
+  const SpatialNavKeyCodes = {
+    codes: {
+      play: 415,
+      pause: 19,
+      ff: 417,
+      rw: 412,
+      back: backKeyCode
+    },
+    names: {
+      415: 'play',
+      19: 'pause',
+      417: 'ff',
+      412: 'rw',
+      [backKeyCode]: 'back'
+    },
+    isEventKey(event, keyName) {
+      keyName = keyName.toLowerCase();
+      if (this.names[event.keyCode] && this.names[event.keyCode] === keyName) {
+        return true;
+      }
+      return false;
+    },
+    getEventName(event) {
+      if (this.names[event.keyCode]) {
+        return this.names[event.keyCode];
+      } else if (this.codes[event.code]) {
+        const code = this.codes[event.code];
+        return this.names[code];
+      }
+      return null;
+    }
+  };
+
+  /**
+   * @file spatial-navigation.js
+   */
+
+  /** @import Component from './component' */
+  /** @import Player from './player' */
+
+  // The number of seconds the `step*` functions move the timeline.
+  const STEP_SECONDS = 5;
+
+  /**
+   * Spatial Navigation in Video.js enhances user experience and accessibility on smartTV devices,
+   * enabling seamless navigation through interactive elements within the player using remote control arrow keys.
+   * This functionality allows users to effortlessly navigate through focusable components.
+   *
+   * @extends EventTarget
+   */
+  class SpatialNavigation extends EventTarget$2 {
+    /**
+     * Constructs a SpatialNavigation instance with initial settings.
+     * Sets up the player instance, and prepares the spatial navigation system.
+     *
+     * @class
+     * @param {Player} player - The Video.js player instance to which the spatial navigation is attached.
+     */
+    constructor(player) {
+      super();
+      this.player_ = player;
+      this.focusableComponents = [];
+      this.isListening_ = false;
+      this.isPaused_ = false;
+      this.onKeyDown_ = this.onKeyDown_.bind(this);
+      this.lastFocusedComponent_ = null;
+    }
+
+    /**
+     * Starts the spatial navigation by adding a keydown event listener to the video container.
+     * This method ensures that the event listener is added only once.
+     */
+    start() {
+      // If the listener is already active, exit early.
+      if (this.isListening_) {
+        return;
+      }
+
+      // Add the event listener since the listener is not yet active.
+      this.player_.on('keydown', this.onKeyDown_);
+      this.player_.on('modalKeydown', this.onKeyDown_);
+      // Listen for source change events
+      this.player_.on('loadedmetadata', () => {
+        this.focus(this.updateFocusableComponents()[0]);
+      });
+      this.player_.on('modalclose', () => {
+        this.refocusComponent();
+      });
+      this.player_.on('focusin', this.handlePlayerFocus_.bind(this));
+      this.player_.on('focusout', this.handlePlayerBlur_.bind(this));
+      this.isListening_ = true;
+      if (this.player_.errorDisplay) {
+        this.player_.errorDisplay.on('aftermodalfill', () => {
+          this.updateFocusableComponents();
+          if (this.focusableComponents.length) {
+            // The modal has focusable components:
+
+            if (this.focusableComponents.length > 1) {
+              // The modal has close button + some additional buttons.
+              // Focusing first additional button:
+
+              this.focusableComponents[1].focus();
+            } else {
+              // The modal has only close button,
+              // Focusing it:
+
+              this.focusableComponents[0].focus();
+            }
+          }
+        });
+      }
+    }
+
+    /**
+     * Stops the spatial navigation by removing the keydown event listener from the video container.
+     * Also sets the `isListening_` flag to false.
+     */
+    stop() {
+      this.player_.off('keydown', this.onKeyDown_);
+      this.isListening_ = false;
+    }
+
+    /**
+     * Responds to keydown events for spatial navigation and media control.
+     *
+     * Determines if spatial navigation or media control is active and handles key inputs accordingly.
+     *
+     * @param {KeyboardEvent} event - The keydown event to be handled.
+     */
+    onKeyDown_(event) {
+      // Determine if the event is a custom modalKeydown event
+      const actualEvent = event.originalEvent ? event.originalEvent : event;
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(actualEvent.key)) {
+        // Handle directional navigation
+        if (this.isPaused_) {
+          return;
+        }
+        actualEvent.preventDefault();
+
+        // "ArrowLeft" => "left" etc
+        const direction = actualEvent.key.substring(5).toLowerCase();
+        this.move(direction);
+      } else if (SpatialNavKeyCodes.isEventKey(actualEvent, 'play') || SpatialNavKeyCodes.isEventKey(actualEvent, 'pause') || SpatialNavKeyCodes.isEventKey(actualEvent, 'ff') || SpatialNavKeyCodes.isEventKey(actualEvent, 'rw')) {
+        // Handle media actions
+        actualEvent.preventDefault();
+        const action = SpatialNavKeyCodes.getEventName(actualEvent);
+        this.performMediaAction_(action);
+      } else if (SpatialNavKeyCodes.isEventKey(actualEvent, 'Back') && event.target && typeof event.target.closeable === 'function' && event.target.closeable()) {
+        actualEvent.preventDefault();
+        event.target.close();
+      }
+    }
+
+    /**
+     * Performs media control actions based on the given key input.
+     *
+     * Controls the playback and seeking functionalities of the media player.
+     *
+     * @param {string} key - The key representing the media action to be performed.
+     *   Accepted keys: 'play', 'pause', 'ff' (fast-forward), 'rw' (rewind).
+     */
+    performMediaAction_(key) {
+      if (this.player_) {
+        switch (key) {
+          case 'play':
+            if (this.player_.paused()) {
+              this.player_.play();
+            }
+            break;
+          case 'pause':
+            if (!this.player_.paused()) {
+              this.player_.pause();
+            }
+            break;
+          case 'ff':
+            this.userSeek_(this.player_.currentTime() + STEP_SECONDS);
+            break;
+          case 'rw':
+            this.userSeek_(this.player_.currentTime() - STEP_SECONDS);
+            break;
+        }
+      }
+    }
+
+    /**
+     * Prevent liveThreshold from causing seeks to seem like they
+     * are not happening from a user perspective.
+     *
+     * @param {number} ct
+     *        current time to seek to
+     */
+    userSeek_(ct) {
+      if (this.player_.liveTracker && this.player_.liveTracker.isLive()) {
+        this.player_.liveTracker.nextSeekedFromUser();
+      }
+      this.player_.currentTime(ct);
+    }
+
+    /**
+     * Pauses the spatial navigation functionality.
+     * This method sets a flag that can be used to temporarily disable the navigation logic.
+     */
+    pause() {
+      this.isPaused_ = true;
+    }
+
+    /**
+     * Resumes the spatial navigation functionality if it has been paused.
+     * This method resets the pause flag, re-enabling the navigation logic.
+     */
+    resume() {
+      this.isPaused_ = false;
+    }
+
+    /**
+     * Handles Player Blur.
+     *
+     * @param {string|Event|Object} event
+     *        The name of the event, an `Event`, or an object with a key of type set to
+     *        an event name.
+     *
+     * Calls for handling of the Player Blur if:
+     * *The next focused element is not a child of current focused element &
+     * The next focused element is not a child of the Player.
+     * *There is no next focused element
+     */
+    handlePlayerBlur_(event) {
+      const nextFocusedElement = event.relatedTarget;
+      let isChildrenOfPlayer = null;
+      const currentComponent = this.getCurrentComponent(event.target);
+      if (nextFocusedElement) {
+        isChildrenOfPlayer = Boolean(nextFocusedElement.closest('.video-js'));
+
+        // If nextFocusedElement is the 'TextTrackSettings' component
+        if (nextFocusedElement.classList.contains('vjs-text-track-settings') && !this.isPaused_) {
+          this.searchForTrackSelect_();
+        }
+      }
+      if (!event.currentTarget.contains(event.relatedTarget) && !isChildrenOfPlayer || !nextFocusedElement) {
+        if (currentComponent && currentComponent.name() === 'CloseButton') {
+          this.refocusComponent();
+        } else {
+          this.pause();
+          if (currentComponent && currentComponent.el()) {
+            // Store last focused component
+            this.lastFocusedComponent_ = currentComponent;
+          }
+        }
+      }
+    }
+
+    /**
+     * Handles the Player focus event.
+     *
+     * Calls for handling of the Player Focus if current element is focusable.
+     */
+    handlePlayerFocus_() {
+      if (this.getCurrentComponent() && this.getCurrentComponent().getIsFocusable()) {
+        this.resume();
+      }
+    }
+
+    /**
+     * Gets a set of focusable components.
+     *
+     * @return {Array}
+     *         Returns an array of focusable components.
+     */
+    updateFocusableComponents() {
+      const player = this.player_;
+      const focusableComponents = [];
+
+      /**
+       * Searches for children candidates.
+       *
+       * Pushes Components to array of 'focusableComponents'.
+       * Calls itself if there is children elements inside iterated component.
+       *
+       * @param {Array} componentsArray - The array of components to search for focusable children.
+       */
+      function searchForChildrenCandidates(componentsArray) {
+        for (const i of componentsArray) {
+          if (i.hasOwnProperty('el_') && i.getIsFocusable() && i.getIsAvailableToBeFocused(i.el())) {
+            focusableComponents.push(i);
+          }
+          if (i.hasOwnProperty('children_') && i.children_.length > 0) {
+            searchForChildrenCandidates(i.children_);
+          }
+        }
+      }
+
+      // Iterate inside all children components of the player.
+      player.children_.forEach(value => {
+        if (value.hasOwnProperty('el_')) {
+          // If component has required functions 'getIsFocusable' & 'getIsAvailableToBeFocused', is focusable & available to be focused.
+          if (value.getIsFocusable && value.getIsAvailableToBeFocused && value.getIsFocusable() && value.getIsAvailableToBeFocused(value.el())) {
+            focusableComponents.push(value);
+            return;
+            // If component has posible children components as candidates.
+          } else if (value.hasOwnProperty('children_') && value.children_.length > 0) {
+            searchForChildrenCandidates(value.children_);
+            // If component has posible item components as candidates.
+          } else if (value.hasOwnProperty('items') && value.items.length > 0) {
+            searchForChildrenCandidates(value.items);
+            // If there is a suitable child element within the component's DOM element.
+          } else if (this.findSuitableDOMChild(value)) {
+            focusableComponents.push(value);
+          }
+        }
+
+        // TODO - Refactor the following logic after refactor of videojs-errors elements to be components is done.
+        if (value.name_ === 'ErrorDisplay' && value.opened_) {
+          const buttonContainer = value.el_.querySelector('.vjs-errors-ok-button-container');
+          if (buttonContainer) {
+            const modalButtons = buttonContainer.querySelectorAll('button');
+            modalButtons.forEach((element, index) => {
+              // Add elements as objects to be handled by the spatial navigation
+              focusableComponents.push({
+                name: () => {
+                  return 'ModalButton' + (index + 1);
+                },
+                el: () => element,
+                getPositions: () => {
+                  const rect = element.getBoundingClientRect();
+
+                  // Creating objects that mirror DOMRectReadOnly for boundingClientRect and center
+                  const boundingClientRect = {
+                    x: rect.x,
+                    y: rect.y,
+                    width: rect.width,
+                    height: rect.height,
+                    top: rect.top,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                    left: rect.left
+                  };
+
+                  // Calculating the center position
+                  const center = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2,
+                    width: 0,
+                    height: 0,
+                    top: rect.top + rect.height / 2,
+                    right: rect.left + rect.width / 2,
+                    bottom: rect.top + rect.height / 2,
+                    left: rect.left + rect.width / 2
+                  };
+                  return {
+                    boundingClientRect,
+                    center
+                  };
+                },
+                // Asume that the following are always focusable
+                getIsAvailableToBeFocused: () => true,
+                getIsFocusable: el => true,
+                focus: () => element.focus()
+              });
+            });
+          }
+        }
+      });
+      this.focusableComponents = focusableComponents;
+      return this.focusableComponents;
+    }
+
+    /**
+     * Finds a suitable child element within the provided component's DOM element.
+     *
+     * @param {Object} component - The component containing the DOM element to search within.
+     * @return {HTMLElement|null} Returns the suitable child element if found, or null if not found.
+     */
+    findSuitableDOMChild(component) {
+      /**
+       * Recursively searches for a suitable child node that can be focused within a given component.
+       * It first checks if the provided node itself can be focused according to the component's
+       * `getIsFocusable` and `getIsAvailableToBeFocused` methods. If not, it recursively searches
+       * through the node's children to find a suitable child node that meets the focusability criteria.
+       *
+       * @param {HTMLElement} node - The DOM node to start the search from.
+       * @return {HTMLElement|null} The first child node that is focusable and available to be focused,
+       * or `null` if no suitable child is found.
+       */
+      function searchForSuitableChild(node) {
+        if (component.getIsFocusable(node) && component.getIsAvailableToBeFocused(node)) {
+          return node;
+        }
+        for (let i = 0; i < node.children.length; i++) {
+          const child = node.children[i];
+          const suitableChild = searchForSuitableChild(child);
+          if (suitableChild) {
+            return suitableChild;
+          }
+        }
+        return null;
+      }
+      if (component.el()) {
+        return searchForSuitableChild(component.el());
+      }
+      return null;
+    }
+
+    /**
+     * Gets the currently focused component from the list of focusable components.
+     * If a target element is provided, it uses that element to find the corresponding
+     * component. If no target is provided, it defaults to using the document's currently
+     * active element.
+     *
+     * @param {HTMLElement} [target] - The DOM element to check against the focusable components.
+     *                                 If not provided, `document.activeElement` is used.
+     * @return {Component|null} - Returns the focused component if found among the focusable components,
+     *                            otherwise returns null if no matching component is found.
+     */
+    getCurrentComponent(target) {
+      this.updateFocusableComponents();
+      // eslint-disable-next-line
+      const curComp = target || document.activeElement;
+      if (this.focusableComponents.length) {
+        for (const i of this.focusableComponents) {
+          // If component Node is equal to the current active element.
+          if (i.el() === curComp) {
+            return i;
+          }
+        }
+      }
+    }
+
+    /**
+     * Adds a component to the array of focusable components.
+     *
+     * @param {Component} component
+     *        The `Component` to be added.
+     */
+    add(component) {
+      const focusableComponents = [...this.focusableComponents];
+      if (component.hasOwnProperty('el_') && component.getIsFocusable() && component.getIsAvailableToBeFocused(component.el())) {
+        focusableComponents.push(component);
+      }
+      this.focusableComponents = focusableComponents;
+      // Trigger the notification manually
+      this.trigger({
+        type: 'focusableComponentsChanged',
+        focusableComponents: this.focusableComponents
+      });
+    }
+
+    /**
+     * Removes component from the array of focusable components.
+     *
+     * @param {Component} component - The component to be removed from the focusable components array.
+     */
+    remove(component) {
+      for (let i = 0; i < this.focusableComponents.length; i++) {
+        if (this.focusableComponents[i].name() === component.name()) {
+          this.focusableComponents.splice(i, 1);
+          // Trigger the notification manually
+          this.trigger({
+            type: 'focusableComponentsChanged',
+            focusableComponents: this.focusableComponents
+          });
+          return;
+        }
+      }
+    }
+
+    /**
+     * Clears array of focusable components.
+     */
+    clear() {
+      // Check if the array is already empty to avoid unnecessary event triggering
+      if (this.focusableComponents.length > 0) {
+        // Clear the array
+        this.focusableComponents = [];
+
+        // Trigger the notification manually
+        this.trigger({
+          type: 'focusableComponentsChanged',
+          focusableComponents: this.focusableComponents
+        });
+      }
+    }
+
+    /**
+     * Navigates to the next focusable component based on the specified direction.
+     *
+     * @param {string} direction 'up', 'down', 'left', 'right'
+     */
+    move(direction) {
+      const currentFocusedComponent = this.getCurrentComponent();
+      if (!currentFocusedComponent) {
+        return;
+      }
+      const currentPositions = currentFocusedComponent.getPositions();
+      const candidates = this.focusableComponents.filter(component => component !== currentFocusedComponent && this.isInDirection_(currentPositions.boundingClientRect, component.getPositions().boundingClientRect, direction));
+      const bestCandidate = this.findBestCandidate_(currentPositions.center, candidates, direction);
+      if (bestCandidate) {
+        this.focus(bestCandidate);
+      } else {
+        this.trigger({
+          type: 'endOfFocusableComponents',
+          direction,
+          focusedComponent: currentFocusedComponent
+        });
+      }
+    }
+
+    /**
+     * Finds the best candidate on the current center position,
+     * the list of candidates, and the specified navigation direction.
+     *
+     * @param {Object} currentCenter The center position of the current focused component element.
+     * @param {Array} candidates An array of candidate components to receive focus.
+     * @param {string} direction The direction of navigation ('up', 'down', 'left', 'right').
+     * @return {Object|null} The component that is the best candidate for receiving focus.
+     */
+    findBestCandidate_(currentCenter, candidates, direction) {
+      let minDistance = Infinity;
+      let bestCandidate = null;
+      for (const candidate of candidates) {
+        const candidateCenter = candidate.getPositions().center;
+        const distance = this.calculateDistance_(currentCenter, candidateCenter, direction);
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestCandidate = candidate;
+        }
+      }
+      return bestCandidate;
+    }
+
+    /**
+     * Determines if a target rectangle is in the specified navigation direction
+     * relative to a source rectangle.
+     *
+     * @param {Object} srcRect The bounding rectangle of the source element.
+     * @param {Object} targetRect The bounding rectangle of the target element.
+     * @param {string} direction The navigation direction ('up', 'down', 'left', 'right').
+     * @return {boolean} True if the target is in the specified direction relative to the source.
+     */
+    isInDirection_(srcRect, targetRect, direction) {
+      switch (direction) {
+        case 'right':
+          return targetRect.left >= srcRect.right;
+        case 'left':
+          return targetRect.right <= srcRect.left;
+        case 'down':
+          return targetRect.top >= srcRect.bottom;
+        case 'up':
+          return targetRect.bottom <= srcRect.top;
+        default:
+          return false;
+      }
+    }
+
+    /**
+     * Focus the last focused component saved before blur on player.
+     */
+    refocusComponent() {
+      if (this.lastFocusedComponent_) {
+        // If user is not active, set it to active.
+        if (!this.player_.userActive()) {
+          this.player_.userActive(true);
+        }
+        this.updateFocusableComponents();
+
+        // Search inside array of 'focusableComponents' for a match of name of
+        // the last focused component.
+        for (let i = 0; i < this.focusableComponents.length; i++) {
+          if (this.focusableComponents[i].name() === this.lastFocusedComponent_.name()) {
+            this.focus(this.focusableComponents[i]);
+            return;
+          }
+        }
+      } else {
+        this.focus(this.updateFocusableComponents()[0]);
+      }
+    }
+
+    /**
+     * Focuses on a given component.
+     * If the component is available to be focused, it focuses on the component.
+     * If not, it attempts to find a suitable DOM child within the component and focuses on it.
+     *
+     * @param {Component} component - The component to be focused.
+     */
+    focus(component) {
+      if (typeof component !== 'object') {
+        return;
+      }
+      if (component.getIsAvailableToBeFocused(component.el())) {
+        component.focus();
+      } else if (this.findSuitableDOMChild(component)) {
+        this.findSuitableDOMChild(component).focus();
+      }
+    }
+
+    /**
+     * Calculates the distance between two points, adjusting the calculation based on
+     * the specified navigation direction.
+     *
+     * @param {Object} center1 The center point of the first element.
+     * @param {Object} center2 The center point of the second element.
+     * @param {string} direction The direction of navigation ('up', 'down', 'left', 'right').
+     * @return {number} The calculated distance between the two centers.
+     */
+    calculateDistance_(center1, center2, direction) {
+      const dx = Math.abs(center1.x - center2.x);
+      const dy = Math.abs(center1.y - center2.y);
+      let distance;
+      switch (direction) {
+        case 'right':
+        case 'left':
+          // Higher weight for vertical distance in horizontal navigation.
+          distance = dx + dy * 100;
+          break;
+        case 'up':
+          // Strongly prioritize vertical proximity for UP navigation.
+          // Adjust the weight to ensure that elements directly above are favored.
+          distance = dy * 2 + dx * 0.5;
+          break;
+        case 'down':
+          // More balanced weight for vertical and horizontal distances.
+          // Adjust the weights here to find the best balance.
+          distance = dy * 5 + dx;
+          break;
+        default:
+          distance = dx + dy;
+      }
+      return distance;
+    }
+
+    /**
+     * This gets called by 'handlePlayerBlur_' if 'spatialNavigation' is enabled.
+     * Searches for the first 'TextTrackSelect' inside of modal to focus.
+     *
+     * @private
+     */
+    searchForTrackSelect_() {
+      const spatialNavigation = this;
+      for (const component of spatialNavigation.updateFocusableComponents()) {
+        if (component.constructor.name === 'TextTrackSelect') {
+          spatialNavigation.focus(component);
+          break;
+        }
+      }
+    }
+  }
+
   /**
    * @file loader.js
    */
+
+  /** @import Player from '../player' */
 
   /**
    * The `MediaLoader` is the `Component` that decides which playback technology to load
@@ -10081,7 +12989,7 @@
     /**
      * Create an instance of this class.
      *
-     * @param { import('../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should attach to.
      *
      * @param {Object} [options]
@@ -10132,6 +13040,8 @@
    * @file clickable-component.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * Component which is clickable or keyboard actionable, but is not a
    * native HTML button.
@@ -10142,7 +13052,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param  { import('./player').default } player
+     * @param  {Player} player
      *         The `Player` that this class should be attached to.
      *
      * @param  {Object} [options]
@@ -10201,11 +13111,13 @@
       }, attributes);
       this.tabIndex_ = props.tabIndex;
       const el = createEl(tag, props, attributes);
-      el.appendChild(createEl('span', {
-        className: 'vjs-icon-placeholder'
-      }, {
-        'aria-hidden': true
-      }));
+      if (!this.player_.options_.experimentalSvgIcons) {
+        el.appendChild(createEl('span', {
+          className: 'vjs-icon-placeholder'
+        }, {
+          'aria-hidden': true
+        }));
+      }
       this.createControlTextEl(el);
       return el;
     }
@@ -10339,7 +13251,7 @@
      *
      * By default, if the key is Space or Enter, it will trigger a `click` event.
      *
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      *        The `keydown` event that caused this function to be called.
      *
      * @listens keydown
@@ -10348,7 +13260,7 @@
       // Support Space or Enter key operation to fire a click event. Also,
       // prevent the event from propagating through the DOM and triggering
       // Player hotkeys.
-      if (keycode.isEventKey(event, 'Space') || keycode.isEventKey(event, 'Enter')) {
+      if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault();
         event.stopPropagation();
         this.trigger('click');
@@ -10364,6 +13276,8 @@
    * @file poster-image.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * A `ClickableComponent` that handles showing the poster image for the player.
    *
@@ -10373,7 +13287,7 @@
     /**
      * Create an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should attach to.
      *
      * @param {Object} [options]
@@ -10538,6 +13452,9 @@
   /**
    * @file text-track-display.js
    */
+
+  /** @import Player from '../player' */
+
   const darkGray = '#222';
   const lightGray = '#ccc';
   const fontMap = {
@@ -10604,6 +13521,21 @@
   }
 
   /**
+   * Converts the CSS top/right/bottom/left property numeric value to string in pixels.
+   *
+   * @param {number} position
+   *        The CSS top/right/bottom/left property value.
+   *
+   * @return {string}
+   *          The CSS property value that was created, like '10px'.
+   *
+   * @private
+   */
+  function getCSSPositionValue(position) {
+    return position ? `${position}px` : '';
+  }
+
+  /**
    * The component for displaying text track cues.
    *
    * @extends Component
@@ -10612,7 +13544,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -10623,10 +13555,17 @@
      */
     constructor(player, options, ready) {
       super(player, options, ready);
-      const updateDisplayHandler = e => this.updateDisplay(e);
+      const updateDisplayTextHandler = e => this.updateDisplay(e);
+      const updateDisplayHandler = e => {
+        this.updateDisplayOverlay();
+        this.updateDisplay(e);
+      };
       player.on('loadstart', e => this.toggleDisplay(e));
-      player.on('texttrackchange', updateDisplayHandler);
-      player.on('loadedmetadata', e => this.preselectTrack(e));
+      player.on('texttrackchange', updateDisplayTextHandler);
+      player.on('loadedmetadata', e => {
+        this.updateDisplayOverlay();
+        this.preselectTrack(e);
+      });
 
       // This used to be called during player init, but was causing an error
       // if a track should show by default and the display hadn't loaded yet.
@@ -10801,6 +13740,72 @@
         }
         this.updateForTrack(descriptionsTrack);
       }
+      if (!window.CSS.supports('inset', '10px')) {
+        const textTrackDisplay = this.el_;
+        const vjsTextTrackCues = textTrackDisplay.querySelectorAll('.vjs-text-track-cue');
+        const controlBarHeight = this.player_.controlBar.el_.getBoundingClientRect().height;
+        const playerHeight = this.player_.el_.getBoundingClientRect().height;
+
+        // Clear inline style before getting actual height of textTrackDisplay
+        textTrackDisplay.style = '';
+
+        // textrack style updates, this styles are required to be inline
+        tryUpdateStyle(textTrackDisplay, 'position', 'relative');
+        tryUpdateStyle(textTrackDisplay, 'height', playerHeight - controlBarHeight + 'px');
+        tryUpdateStyle(textTrackDisplay, 'top', 'unset');
+        if (IS_SMART_TV) {
+          tryUpdateStyle(textTrackDisplay, 'bottom', playerHeight + 'px');
+        } else {
+          tryUpdateStyle(textTrackDisplay, 'bottom', '0px');
+        }
+
+        // vjsTextTrackCue style updates
+        if (vjsTextTrackCues.length > 0) {
+          vjsTextTrackCues.forEach(vjsTextTrackCue => {
+            // verify if inset styles are inline
+            if (vjsTextTrackCue.style.inset) {
+              const insetStyles = vjsTextTrackCue.style.inset.split(' ');
+
+              // expected value is always 3
+              if (insetStyles.length === 3) {
+                Object.assign(vjsTextTrackCue.style, {
+                  top: insetStyles[0],
+                  right: insetStyles[1],
+                  bottom: insetStyles[2],
+                  left: 'unset'
+                });
+              }
+            }
+          });
+        }
+      }
+    }
+
+    /**
+     * Updates the displayed TextTrack to be sure it overlays the video when a either
+     * a {@link Player#texttrackchange} or a {@link Player#fullscreenchange} is fired.
+     */
+    updateDisplayOverlay() {
+      // inset-inline and inset-block are not supprted on old chrome, but these are
+      // only likely to be used on TV devices
+      if (!this.player_.videoHeight() || !window.CSS.supports('inset-inline: 10px')) {
+        return;
+      }
+      const playerWidth = this.player_.currentWidth();
+      const playerHeight = this.player_.currentHeight();
+      const playerAspectRatio = playerWidth / playerHeight;
+      const videoAspectRatio = this.player_.videoWidth() / this.player_.videoHeight();
+      let insetInlineMatch = 0;
+      let insetBlockMatch = 0;
+      if (Math.abs(playerAspectRatio - videoAspectRatio) > 0.1) {
+        if (playerAspectRatio > videoAspectRatio) {
+          insetInlineMatch = Math.round((playerWidth - playerHeight * videoAspectRatio) / 2);
+        } else {
+          insetBlockMatch = Math.round((playerHeight - playerWidth / videoAspectRatio) / 2);
+        }
+      }
+      tryUpdateStyle(this.el_, 'insetInline', getCSSPositionValue(insetInlineMatch));
+      tryUpdateStyle(this.el_, 'insetBlock', getCSSPositionValue(insetBlockMatch));
     }
 
     /**
@@ -10989,11 +13994,13 @@
         type: 'button'
       }, attributes);
       const el = createEl(tag, props, attributes);
-      el.appendChild(createEl('span', {
-        className: 'vjs-icon-placeholder'
-      }, {
-        'aria-hidden': true
-      }));
+      if (!this.player_.options_.experimentalSvgIcons) {
+        el.appendChild(createEl('span', {
+          className: 'vjs-icon-placeholder'
+        }, {
+          'aria-hidden': true
+        }));
+      }
       this.createControlTextEl(el);
       return el;
     }
@@ -11044,7 +14051,7 @@
      * This gets called when a `Button` has focus and `keydown` is triggered via a key
      * press.
      *
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      *        The event that caused this function to get called.
      *
      * @listens keydown
@@ -11055,7 +14062,7 @@
       // prevent the event from propagating through the DOM and triggering Player
       // hotkeys. We do not preventDefault here because we _want_ the browser to
       // handle it.
-      if (keycode.isEventKey(event, 'Space') || keycode.isEventKey(event, 'Enter')) {
+      if (event.key === ' ' || event.key === 'Enter') {
         event.stopPropagation();
         return;
       }
@@ -11080,6 +14087,7 @@
     constructor(player, options) {
       super(player, options);
       this.mouseused_ = false;
+      this.setIcon('play');
       this.on('mousedown', e => this.handleMouseDown(e));
     }
 
@@ -11097,7 +14105,7 @@
      * This gets called when a `BigPlayButton` "clicked". See {@link ClickableComponent}
      * for more detailed information on what a click can be.
      *
-     * @param {KeyboardEvent} event
+     * @param {KeyboardEvent|MouseEvent|TouchEvent} event
      *        The `keydown`, `tap`, or `click` event that caused this function to be
      *        called.
      *
@@ -11108,7 +14116,7 @@
       const playPromise = this.player_.play();
 
       // exit early if clicked via the mouse
-      if (this.mouseused_ && event.clientX && event.clientY) {
+      if (this.mouseused_ && 'clientX' in event && 'clientY' in event) {
         silencePromise(playPromise);
         if (this.player_.tech(true)) {
           this.player_.tech(true).focus();
@@ -11128,10 +14136,29 @@
         this.setTimeout(playFocus, 1);
       }
     }
+
+    /**
+     * Event handler that is called when a `BigPlayButton` receives a
+     * `keydown` event.
+     *
+     * @param {KeyboardEvent} event
+     *        The `keydown` event that caused this function to be called.
+     *
+     * @listens keydown
+     */
     handleKeyDown(event) {
       this.mouseused_ = false;
       super.handleKeyDown(event);
     }
+
+    /**
+     * Handle `mousedown` events on the `BigPlayButton`.
+     *
+     * @param {MouseEvent} event
+     *        `mousedown` or `touchstart` event that triggered this function
+     *
+     * @listens mousedown
+     */
     handleMouseDown(event) {
       this.mouseused_ = true;
     }
@@ -11150,6 +14177,8 @@
    * @file close-button.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * The `CloseButton` is a `{@link Button}` that fires a `close` event when
    * it gets clicked.
@@ -11160,7 +14189,7 @@
     /**
     * Creates an instance of the this class.
     *
-    * @param  { import('./player').default } player
+    * @param  {Player} player
     *         The `Player` that this class should be attached to.
     *
     * @param  {Object} [options]
@@ -11168,6 +14197,7 @@
     */
     constructor(player, options) {
       super(player, options);
+      this.setIcon('cancel');
       this.controlText(options && options.controlText || this.localize('Close'));
     }
 
@@ -11216,14 +14246,14 @@
      *
      * By default, if the key is Esc, it will trigger a `click` event.
      *
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      *        The `keydown` event that caused this function to be called.
      *
      * @listens keydown
      */
     handleKeyDown(event) {
       // Esc button will trigger `click` event
-      if (keycode.isEventKey(event, 'Esc')) {
+      if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         this.trigger('click');
@@ -11239,6 +14269,8 @@
    * @file play-toggle.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * Button to toggle between play and pause.
    *
@@ -11248,7 +14280,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options={}]
@@ -11259,6 +14291,7 @@
 
       // show or hide replay icon
       options.replay = options.replay === undefined || options.replay;
+      this.setIcon('play');
       this.on(player, 'play', e => this.handlePlay(e));
       this.on(player, 'pause', e => this.handlePause(e));
       if (options.replay) {
@@ -11325,6 +14358,7 @@
       this.removeClass('vjs-ended', 'vjs-paused');
       this.addClass('vjs-playing');
       // change the button text to "Pause"
+      this.setIcon('pause');
       this.controlText('Pause');
     }
 
@@ -11340,6 +14374,7 @@
       this.removeClass('vjs-playing');
       this.addClass('vjs-paused');
       // change the button text to "Play"
+      this.setIcon('play');
       this.controlText('Play');
     }
 
@@ -11355,6 +14390,7 @@
       this.removeClass('vjs-playing');
       this.addClass('vjs-ended');
       // change the button text to "Replay"
+      this.setIcon('replay');
       this.controlText('Replay');
 
       // on the next seek remove the replay button
@@ -11375,6 +14411,8 @@
    * @file time-display.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * Displays time information about the video
    *
@@ -11384,7 +14422,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -11392,7 +14430,7 @@
      */
     constructor(player, options) {
       super(player, options);
-      this.on(player, ['timeupdate', 'ended'], e => this.updateContent(e));
+      this.on(player, ['timeupdate', 'ended', 'seeking'], e => this.update(e));
       this.updateTextNode_();
     }
 
@@ -11430,6 +14468,19 @@
       this.contentEl_ = null;
       this.textNode_ = null;
       super.dispose();
+    }
+
+    /**
+     * Updates the displayed time according to the `updateContent` function which is defined in the child class.
+     *
+     * @param {Event} [event]
+     *          The `timeupdate`, `ended` or `seeking` (if enableSmoothSeeking is true) event that caused this function to be called.
+     */
+    update(event) {
+      if (!this.player_.options_.enableSmoothSeeking && event.type === 'seeking') {
+        return;
+      }
+      this.updateContent(event);
     }
 
     /**
@@ -11530,6 +14581,8 @@
       let time;
       if (this.player_.ended()) {
         time = this.player_.duration();
+      } else if (event && event.target && typeof event.target.pendingSeekTime === 'function') {
+        time = event.target.pendingSeekTime();
       } else {
         time = this.player_.scrubbing() ? this.player_.getCache().currentTime : this.player_.currentTime();
       }
@@ -11560,6 +14613,8 @@
    * @file duration-display.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * Displays the duration
    *
@@ -11569,7 +14624,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -11682,6 +14737,8 @@
    * @file remaining-time-display.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * Displays the time left in the video
    *
@@ -11691,7 +14748,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -11779,6 +14836,8 @@
    * @file live-display.js
    */
 
+  /** @import Player from './player' */
+
   // TODO - Future make it click to snap to live
 
   /**
@@ -11790,7 +14849,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -11853,6 +14912,8 @@
    * @file seek-to-live.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * Displays the live indicator when duration is Infinity.
    *
@@ -11862,7 +14923,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -11887,6 +14948,7 @@
       const el = super.createEl('button', {
         className: 'vjs-seek-to-live-control vjs-control'
       });
+      this.setIcon('circle', el);
       this.textEl_ = createEl('span', {
         className: 'vjs-seek-to-live-text',
         textContent: this.localize('LIVE')
@@ -11976,6 +15038,8 @@
    * @file slider.js
    */
 
+  /** @import Player from '../player' */
+
   /**
    * The base functionality for a slider. Can be vertical or horizontal.
    * For instance the volume bar or the seek bar on a video is a slider.
@@ -11986,7 +15050,7 @@
     /**
     * Create an instance of this class
     *
-    * @param { import('../player').default } player
+    * @param {Player} player
     *        The `Player` that this class should be attached to.
     *
     * @param {Object} [options]
@@ -12252,14 +15316,34 @@
      * @listens keydown
      */
     handleKeyDown(event) {
-      // Left and Down Arrows
-      if (keycode.isEventKey(event, 'Left') || keycode.isEventKey(event, 'Down')) {
+      const spatialNavOptions = this.options_.playerOptions.spatialNavigation;
+      const spatialNavEnabled = spatialNavOptions && spatialNavOptions.enabled;
+      const horizontalSeek = spatialNavOptions && spatialNavOptions.horizontalSeek;
+      if (spatialNavEnabled) {
+        if (horizontalSeek && event.key === 'ArrowLeft' || !horizontalSeek && event.key === 'ArrowDown') {
+          event.preventDefault();
+          event.stopPropagation();
+          this.stepBack();
+        } else if (horizontalSeek && event.key === 'ArrowRight' || !horizontalSeek && event.key === 'ArrowUp') {
+          event.preventDefault();
+          event.stopPropagation();
+          this.stepForward();
+        } else {
+          if (this.pendingSeekTime()) {
+            this.pendingSeekTime(null);
+            this.userSeek_(this.player_.currentTime());
+          }
+          super.handleKeyDown(event);
+        }
+
+        // Left and Down Arrows
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
         event.preventDefault();
         event.stopPropagation();
         this.stepBack();
 
         // Up and Right Arrows
-      } else if (keycode.isEventKey(event, 'Right') || keycode.isEventKey(event, 'Up')) {
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
         event.preventDefault();
         event.stopPropagation();
         this.stepForward();
@@ -12310,6 +15394,8 @@
    * @file load-progress-bar.js
    */
 
+  /** @import Player from '../../player' */
+
   // get the percent width of a time compared to the total end
   const percentify = (time, end) => clamp(time / end * 100, 0, 100).toFixed(2) + '%';
 
@@ -12322,7 +15408,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -12427,6 +15513,8 @@
    * @file time-tooltip.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * Time tooltips display a time above the progress bar.
    *
@@ -12436,7 +15524,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The {@link Player} that this class should be attached to.
      *
      * @param {Object} [options]
@@ -12486,14 +15574,23 @@
       // of the player. We calculate any gap between the left edge of the player
       // and the left edge of the `SeekBar` and add the number of pixels in the
       // `SeekBar` before hitting the `seekBarPoint`
-      const spaceLeftOfPoint = seekBarRect.left - playerRect.left + seekBarPointPx;
+      let spaceLeftOfPoint = seekBarRect.left - playerRect.left + seekBarPointPx;
 
       // This is the space right of the `seekBarPoint` available within the bounds
       // of the player. We calculate the number of pixels from the `seekBarPoint`
       // to the right edge of the `SeekBar` and add to that any gap between the
       // right edge of the `SeekBar` and the player.
-      const spaceRightOfPoint = seekBarRect.width - seekBarPointPx + (playerRect.right - seekBarRect.right);
+      let spaceRightOfPoint = seekBarRect.width - seekBarPointPx + (playerRect.right - seekBarRect.right);
 
+      // spaceRightOfPoint is always NaN for mouse time display
+      // because the seekbarRect does not have a right property. This causes
+      // the mouse tool tip to be truncated when it's close to the right edge of the player.
+      // In such cases, we ignore the `playerRect.right - seekBarRect.right` value when calculating.
+      // For the sake of consistency, we ignore seekBarRect.left - playerRect.left for the left edge.
+      if (!spaceRightOfPoint) {
+        spaceRightOfPoint = seekBarRect.width - seekBarPointPx;
+        spaceLeftOfPoint = seekBarPointPx;
+      }
       // This is the number of pixels by which the tooltip will need to be pulled
       // further to the right to center it over the `seekBarPoint`.
       let pullTooltipBy = tooltipRect.width / 2;
@@ -12585,7 +15682,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The {@link Player} that this class should be attached to.
      *
      * @param {Object} [options]
@@ -12593,6 +15690,7 @@
      */
     constructor(player, options) {
       super(player, options);
+      this.setIcon('circle');
       this.update = throttle(bind_(this, this.update), UPDATE_REFRESH_INTERVAL);
     }
 
@@ -12620,13 +15718,18 @@
      * @param {number} seekBarPoint
      *        A number from 0 to 1, representing a horizontal reference point
      *        from the left edge of the {@link SeekBar}
+     *
+     * @param {Event} [event]
+     *        The `timeupdate` event that caused this function to run.
      */
-    update(seekBarRect, seekBarPoint) {
+    update(seekBarRect, seekBarPoint, event) {
       const timeTooltip = this.getChild('timeTooltip');
       if (!timeTooltip) {
         return;
       }
-      const time = this.player_.scrubbing() ? this.player_.getCache().currentTime : this.player_.currentTime();
+
+      // Combined logic: if an event with a valid pendingSeekTime getter exists, use it.
+      const time = event && event.target && typeof event.target.pendingSeekTime === 'function' ? event.target.pendingSeekTime() : this.player_.scrubbing() ? this.player_.getCache().currentTime : this.player_.currentTime();
       timeTooltip.updateTime(seekBarRect, seekBarPoint, time);
     }
   }
@@ -12663,7 +15766,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The {@link Player} that this class should be attached to.
      *
      * @param {Object} [options]
@@ -12720,12 +15823,6 @@
    * @file seek-bar.js
    */
 
-  // The number of seconds the `step*` functions move the timeline.
-  const STEP_SECONDS = 5;
-
-  // The multiplier of STEP_SECONDS that PgUp/PgDown move the timeline.
-  const PAGE_KEY_MULTIPLIER = 12;
-
   /**
    * Seek bar and container for the progress bars. Uses {@link PlayProgressBar}
    * as its `bar`.
@@ -12736,14 +15833,30 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
      *        The key/value store of player options.
+     * @param {number} [options.stepSeconds=5]
+     *        The number of seconds to increment on keyboard control
+     * @param {number} [options.pageMultiplier=12]
+     *        The multiplier of stepSeconds that PgUp/PgDown move the timeline.
      */
     constructor(player, options) {
+      options = merge$2(SeekBar.prototype.options_, options);
+
+      // Avoid mutating the prototype's `children` array by creating a copy
+      options.children = [...options.children];
+      const shouldDisableSeekWhileScrubbing = player.options_.disableSeekWhileScrubbingOnMobile && (IS_IOS || IS_ANDROID) || player.options_.disableSeekWhileScrubbingOnSTV;
+
+      // Add the TimeTooltip as a child if we are on desktop, or on mobile with `disableSeekWhileScrubbingOnMobile: true`
+      if (!IS_IOS && !IS_ANDROID || shouldDisableSeekWhileScrubbing) {
+        options.children.splice(1, 0, 'mouseTimeDisplay');
+      }
       super(player, options);
+      this.shouldDisableSeekWhileScrubbing_ = shouldDisableSeekWhileScrubbing;
+      this.pendingSeekTime_ = null;
       this.setEventHandlers_();
     }
 
@@ -12755,7 +15868,8 @@
     setEventHandlers_() {
       this.update_ = bind_(this, this.update);
       this.update = throttle(this.update_, UPDATE_REFRESH_INTERVAL);
-      this.on(this.player_, ['ended', 'durationchange', 'timeupdate'], this.update);
+      this.on(this.player_, ['durationchange', 'timeupdate'], this.update);
+      this.on(this.player_, ['ended'], this.update_);
       if (this.player_.liveTracker) {
         this.on(this.player_.liveTracker, 'liveedgechange', this.update);
       }
@@ -12858,7 +15972,7 @@
 
         // update the progress bar time tooltip with the current time
         if (this.bar) {
-          this.bar.update(getBoundingClientRect(this.el()), this.getProgress());
+          this.bar.update(getBoundingClientRect(this.el()), this.getProgress(), event);
         }
       });
       return percent;
@@ -12892,12 +16006,36 @@
     }
 
     /**
+     * Getter and setter for pendingSeekTime.
+     * Ensures the value is clamped between 0 and duration.
+     *
+     * @param {number|null} [time] - Optional. The new pending seek time, can be a number or null.
+     * @return {number|null} - The current pending seek time.
+     */
+    pendingSeekTime(time) {
+      if (time !== undefined) {
+        if (time !== null) {
+          const duration = this.player_.duration();
+          this.pendingSeekTime_ = Math.max(0, Math.min(time, duration));
+        } else {
+          this.pendingSeekTime_ = null;
+        }
+      }
+      return this.pendingSeekTime_;
+    }
+
+    /**
      * Get the percentage of media played so far.
      *
      * @return {number}
      *         The percentage of media played so far (0 to 1).
      */
     getPercent() {
+      // If we have a pending seek time, we are scrubbing on mobile and should set the slider percent
+      // to reflect the current scrub location.
+      if (this.pendingSeekTime() !== null) {
+        return this.pendingSeekTime() / this.player_.duration();
+      }
       const currentTime = this.getCurrentTime_();
       let percent;
       const liveTracker = this.player_.liveTracker;
@@ -12930,7 +16068,12 @@
       // Stop event propagation to prevent double fire in progress-control.js
       event.stopPropagation();
       this.videoWasPlaying = !this.player_.paused();
-      this.player_.pause();
+
+      // Don't pause if we are on mobile and `disableSeekWhileScrubbingOnMobile: true`.
+      // In that case, playback should continue while the player scrubs to a new location.
+      if (!this.shouldDisableSeekWhileScrubbing_) {
+        this.player_.pause();
+      }
       super.handleMouseDown(event);
     }
 
@@ -12944,7 +16087,7 @@
      * @listens mousemove
      */
     handleMouseMove(event, mouseDown = false) {
-      if (!isSingleLeftClick(event)) {
+      if (!isSingleLeftClick(event) || isNaN(this.player_.duration())) {
         return;
       }
       if (!mouseDown && !this.player_.scrubbing()) {
@@ -12988,8 +16131,15 @@
         }
       }
 
-      // Set new time (tell player to seek to new time)
-      this.userSeek_(newTime);
+      // if on mobile and `disableSeekWhileScrubbingOnMobile: true`, keep track of the desired seek point but we won't initiate the seek until 'touchend'
+      if (this.shouldDisableSeekWhileScrubbing_) {
+        this.pendingSeekTime(newTime);
+      } else {
+        this.userSeek_(newTime);
+      }
+      if (this.player_.options_.enableSmoothSeeking) {
+        this.update();
+      }
     }
     enable() {
       super.enable();
@@ -13025,6 +16175,12 @@
       }
       this.player_.scrubbing(false);
 
+      // If we have a pending seek time, then we have finished scrubbing on mobile and should initiate a seek.
+      if (this.pendingSeekTime() !== null) {
+        this.userSeek_(this.pendingSeekTime());
+        this.pendingSeekTime(null);
+      }
+
       /**
        * Trigger timeupdate because we're done seeking and the time has changed.
        * This is particularly useful for if the player is paused to time the time displays.
@@ -13047,17 +16203,45 @@
     }
 
     /**
+     * Handles pending seek time when `disableSeekWhileScrubbingOnSTV` is enabled.
+     *
+     * @param {number} stepAmount - The number of seconds to step (positive for forward, negative for backward).
+     */
+    handlePendingSeek_(stepAmount) {
+      if (!this.player_.paused()) {
+        this.player_.pause();
+      }
+      const currentPos = this.pendingSeekTime() !== null ? this.pendingSeekTime() : this.player_.currentTime();
+      this.pendingSeekTime(currentPos + stepAmount);
+      this.player_.trigger({
+        type: 'timeupdate',
+        target: this,
+        manuallyTriggered: true
+      });
+    }
+
+    /**
      * Move more quickly fast forward for keyboard-only users
      */
     stepForward() {
-      this.userSeek_(this.player_.currentTime() + STEP_SECONDS);
+      // if `disableSeekWhileScrubbingOnSTV: true`, keep track of the desired seek point but we won't initiate the seek
+      if (this.shouldDisableSeekWhileScrubbing_) {
+        this.handlePendingSeek_(this.options().stepSeconds);
+      } else {
+        this.userSeek_(this.player_.currentTime() + this.options().stepSeconds);
+      }
     }
 
     /**
      * Move more quickly rewind for keyboard-only users
      */
     stepBack() {
-      this.userSeek_(this.player_.currentTime() - STEP_SECONDS);
+      // if `disableSeekWhileScrubbingOnSTV: true`, keep track of the desired seek point but we won't initiate the seek
+      if (this.shouldDisableSeekWhileScrubbing_) {
+        this.handlePendingSeek_(-this.options().stepSeconds);
+      } else {
+        this.userSeek_(this.player_.currentTime() - this.options().stepSeconds);
+      }
     }
 
     /**
@@ -13069,6 +16253,10 @@
      *
      */
     handleAction(event) {
+      if (this.pendingSeekTime() !== null) {
+        this.userSeek_(this.pendingSeekTime());
+        this.pendingSeekTime(null);
+      }
       if (this.player_.paused()) {
         this.player_.play();
       } else {
@@ -13094,15 +16282,15 @@
      */
     handleKeyDown(event) {
       const liveTracker = this.player_.liveTracker;
-      if (keycode.isEventKey(event, 'Space') || keycode.isEventKey(event, 'Enter')) {
+      if (event.key === ' ' || event.key === 'Enter') {
         event.preventDefault();
         event.stopPropagation();
         this.handleAction(event);
-      } else if (keycode.isEventKey(event, 'Home')) {
+      } else if (event.key === 'Home') {
         event.preventDefault();
         event.stopPropagation();
         this.userSeek_(0);
-      } else if (keycode.isEventKey(event, 'End')) {
+      } else if (event.key === 'End') {
         event.preventDefault();
         event.stopPropagation();
         if (liveTracker && liveTracker.isLive()) {
@@ -13110,23 +16298,23 @@
         } else {
           this.userSeek_(this.player_.duration());
         }
-      } else if (/^[0-9]$/.test(keycode(event))) {
+      } else if (/^[0-9]$/.test(event.key)) {
         event.preventDefault();
         event.stopPropagation();
-        const gotoFraction = (keycode.codes[keycode(event)] - keycode.codes['0']) * 10.0 / 100.0;
+        const gotoFraction = parseInt(event.key, 10) * 0.1;
         if (liveTracker && liveTracker.isLive()) {
           this.userSeek_(liveTracker.seekableStart() + liveTracker.liveWindow() * gotoFraction);
         } else {
           this.userSeek_(this.player_.duration() * gotoFraction);
         }
-      } else if (keycode.isEventKey(event, 'PgDn')) {
+      } else if (event.key === 'PageDown') {
         event.preventDefault();
         event.stopPropagation();
-        this.userSeek_(this.player_.currentTime() - STEP_SECONDS * PAGE_KEY_MULTIPLIER);
-      } else if (keycode.isEventKey(event, 'PgUp')) {
+        this.userSeek_(this.player_.currentTime() - this.options().stepSeconds * this.options().pageMultiplier);
+      } else if (event.key === 'PageUp') {
         event.preventDefault();
         event.stopPropagation();
-        this.userSeek_(this.player_.currentTime() + STEP_SECONDS * PAGE_KEY_MULTIPLIER);
+        this.userSeek_(this.player_.currentTime() + this.options().stepSeconds * this.options().pageMultiplier);
       } else {
         // Pass keydown handling up for unsupported keys
         super.handleKeyDown(event);
@@ -13134,7 +16322,8 @@
     }
     dispose() {
       this.disableInterval_();
-      this.off(this.player_, ['ended', 'durationchange', 'timeupdate'], this.update);
+      this.off(this.player_, ['durationchange', 'timeupdate'], this.update);
+      this.off(this.player_, ['ended'], this.update_);
       if (this.player_.liveTracker) {
         this.off(this.player_.liveTracker, 'liveedgechange', this.update);
       }
@@ -13158,13 +16347,10 @@
    */
   SeekBar.prototype.options_ = {
     children: ['loadProgressBar', 'playProgressBar'],
-    barName: 'playProgressBar'
+    barName: 'playProgressBar',
+    stepSeconds: 5,
+    pageMultiplier: 12
   };
-
-  // MouseTimeDisplay tooltips should not be added to a player on mobile devices
-  if (!IS_IOS && !IS_ANDROID) {
-    SeekBar.prototype.options_.children.splice(1, 0, 'mouseTimeDisplay');
-  }
   Component$1.registerComponent('SeekBar', SeekBar);
 
   /**
@@ -13181,7 +16367,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -13289,7 +16475,7 @@
         return;
       }
       this.off(['mousedown', 'touchstart'], this.handleMouseDownHandler_);
-      this.off(this.el_, 'mousemove', this.handleMouseMove);
+      this.off(this.el_, ['mousemove', 'touchmove'], this.handleMouseMove);
       this.removeListenersAddedOnMousedownAndTouchstart();
       this.addClass('disabled');
       this.enabled_ = false;
@@ -13313,7 +16499,7 @@
         return;
       }
       this.on(['mousedown', 'touchstart'], this.handleMouseDownHandler_);
-      this.on(this.el_, 'mousemove', this.handleMouseMove);
+      this.on(this.el_, ['mousemove', 'touchmove'], this.handleMouseMove);
       this.removeClass('disabled');
       this.enabled_ = true;
     }
@@ -13383,6 +16569,8 @@
    * @file picture-in-picture-toggle.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * Toggle Picture-in-Picture mode
    *
@@ -13392,7 +16580,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -13403,20 +16591,10 @@
      */
     constructor(player, options) {
       super(player, options);
+      this.setIcon('picture-in-picture-enter');
       this.on(player, ['enterpictureinpicture', 'leavepictureinpicture'], e => this.handlePictureInPictureChange(e));
       this.on(player, ['disablepictureinpicturechanged', 'loadedmetadata'], e => this.handlePictureInPictureEnabledChange(e));
-      this.on(player, ['loadedmetadata', 'audioonlymodechange', 'audiopostermodechange'], () => {
-        // This audio detection will not detect HLS or DASH audio-only streams because there was no reliable way to detect them at the time
-        const isSourceAudio = player.currentType().substring(0, 5) === 'audio';
-        if (isSourceAudio || player.audioPosterMode() || player.audioOnlyMode()) {
-          if (player.isInPictureInPicture()) {
-            player.exitPictureInPicture();
-          }
-          this.hide();
-        } else {
-          this.show();
-        }
-      });
+      this.on(player, ['loadedmetadata', 'audioonlymodechange', 'audiopostermodechange'], () => this.handlePictureInPictureAudioModeChange());
 
       // TODO: Deactivate button on player emptied event.
       this.disable();
@@ -13429,7 +16607,25 @@
      *         The DOM `className` for this object.
      */
     buildCSSClass() {
-      return `vjs-picture-in-picture-control ${super.buildCSSClass()}`;
+      return `vjs-picture-in-picture-control vjs-hidden ${super.buildCSSClass()}`;
+    }
+
+    /**
+     * Displays or hides the button depending on the audio mode detection.
+     * Exits picture-in-picture if it is enabled when switching to audio mode.
+     */
+    handlePictureInPictureAudioModeChange() {
+      // This audio detection will not detect HLS or DASH audio-only streams because there was no reliable way to detect them at the time
+      const isSourceAudio = this.player_.currentType().substring(0, 5) === 'audio';
+      const isAudioMode = isSourceAudio || this.player_.audioPosterMode() || this.player_.audioOnlyMode();
+      if (!isAudioMode) {
+        this.show();
+        return;
+      }
+      if (this.player_.isInPictureInPicture()) {
+        this.player_.exitPictureInPicture();
+      }
+      this.hide();
     }
 
     /**
@@ -13461,8 +16657,10 @@
      */
     handlePictureInPictureChange(event) {
       if (this.player_.isInPictureInPicture()) {
+        this.setIcon('picture-in-picture-exit');
         this.controlText('Exit Picture-in-Picture');
       } else {
+        this.setIcon('picture-in-picture-enter');
         this.controlText('Picture-in-Picture');
       }
       this.handlePictureInPictureEnabledChange();
@@ -13486,6 +16684,18 @@
         this.player_.exitPictureInPicture();
       }
     }
+
+    /**
+     * Show the `Component`s element if it is hidden by removing the
+     * 'vjs-hidden' class name from it only in browsers that support the Picture-in-Picture API.
+     */
+    show() {
+      // Does not allow to display the pictureInPictureToggle in browsers that do not support the Picture-in-Picture API, e.g. Firefox.
+      if (typeof document.exitPictureInPicture !== 'function') {
+        return;
+      }
+      super.show();
+    }
   }
 
   /**
@@ -13501,6 +16711,8 @@
    * @file fullscreen-toggle.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * Toggle fullscreen video
    *
@@ -13510,7 +16722,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -13518,6 +16730,7 @@
      */
     constructor(player, options) {
       super(player, options);
+      this.setIcon('fullscreen-enter');
       this.on(player, 'fullscreenchange', e => this.handleFullscreenChange(e));
       if (document[player.fsApi_.fullscreenEnabled] === false) {
         this.disable();
@@ -13546,8 +16759,10 @@
     handleFullscreenChange(event) {
       if (this.player_.isFullscreen()) {
         this.controlText('Exit Fullscreen');
+        this.setIcon('fullscreen-exit');
       } else {
         this.controlText('Fullscreen');
+        this.setIcon('fullscreen-enter');
       }
     }
 
@@ -13580,14 +16795,17 @@
   FullscreenToggle.prototype.controlText_ = 'Fullscreen';
   Component$1.registerComponent('FullscreenToggle', FullscreenToggle);
 
+  /** @import Component from '../../component' */
+  /** @import Player from '../../player' */
+
   /**
    * Check if volume control is supported and if it isn't hide the
    * `Component` that was passed  using the `vjs-hidden` class.
    *
-   * @param { import('../../component').default } self
+   * @param {Component} self
    *        The component that should be hidden if volume is unsupported
    *
-   * @param { import('../../player').default } player
+   * @param {Player} player
    *        A reference to the player
    *
    * @private
@@ -13626,6 +16844,7 @@
       const el = super.createEl('div', {
         className: 'vjs-volume-level'
       });
+      this.setIcon('circle', el);
       el.appendChild(super.createEl('span', {
         className: 'vjs-control-text'
       }));
@@ -13638,6 +16857,8 @@
    * @file volume-level-tooltip.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * Volume level tooltips display a volume above or side by side the volume bar.
    *
@@ -13647,7 +16868,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The {@link Player} that this class should be attached to.
      *
      * @param {Object} [options]
@@ -13772,7 +16993,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The {@link Player} that this class should be attached to.
      *
      * @param {Object} [options]
@@ -13847,7 +17068,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -14035,7 +17256,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options={}]
@@ -14149,14 +17370,17 @@
   };
   Component$1.registerComponent('VolumeControl', VolumeControl);
 
+  /** @import Component from '../../component' */
+  /** @import Player from '../../player' */
+
   /**
    * Check if muting volume is supported and if it isn't hide the mute toggle
    * button.
    *
-   * @param { import('../../component').default } self
+   * @param {Component} self
    *        A reference to the mute toggle button
    *
-   * @param { import('../../player').default } player
+   * @param {Player} player
    *        A reference to the player
    *
    * @private
@@ -14179,6 +17403,8 @@
    * @file mute-toggle.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * A button component for muting the audio.
    *
@@ -14188,7 +17414,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -14265,6 +17491,7 @@
     updateIcon_() {
       const vol = this.player_.volume();
       let level = 3;
+      this.setIcon('volume-high');
 
       // in iOS when a player is loaded with muted attribute
       // and volume is changed with a native mute button
@@ -14273,10 +17500,13 @@
         this.player_.muted(this.player_.tech_.el_.muted);
       }
       if (vol === 0 || this.player_.muted()) {
+        this.setIcon('volume-mute');
         level = 0;
       } else if (vol < 0.33) {
+        this.setIcon('volume-low');
         level = 1;
       } else if (vol < 0.67) {
+        this.setIcon('volume-medium');
         level = 2;
       }
       removeClass(this.el_, [0, 1, 2, 3].reduce((str, i) => str + `${i ? ' ' : ''}vjs-vol-${i}`, ''));
@@ -14322,7 +17552,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options={}]
@@ -14433,7 +17663,7 @@
      * @listens keyup
      */
     handleVolumeControlKeyUp(event) {
-      if (keycode.isEventKey(event, 'Esc')) {
+      if (event.key === 'Escape') {
         this.muteToggle.focus();
       }
     }
@@ -14478,7 +17708,7 @@
      * @listens keydown | keyup
      */
     handleKeyPress(event) {
-      if (keycode.isEventKey(event, 'Esc')) {
+      if (event.key === 'Escape') {
         this.handleMouseOut();
       }
     }
@@ -14509,7 +17739,8 @@
       this.validOptions = [5, 10, 30];
       this.skipTime = this.getSkipForwardTime();
       if (this.skipTime && this.validOptions.includes(this.skipTime)) {
-        this.controlText(this.localize('Skip forward {1} seconds', [this.skipTime]));
+        this.setIcon(`forward-${this.skipTime}`);
+        this.controlText(this.localize('Skip forward {1} seconds', [this.skipTime.toLocaleString(player.language())]));
         this.show();
       } else {
         this.hide();
@@ -14535,6 +17766,9 @@
      *        to be called
      */
     handleClick(event) {
+      if (isNaN(this.player_.duration())) {
+        return;
+      }
       const currentVideoTime = this.player_.currentTime();
       const liveTracker = this.player_.liveTracker;
       const duration = liveTracker && liveTracker.isLive() ? liveTracker.seekableEnd() : this.player_.duration();
@@ -14554,6 +17788,7 @@
       this.controlText(this.localize('Skip forward {1} seconds', [this.skipTime]));
     }
   }
+  SkipForward.prototype.controlText_ = 'Skip Forward';
   Component$1.registerComponent('SkipForward', SkipForward);
 
   /**
@@ -14570,7 +17805,8 @@
       this.validOptions = [5, 10, 30];
       this.skipTime = this.getSkipBackwardTime();
       if (this.skipTime && this.validOptions.includes(this.skipTime)) {
-        this.controlText(this.localize('Skip backward {1} seconds', [this.skipTime]));
+        this.setIcon(`replay-${this.skipTime}`);
+        this.controlText(this.localize('Skip backward {1} seconds', [this.skipTime.toLocaleString(player.language())]));
         this.show();
       } else {
         this.hide();
@@ -14624,6 +17860,8 @@
    * @file menu.js
    */
 
+  /** @import Player from '../player' */
+
   /**
    * The Menu component is used to build popup menus, including subtitle and
    * captions selection menus.
@@ -14634,7 +17872,7 @@
     /**
      * Create an instance of this class.
      *
-     * @param { import('../player').default } player
+     * @param {Player} player
      *        the player that this component should attach to
      *
      * @param {Object} [options]
@@ -14802,20 +18040,20 @@
     /**
      * Handle a `keydown` event on this menu. This listener is added in the constructor.
      *
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      *        A `keydown` event that happened on the menu.
      *
      * @listens keydown
      */
     handleKeyDown(event) {
       // Left and Down Arrows
-      if (keycode.isEventKey(event, 'Left') || keycode.isEventKey(event, 'Down')) {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
         event.preventDefault();
         event.stopPropagation();
         this.stepForward();
 
         // Up and Right Arrows
-      } else if (keycode.isEventKey(event, 'Right') || keycode.isEventKey(event, 'Up')) {
+      } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
         event.preventDefault();
         event.stopPropagation();
         this.stepBack();
@@ -14873,6 +18111,8 @@
    * @file menu-button.js
    */
 
+  /** @import Player from '../player' */
+
   /**
    * A `MenuButton` class for any popup {@link Menu}.
    *
@@ -14882,7 +18122,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options={}]
@@ -15007,6 +18247,17 @@
     }
 
     /**
+     * Overwrites the `setIcon` method from `Component`.
+     * In this case, we want the icon to be appended to the menuButton.
+     *
+     * @param {string} name
+     *         The icon name to be added.
+     */
+    setIcon(name) {
+      super.setIcon(name, this.menuButton_.el_);
+    }
+
+    /**
      * Allow sub components to stack CSS class names for the wrapper element
      *
      * @return {string}
@@ -15128,19 +18379,19 @@
      */
     handleKeyDown(event) {
       // Escape or Tab unpress the 'button'
-      if (keycode.isEventKey(event, 'Esc') || keycode.isEventKey(event, 'Tab')) {
+      if (event.key === 'Escape' || event.key === 'Tab') {
         if (this.buttonPressed_) {
           this.unpressButton();
         }
 
         // Don't preventDefault for Tab key - we still want to lose focus
-        if (!keycode.isEventKey(event, 'Tab')) {
+        if (!event.key === 'Tab') {
           event.preventDefault();
           // Set focus back to the menu button's button
           this.menuButton_.focus();
         }
         // Up Arrow or Down Arrow also 'press' the button to open the menu
-      } else if (keycode.isEventKey(event, 'Up') || keycode.isEventKey(event, 'Down')) {
+      } else if (event.key === 'Up' || event.key === 'Down' && !(this.player_.options_.playerOptions.spatialNavigation && this.player_.options_.playerOptions.spatialNavigation.enabled)) {
         if (!this.buttonPressed_) {
           event.preventDefault();
           this.pressButton();
@@ -15159,7 +18410,7 @@
      */
     handleMenuKeyUp(event) {
       // Escape hides popup menu
-      if (keycode.isEventKey(event, 'Esc') || keycode.isEventKey(event, 'Tab')) {
+      if (event.key === 'Escape' || event.key === 'Tab') {
         this.removeClass('vjs-hover');
       }
     }
@@ -15187,12 +18438,12 @@
      */
     handleSubmenuKeyDown(event) {
       // Escape or Tab unpress the 'button'
-      if (keycode.isEventKey(event, 'Esc') || keycode.isEventKey(event, 'Tab')) {
+      if (event.key === 'Escape' || event.key === 'Tab') {
         if (this.buttonPressed_) {
           this.unpressButton();
         }
         // Don't preventDefault for Tab key - we still want to lose focus
-        if (!keycode.isEventKey(event, 'Tab')) {
+        if (!event.key === 'Tab') {
           event.preventDefault();
           // Set focus back to the menu button's button
           this.menuButton_.focus();
@@ -15257,6 +18508,8 @@
    * @file track-button.js
    */
 
+  /** @import Player from './player' */
+
   /**
    * The base class for buttons that toggle specific  track types (e.g. subtitles).
    *
@@ -15266,7 +18519,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -15296,22 +18549,10 @@
   Component$1.registerComponent('TrackButton', TrackButton);
 
   /**
-   * @file menu-keys.js
-   */
-
-  /**
-    * All keys used for operation of a menu (`MenuButton`, `Menu`, and `MenuItem`)
-    * Note that 'Enter' and 'Space' are not included here (otherwise they would
-    * prevent the `MenuButton` and `MenuItem` from being keyboard-clickable)
-   *
-    * @typedef MenuKeys
-    * @array
-    */
-  const MenuKeys = ['Tab', 'Esc', 'Up', 'Down', 'Right', 'Left'];
-
-  /**
    * @file menu-item.js
    */
+
+  /** @import Player from '../player' */
 
   /**
    * The component for a menu item. `<li>`
@@ -15322,7 +18563,7 @@
     /**
      * Creates an instance of the this class.
      *
-     * @param { import('../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options={}]
@@ -15370,10 +18611,17 @@
       }, props), attrs);
 
       // swap icon with menu item text.
-      el.replaceChild(createEl('span', {
+      const menuItemEl = createEl('span', {
         className: 'vjs-menu-item-text',
         textContent: this.localize(this.options_.label)
-      }), el.querySelector('.vjs-icon-placeholder'));
+      });
+
+      // If using SVG icons, the element with vjs-icon-placeholder will be added separately.
+      if (this.player_.options_.experimentalSvgIcons) {
+        el.appendChild(menuItemEl);
+      } else {
+        el.replaceChild(menuItemEl, el.querySelector('.vjs-icon-placeholder'));
+      }
       return el;
     }
 
@@ -15381,13 +18629,13 @@
      * Ignore keys which are used by the menu, but pass any other ones up. See
      * {@link ClickableComponent#handleKeyDown} for instances where this is called.
      *
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      *        The `keydown` event that caused this function to be called.
      *
      * @listens keydown
      */
     handleKeyDown(event) {
-      if (!MenuKeys.some(key => keycode.isEventKey(event, key))) {
+      if (!['Tab', 'Escape', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown'].includes(event.key)) {
         // Pass keydown handling up for unused keys
         super.handleKeyDown(event);
       }
@@ -15439,6 +18687,8 @@
    * @file text-track-menu-item.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The specific menu item type for selecting a language within a text track kind
    *
@@ -15448,7 +18698,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -15596,8 +18846,10 @@
    * @file off-text-track-menu-item.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
-   * A special menu item for turning of a specific type of text track
+   * A special menu item for turning off a specific type of text track
    *
    * @extends TextTrackMenuItem
    */
@@ -15605,7 +18857,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -15694,6 +18946,8 @@
    * @file text-track-button.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The base class for buttons that toggle specific text track types (e.g. subtitles)
    *
@@ -15703,7 +18957,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options={}]
@@ -15768,6 +19022,8 @@
    * @file chapters-track-menu-item.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The chapter track menu item
    *
@@ -15777,7 +19033,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -15820,6 +19076,11 @@
    * @file chapters-button.js
    */
 
+  /** @import Player from '../../player' */
+  /** @import Menu from '../../menu/menu' */
+  /** @import TextTrack from '../../tracks/text-track' */
+  /** @import TextTrackMenuItem from '../text-track-controls/text-track-menu-item' */
+
   /**
    * The button component for toggling and selecting chapters
    * Chapters act much differently than other text tracks
@@ -15831,7 +19092,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -15842,6 +19103,7 @@
      */
     constructor(player, options, ready) {
       super(player, options, ready);
+      this.setIcon('chapters');
       this.selectCurrentItem_ = () => {
         this.items.forEach(item => {
           item.selected(this.track_.activeCues[0] === item.cue);
@@ -15957,7 +19219,7 @@
     /**
      * Create menu from chapter track
      *
-     * @return { import('../../menu/menu').default }
+     * @return {Menu}
      *         New menu for the chapter buttons
      */
     createMenu() {
@@ -15968,7 +19230,7 @@
     /**
      * Create a menu item for each text track
      *
-     * @return  { import('./text-track-menu-item').default[] }
+     * @return  {TextTrackMenuItem[]}
      *         Array of menu items
      */
     createItems() {
@@ -16013,6 +19275,8 @@
    * @file descriptions-button.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The button component for toggling and selecting descriptions
    *
@@ -16022,7 +19286,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16033,6 +19297,7 @@
      */
     constructor(player, options, ready) {
       super(player, options, ready);
+      this.setIcon('audio-description');
       const tracks = player.textTracks();
       const changeHandler = bind_(this, this.handleTracksChange);
       tracks.addEventListener('change', changeHandler);
@@ -16105,6 +19370,8 @@
    * @file subtitles-button.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The button component for toggling and selecting subtitles
    *
@@ -16114,7 +19381,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16125,6 +19392,7 @@
      */
     constructor(player, options, ready) {
       super(player, options, ready);
+      this.setIcon('subtitles');
     }
 
     /**
@@ -16162,6 +19430,8 @@
    * @file caption-settings-menu-item.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The menu item for caption track settings menu
    *
@@ -16171,7 +19441,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16224,6 +19494,8 @@
    * @file captions-button.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The button component for toggling and selecting captions
    *
@@ -16233,7 +19505,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16244,6 +19516,7 @@
      */
     constructor(player, options, ready) {
       super(player, options, ready);
+      this.setIcon('captions');
     }
 
     /**
@@ -16309,11 +19582,15 @@
       const el = super.createEl(type, props, attrs);
       const parentSpan = el.querySelector('.vjs-menu-item-text');
       if (this.options_.track.kind === 'captions') {
-        parentSpan.appendChild(createEl('span', {
-          className: 'vjs-icon-placeholder'
-        }, {
-          'aria-hidden': true
-        }));
+        if (this.player_.options_.experimentalSvgIcons) {
+          this.setIcon('captions', el);
+        } else {
+          parentSpan.appendChild(createEl('span', {
+            className: 'vjs-icon-placeholder'
+          }, {
+            'aria-hidden': true
+          }));
+        }
         parentSpan.appendChild(createEl('span', {
           className: 'vjs-control-text',
           // space added as the text will visually flow with the
@@ -16330,6 +19607,8 @@
    * @file sub-caps-button.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The button component for toggling and selecting captions and/or subtitles
    *
@@ -16339,7 +19618,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16354,8 +19633,10 @@
       // Although North America uses "captions" in most cases for
       // "captions and subtitles" other locales use "subtitles"
       this.label_ = 'subtitles';
+      this.setIcon('subtitles');
       if (['en', 'en-us', 'en-ca', 'fr-ca'].indexOf(this.player_.language_) > -1) {
         this.label_ = 'captions';
+        this.setIcon('captions');
       }
       this.menuButton_.controlText(toTitleCase$1(this.label_));
     }
@@ -16414,6 +19695,8 @@
    * @file audio-track-menu-item.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * An {@link AudioTrack} {@link MenuItem}
    *
@@ -16423,7 +19706,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16450,7 +19733,7 @@
     createEl(type, props, attrs) {
       const el = super.createEl(type, props, attrs);
       const parentSpan = el.querySelector('.vjs-menu-item-text');
-      if (this.options_.track.kind === 'main-desc') {
+      if (['main-desc', 'descriptions'].indexOf(this.options_.track.kind) >= 0) {
         parentSpan.appendChild(createEl('span', {
           className: 'vjs-icon-placeholder'
         }, {
@@ -16533,6 +19816,7 @@
     constructor(player, options = {}) {
       options.tracks = player.audioTracks();
       super(player, options);
+      this.setIcon('audio');
     }
 
     /**
@@ -16588,6 +19872,8 @@
    * @file playback-rate-menu-item.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The specific menu item type for selecting a playback rate.
    *
@@ -16597,7 +19883,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16660,6 +19946,8 @@
    * @file playback-rate-menu-button.js
    */
 
+  /** @import Player from '../../player' */
+
   /**
    * The component for controlling the playback rate.
    *
@@ -16669,7 +19957,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../../player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -16912,16 +20200,15 @@
    * @private
    */
   ControlBar.prototype.options_ = {
-    children: ['playToggle', 'skipBackward', 'skipForward', 'volumePanel', 'currentTimeDisplay', 'timeDivider', 'durationDisplay', 'progressControl', 'liveDisplay', 'seekToLive', 'remainingTimeDisplay', 'customControlSpacer', 'playbackRateMenuButton', 'chaptersButton', 'descriptionsButton', 'subsCapsButton', 'audioTrackButton', 'fullscreenToggle']
+    children: ['playToggle', 'skipBackward', 'skipForward', 'volumePanel', 'currentTimeDisplay', 'timeDivider', 'durationDisplay', 'progressControl', 'liveDisplay', 'seekToLive', 'remainingTimeDisplay', 'customControlSpacer', 'playbackRateMenuButton', 'chaptersButton', 'descriptionsButton', 'subsCapsButton', 'audioTrackButton', 'pictureInPictureToggle', 'fullscreenToggle']
   };
-  if ('exitPictureInPicture' in document) {
-    ControlBar.prototype.options_.children.splice(ControlBar.prototype.options_.children.length - 1, 0, 'pictureInPictureToggle');
-  }
   Component$1.registerComponent('ControlBar', ControlBar);
 
   /**
    * @file error-display.js
    */
+
+  /** @import Player from './player' */
 
   /**
    * A display that indicates an error has occurred. This means that the video
@@ -16933,7 +20220,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param  { import('./player').default } player
+     * @param  {Player} player
      *         The `Player` that this class should be attached to.
      *
      * @param  {Object} [options]
@@ -16941,7 +20228,9 @@
      */
     constructor(player, options) {
       super(player, options);
-      this.on(player, 'error', e => this.open(e));
+      this.on(player, 'error', e => {
+        this.open(e);
+      });
     }
 
     /**
@@ -16981,9 +20270,412 @@
   });
   Component$1.registerComponent('ErrorDisplay', ErrorDisplay);
 
+  /** @import Player from './player' */
+  /** @import { ContentDescriptor } from  '../utils/dom' */
+
+  /**
+   * Creates DOM element of 'select' & its options.
+   *
+   * @extends Component
+   */
+  class TextTrackSelect extends Component$1 {
+    /**
+     * Creates an instance of this class.
+     *
+     * @param {Player} player
+     *        The `Player` that this class should be attached to.
+     *
+     * @param {Object} [options]
+     *        The key/value store of player options.
+     *
+     * @param {ContentDescriptor} [options.content=undefined]
+     *        Provide customized content for this modal.
+     *
+     * @param {string} [options.legendId]
+     *        A text with part of an string to create atribute of aria-labelledby.
+     *
+     * @param {string} [options.id]
+     *        A text with part of an string to create atribute of aria-labelledby.
+     *
+     * @param {Array} [options.SelectOptions]
+     *        Array that contains the value & textContent of for each of the
+     *        options elements.
+     */
+    constructor(player, options = {}) {
+      super(player, options);
+      this.el_.setAttribute('aria-labelledby', this.selectLabelledbyIds);
+    }
+
+    /**
+     * Create the `TextTrackSelect`'s DOM element
+     *
+     * @return {Element}
+     *         The DOM element that gets created.
+     */
+    createEl() {
+      this.selectLabelledbyIds = [this.options_.legendId, this.options_.labelId].join(' ').trim();
+
+      // Create select & inner options
+      const selectoptions = createEl('select', {
+        id: this.options_.id
+      }, {}, this.options_.SelectOptions.map(optionText => {
+        // Constructs an id for the <option>.
+        // For the colour settings that have two <selects> with a <label> each, generates an id based off the label value
+        // For font size/family and edge style with one <select> and no <label>, generates an id with a guid
+        const optionId = (this.options_.labelId ? this.options_.labelId : `vjs-track-option-${newGUID()}`) + '-' + optionText[1].replace(/\W+/g, '');
+        const option = createEl('option', {
+          id: optionId,
+          value: this.localize(optionText[0]),
+          textContent: this.localize(optionText[1])
+        });
+        option.setAttribute('aria-labelledby', `${this.selectLabelledbyIds} ${optionId}`);
+        return option;
+      }));
+      return selectoptions;
+    }
+  }
+  Component$1.registerComponent('TextTrackSelect', TextTrackSelect);
+
+  /** @import Player from './player' */
+  /** @import { ContentDescriptor } from '../utils/dom' */
+
+  /**
+   * Creates fieldset section of 'TextTrackSettings'.
+   * Manganes two versions of fieldsets, one for type of 'colors'
+   * & the other for 'font', Component adds diferent DOM elements
+   * to that fieldset  depending on the type.
+   *
+   * @extends Component
+   */
+  class TextTrackFieldset extends Component$1 {
+    /**
+     * Creates an instance of this class.
+     *
+     * @param {Player} player
+     *        The `Player` that this class should be attached to.
+     *
+     * @param {Object} [options]
+     *        The key/value store of player options.
+     *
+     * @param {ContentDescriptor} [options.content=undefined]
+     *        Provide customized content for this modal.
+     *
+     * @param {string} [options.legendId]
+     *        A text with part of an string to create atribute of aria-labelledby.
+     *        It passes to 'TextTrackSelect'.
+     *
+     * @param {string} [options.id]
+     *        A text with part of an string to create atribute of aria-labelledby.
+     *        It passes to 'TextTrackSelect'.
+     *
+     * @param {string} [options.legendText]
+     *        A text to use as the text content of the legend element.
+     *
+     * @param {Array} [options.selects]
+     *        Array that contains the selects that are use to create 'selects'
+     *        components.
+     *
+     * @param {Array} [options.SelectOptions]
+     *        Array that contains the value & textContent of for each of the
+     *        options elements, it passes to 'TextTrackSelect'.
+     *
+     * @param {string} [options.type]
+     *        Conditions if some DOM elements will be added to the fieldset
+     *        component.
+     *
+     * @param {Object} [options.selectConfigs]
+     *        Object with the following properties that are the selects configurations:
+     *        backgroundColor, backgroundOpacity, color, edgeStyle, fontFamily,
+     *        fontPercent, textOpacity, windowColor, windowOpacity.
+     *        These properties are use to configure the 'TextTrackSelect' Component.
+     */
+    constructor(player, options = {}) {
+      super(player, options);
+
+      // Add Components & DOM Elements
+      const legendElement = createEl('legend', {
+        textContent: this.localize(this.options_.legendText),
+        id: this.options_.legendId
+      });
+      this.el().appendChild(legendElement);
+      const selects = this.options_.selects;
+
+      // Iterate array of selects to create 'selects' components
+      for (const i of selects) {
+        const selectConfig = this.options_.selectConfigs[i];
+        const selectClassName = selectConfig.className;
+        const id = selectConfig.id.replace('%s', this.options_.id_);
+        let span = null;
+        const guid = `vjs_select_${newGUID()}`;
+
+        // Conditionally create span to add on the component
+        if (this.options_.type === 'colors') {
+          span = createEl('span', {
+            className: selectClassName
+          });
+          const label = createEl('label', {
+            id,
+            className: 'vjs-label',
+            textContent: this.localize(selectConfig.label)
+          });
+          label.setAttribute('for', guid);
+          span.appendChild(label);
+        }
+        const textTrackSelect = new TextTrackSelect(player, {
+          SelectOptions: selectConfig.options,
+          legendId: this.options_.legendId,
+          id: guid,
+          labelId: id
+        });
+        this.addChild(textTrackSelect);
+
+        // Conditionally append to 'select' component to conditionally created span
+        if (this.options_.type === 'colors') {
+          span.appendChild(textTrackSelect.el());
+          this.el().appendChild(span);
+        }
+      }
+    }
+
+    /**
+     * Create the `TextTrackFieldset`'s DOM element
+     *
+     * @return {Element}
+     *         The DOM element that gets created.
+     */
+    createEl() {
+      const el = createEl('fieldset', {
+        // Prefixing classes of elements within a player with "vjs-"
+        // is a convention used in Video.js.
+        className: this.options_.className
+      });
+      return el;
+    }
+  }
+  Component$1.registerComponent('TextTrackFieldset', TextTrackFieldset);
+
+  /** @import Player from './player' */
+  /** @import { ContentDescriptor } from  '../utils/dom' */
+
+  /**
+   * The component 'TextTrackSettingsColors' displays a set of 'fieldsets'
+   * using the component 'TextTrackFieldset'.
+   *
+   * @extends Component
+   */
+  class TextTrackSettingsColors extends Component$1 {
+    /**
+     * Creates an instance of this class.
+     *
+     * @param {Player} player
+     *        The `Player` that this class should be attached to.
+     *
+     * @param {Object} [options]
+     *        The key/value store of player options.
+     *
+     * @param {ContentDescriptor} [options.content=undefined]
+     *        Provide customized content for this modal.
+     *
+     * @param {Array} [options.fieldSets]
+     *        Array that contains the configurations for the selects.
+     *
+     * @param {Object} [options.selectConfigs]
+     *        Object with the following properties that are the select confugations:
+     *        backgroundColor, backgroundOpacity, color, edgeStyle, fontFamily,
+     *        fontPercent, textOpacity, windowColor, windowOpacity.
+     *        it passes to 'TextTrackFieldset'.
+     */
+    constructor(player, options = {}) {
+      super(player, options);
+      const id_ = this.options_.textTrackComponentid;
+
+      // createElFgColor_
+      const ElFgColorFieldset = new TextTrackFieldset(player, {
+        id_,
+        legendId: `captions-text-legend-${id_}`,
+        legendText: this.localize('Text'),
+        className: 'vjs-fg vjs-track-setting',
+        selects: this.options_.fieldSets[0],
+        selectConfigs: this.options_.selectConfigs,
+        type: 'colors'
+      });
+      this.addChild(ElFgColorFieldset);
+
+      // createElBgColor_
+      const ElBgColorFieldset = new TextTrackFieldset(player, {
+        id_,
+        legendId: `captions-background-${id_}`,
+        legendText: this.localize('Text Background'),
+        className: 'vjs-bg vjs-track-setting',
+        selects: this.options_.fieldSets[1],
+        selectConfigs: this.options_.selectConfigs,
+        type: 'colors'
+      });
+      this.addChild(ElBgColorFieldset);
+
+      // createElWinColor_
+      const ElWinColorFieldset = new TextTrackFieldset(player, {
+        id_,
+        legendId: `captions-window-${id_}`,
+        legendText: this.localize('Caption Area Background'),
+        className: 'vjs-window vjs-track-setting',
+        selects: this.options_.fieldSets[2],
+        selectConfigs: this.options_.selectConfigs,
+        type: 'colors'
+      });
+      this.addChild(ElWinColorFieldset);
+    }
+
+    /**
+     * Create the `TextTrackSettingsColors`'s DOM element
+     *
+     * @return {Element}
+     *         The DOM element that gets created.
+     */
+    createEl() {
+      const el = createEl('div', {
+        className: 'vjs-track-settings-colors'
+      });
+      return el;
+    }
+  }
+  Component$1.registerComponent('TextTrackSettingsColors', TextTrackSettingsColors);
+
+  /** @import Player from './player' */
+  /** @import { ContentDescriptor } from  '../utils/dom' */
+
+  /**
+   * The component 'TextTrackSettingsFont' displays a set of 'fieldsets'
+   * using the component 'TextTrackFieldset'.
+   *
+   * @extends Component
+   */
+  class TextTrackSettingsFont extends Component$1 {
+    /**
+     * Creates an instance of this class.
+     *
+     * @param {Player} player
+     *        The `Player` that this class should be attached to.
+     *
+     * @param {Object} [options]
+     *        The key/value store of player options.
+     *
+     * @param {ContentDescriptor} [options.content=undefined]
+     *        Provide customized content for this modal.
+     *
+     * @param {Array} [options.fieldSets]
+     *        Array that contains the configurations for the selects.
+     *
+     * @param {Object} [options.selectConfigs]
+     *        Object with the following properties that are the select confugations:
+     *        backgroundColor, backgroundOpacity, color, edgeStyle, fontFamily,
+     *        fontPercent, textOpacity, windowColor, windowOpacity.
+     *        it passes to 'TextTrackFieldset'.
+     */
+    constructor(player, options = {}) {
+      super(player, options);
+      const id_ = this.options_.textTrackComponentid;
+      const ElFgColorFieldset = new TextTrackFieldset(player, {
+        id_,
+        legendId: `captions-font-size-${id_}`,
+        legendText: 'Font Size',
+        className: 'vjs-font-percent vjs-track-setting',
+        selects: this.options_.fieldSets[0],
+        selectConfigs: this.options_.selectConfigs,
+        type: 'font'
+      });
+      this.addChild(ElFgColorFieldset);
+      const ElBgColorFieldset = new TextTrackFieldset(player, {
+        id_,
+        legendId: `captions-edge-style-${id_}`,
+        legendText: this.localize('Text Edge Style'),
+        className: 'vjs-edge-style vjs-track-setting',
+        selects: this.options_.fieldSets[1],
+        selectConfigs: this.options_.selectConfigs,
+        type: 'font'
+      });
+      this.addChild(ElBgColorFieldset);
+      const ElWinColorFieldset = new TextTrackFieldset(player, {
+        id_,
+        legendId: `captions-font-family-${id_}`,
+        legendText: this.localize('Font Family'),
+        className: 'vjs-font-family vjs-track-setting',
+        selects: this.options_.fieldSets[2],
+        selectConfigs: this.options_.selectConfigs,
+        type: 'font'
+      });
+      this.addChild(ElWinColorFieldset);
+    }
+
+    /**
+     * Create the `TextTrackSettingsFont`'s DOM element
+     *
+     * @return {Element}
+     *         The DOM element that gets created.
+     */
+    createEl() {
+      const el = createEl('div', {
+        className: 'vjs-track-settings-font'
+      });
+      return el;
+    }
+  }
+  Component$1.registerComponent('TextTrackSettingsFont', TextTrackSettingsFont);
+
+  /**
+   * Buttons of reset & done that modal 'TextTrackSettings'
+   * uses as part of its content.
+   *
+   * 'Reset': Resets all settings on 'TextTrackSettings'.
+   * 'Done': Closes 'TextTrackSettings' modal.
+   *
+   * @extends Component
+   */
+  class TrackSettingsControls extends Component$1 {
+    constructor(player, options = {}) {
+      super(player, options);
+
+      // Create DOM elements
+      const defaultsDescription = this.localize('restore all settings to the default values');
+      const resetButton = new Button(player, {
+        controlText: defaultsDescription,
+        className: 'vjs-default-button'
+      });
+      resetButton.el().classList.remove('vjs-control', 'vjs-button');
+      resetButton.el().textContent = this.localize('Reset');
+      this.addChild(resetButton);
+      const doneButton = new Button(player, {
+        controlText: defaultsDescription,
+        className: 'vjs-done-button'
+      });
+
+      // Remove unrequired style classes
+      doneButton.el().classList.remove('vjs-control', 'vjs-button');
+      doneButton.el().textContent = this.localize('Done');
+      this.addChild(doneButton);
+    }
+
+    /**
+     * Create the `TrackSettingsControls`'s DOM element
+     *
+     * @return {Element}
+     *         The DOM element that gets created.
+     */
+    createEl() {
+      const el = createEl('div', {
+        className: 'vjs-track-settings-controls'
+      });
+      return el;
+    }
+  }
+  Component$1.registerComponent('TrackSettingsControls', TrackSettingsControls);
+
   /**
    * @file text-track-settings.js
    */
+
+  /** @import Player from '../player' */
+
   const LOCAL_STORAGE_KEY$1 = 'vjs-text-track-settings';
   const COLOR_BLACK = ['#000', 'Black'];
   const COLOR_BLUE = ['#00F', 'Blue'];
@@ -17013,35 +20705,38 @@
       selector: '.vjs-bg-color > select',
       id: 'captions-background-color-%s',
       label: 'Color',
-      options: [COLOR_BLACK, COLOR_WHITE, COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA, COLOR_CYAN]
+      options: [COLOR_BLACK, COLOR_WHITE, COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA, COLOR_CYAN],
+      className: 'vjs-bg-color'
     },
     backgroundOpacity: {
       selector: '.vjs-bg-opacity > select',
       id: 'captions-background-opacity-%s',
       label: 'Opacity',
-      options: [OPACITY_OPAQUE, OPACITY_SEMI, OPACITY_TRANS]
+      options: [OPACITY_OPAQUE, OPACITY_SEMI, OPACITY_TRANS],
+      className: 'vjs-bg-opacity vjs-opacity'
     },
     color: {
       selector: '.vjs-text-color > select',
       id: 'captions-foreground-color-%s',
       label: 'Color',
-      options: [COLOR_WHITE, COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA, COLOR_CYAN]
+      options: [COLOR_WHITE, COLOR_BLACK, COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA, COLOR_CYAN],
+      className: 'vjs-text-color'
     },
     edgeStyle: {
       selector: '.vjs-edge-style > select',
-      id: '%s',
+      id: '',
       label: 'Text Edge Style',
-      options: [['none', 'None'], ['raised', 'Raised'], ['depressed', 'Depressed'], ['uniform', 'Uniform'], ['dropshadow', 'Dropshadow']]
+      options: [['none', 'None'], ['raised', 'Raised'], ['depressed', 'Depressed'], ['uniform', 'Uniform'], ['dropshadow', 'Drop shadow']]
     },
     fontFamily: {
       selector: '.vjs-font-family > select',
-      id: 'captions-font-family-%s',
+      id: '',
       label: 'Font Family',
       options: [['proportionalSansSerif', 'Proportional Sans-Serif'], ['monospaceSansSerif', 'Monospace Sans-Serif'], ['proportionalSerif', 'Proportional Serif'], ['monospaceSerif', 'Monospace Serif'], ['casual', 'Casual'], ['script', 'Script'], ['small-caps', 'Small Caps']]
     },
     fontPercent: {
       selector: '.vjs-font-percent > select',
-      id: 'captions-font-size-%s',
+      id: '',
       label: 'Font Size',
       options: [['0.50', '50%'], ['0.75', '75%'], ['1.00', '100%'], ['1.25', '125%'], ['1.50', '150%'], ['1.75', '175%'], ['2.00', '200%'], ['3.00', '300%'], ['4.00', '400%']],
       default: 2,
@@ -17051,20 +20746,23 @@
       selector: '.vjs-text-opacity > select',
       id: 'captions-foreground-opacity-%s',
       label: 'Opacity',
-      options: [OPACITY_OPAQUE, OPACITY_SEMI]
+      options: [OPACITY_OPAQUE, OPACITY_SEMI],
+      className: 'vjs-text-opacity vjs-opacity'
     },
     // Options for this object are defined below.
     windowColor: {
       selector: '.vjs-window-color > select',
       id: 'captions-window-color-%s',
-      label: 'Color'
+      label: 'Color',
+      className: 'vjs-window-color'
     },
     // Options for this object are defined below.
     windowOpacity: {
       selector: '.vjs-window-opacity > select',
       id: 'captions-window-opacity-%s',
       label: 'Opacity',
-      options: [OPACITY_TRANS, OPACITY_SEMI, OPACITY_OPAQUE]
+      options: [OPACITY_TRANS, OPACITY_SEMI, OPACITY_OPAQUE],
+      className: 'vjs-window-opacity vjs-opacity'
     }
   };
   selectConfigs.windowColor.options = selectConfigs.backgroundColor.options;
@@ -17151,7 +20849,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('../player').default } player
+     * @param {Player} player
      *         The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -17165,6 +20863,7 @@
       // fill the modal and pretend we have opened it
       this.fill();
       this.hasBeenOpened_ = this.hasBeenFilled_ = true;
+      this.renderModalComponents(player);
       this.endDialog = createEl('p', {
         className: 'vjs-control-text',
         textContent: this.localize('End of dialog window.')
@@ -17176,133 +20875,43 @@
       if (options.persistTextTrackSettings === undefined) {
         this.options_.persistTextTrackSettings = this.options_.playerOptions.persistTextTrackSettings;
       }
-      this.on(this.$('.vjs-done-button'), 'click', () => {
+      this.bindFunctionsToSelectsAndButtons();
+      if (this.options_.persistTextTrackSettings) {
+        this.restoreSettings();
+      }
+    }
+    renderModalComponents(player) {
+      const textTrackSettingsColors = new TextTrackSettingsColors(player, {
+        textTrackComponentid: this.id_,
+        selectConfigs,
+        fieldSets: [['color', 'textOpacity'], ['backgroundColor', 'backgroundOpacity'], ['windowColor', 'windowOpacity']]
+      });
+      this.addChild(textTrackSettingsColors);
+      const textTrackSettingsFont = new TextTrackSettingsFont(player, {
+        textTrackComponentid: this.id_,
+        selectConfigs,
+        fieldSets: [['fontPercent'], ['edgeStyle'], ['fontFamily']]
+      });
+      this.addChild(textTrackSettingsFont);
+      const trackSettingsControls = new TrackSettingsControls(player);
+      this.addChild(trackSettingsControls);
+    }
+    bindFunctionsToSelectsAndButtons() {
+      this.on(this.$('.vjs-done-button'), ['click', 'tap'], () => {
         this.saveSettings();
         this.close();
       });
-      this.on(this.$('.vjs-default-button'), 'click', () => {
+      this.on(this.$('.vjs-default-button'), ['click', 'tap'], () => {
         this.setDefaults();
         this.updateDisplay();
       });
       each(selectConfigs, config => {
         this.on(this.$(config.selector), 'change', this.updateDisplay);
       });
-      if (this.options_.persistTextTrackSettings) {
-        this.restoreSettings();
-      }
     }
     dispose() {
       this.endDialog = null;
       super.dispose();
-    }
-
-    /**
-     * Create a <select> element with configured options.
-     *
-     * @param {string} key
-     *        Configuration key to use during creation.
-     *
-     * @return {string}
-     *         An HTML string.
-     *
-     * @private
-     */
-    createElSelect_(key, legendId = '', type = 'label') {
-      const config = selectConfigs[key];
-      const id = config.id.replace('%s', this.id_);
-      const selectLabelledbyIds = [legendId, id].join(' ').trim();
-      return [`<${type} id="${id}" class="${type === 'label' ? 'vjs-label' : ''}">`, this.localize(config.label), `</${type}>`, `<select aria-labelledby="${selectLabelledbyIds}">`].concat(config.options.map(o => {
-        const optionId = id + '-' + o[1].replace(/\W+/g, '');
-        return [`<option id="${optionId}" value="${o[0]}" `, `aria-labelledby="${selectLabelledbyIds} ${optionId}">`, this.localize(o[1]), '</option>'].join('');
-      })).concat('</select>').join('');
-    }
-
-    /**
-     * Create foreground color element for the component
-     *
-     * @return {string}
-     *         An HTML string.
-     *
-     * @private
-     */
-    createElFgColor_() {
-      const legendId = `captions-text-legend-${this.id_}`;
-      return ['<fieldset class="vjs-fg vjs-track-setting">', `<legend id="${legendId}">`, this.localize('Text'), '</legend>', '<span class="vjs-text-color">', this.createElSelect_('color', legendId), '</span>', '<span class="vjs-text-opacity vjs-opacity">', this.createElSelect_('textOpacity', legendId), '</span>', '</fieldset>'].join('');
-    }
-
-    /**
-     * Create background color element for the component
-     *
-     * @return {string}
-     *         An HTML string.
-     *
-     * @private
-     */
-    createElBgColor_() {
-      const legendId = `captions-background-${this.id_}`;
-      return ['<fieldset class="vjs-bg vjs-track-setting">', `<legend id="${legendId}">`, this.localize('Text Background'), '</legend>', '<span class="vjs-bg-color">', this.createElSelect_('backgroundColor', legendId), '</span>', '<span class="vjs-bg-opacity vjs-opacity">', this.createElSelect_('backgroundOpacity', legendId), '</span>', '</fieldset>'].join('');
-    }
-
-    /**
-     * Create window color element for the component
-     *
-     * @return {string}
-     *         An HTML string.
-     *
-     * @private
-     */
-    createElWinColor_() {
-      const legendId = `captions-window-${this.id_}`;
-      return ['<fieldset class="vjs-window vjs-track-setting">', `<legend id="${legendId}">`, this.localize('Caption Area Background'), '</legend>', '<span class="vjs-window-color">', this.createElSelect_('windowColor', legendId), '</span>', '<span class="vjs-window-opacity vjs-opacity">', this.createElSelect_('windowOpacity', legendId), '</span>', '</fieldset>'].join('');
-    }
-
-    /**
-     * Create color elements for the component
-     *
-     * @return {Element}
-     *         The element that was created
-     *
-     * @private
-     */
-    createElColors_() {
-      return createEl('div', {
-        className: 'vjs-track-settings-colors',
-        innerHTML: [this.createElFgColor_(), this.createElBgColor_(), this.createElWinColor_()].join('')
-      });
-    }
-
-    /**
-     * Create font elements for the component
-     *
-     * @return {Element}
-     *         The element that was created.
-     *
-     * @private
-     */
-    createElFont_() {
-      return createEl('div', {
-        className: 'vjs-track-settings-font',
-        innerHTML: ['<fieldset class="vjs-font-percent vjs-track-setting">', this.createElSelect_('fontPercent', '', 'legend'), '</fieldset>', '<fieldset class="vjs-edge-style vjs-track-setting">', this.createElSelect_('edgeStyle', '', 'legend'), '</fieldset>', '<fieldset class="vjs-font-family vjs-track-setting">', this.createElSelect_('fontFamily', '', 'legend'), '</fieldset>'].join('')
-      });
-    }
-
-    /**
-     * Create controls for the component
-     *
-     * @return {Element}
-     *         The element that was created.
-     *
-     * @private
-     */
-    createElControls_() {
-      const defaultsDescription = this.localize('restore all settings to the default values');
-      return createEl('div', {
-        className: 'vjs-track-settings-controls',
-        innerHTML: [`<button type="button" class="vjs-default-button" title="${defaultsDescription}">`, this.localize('Reset'), `<span class="vjs-control-text"> ${defaultsDescription}</span>`, '</button>', `<button type="button" class="vjs-done-button">${this.localize('Done')}</button>`].join('')
-      });
-    }
-    content() {
-      return [this.createElColors_(), this.createElFont_(), this.createElControls_()];
     }
     label() {
       return this.localize('Caption Settings Dialog');
@@ -17397,27 +21006,12 @@
     }
 
     /**
-     * conditionally blur the element and refocus the captions button
-     *
-     * @private
-     */
-    conditionalBlur_() {
-      this.previouslyActiveEl_ = null;
-      const cb = this.player_.controlBar;
-      const subsCapsBtn = cb && cb.subsCapsButton;
-      const ccBtn = cb && cb.captionsButton;
-      if (subsCapsBtn) {
-        subsCapsBtn.focus();
-      } else if (ccBtn) {
-        ccBtn.focus();
-      }
-    }
-
-    /**
      * Repopulate dialog with new localizations on languagechange
      */
     handleLanguagechange() {
       this.fill();
+      this.renderModalComponents(this.player_);
+      this.bindFunctionsToSelectsAndButtons();
     }
   }
   Component$1.registerComponent('TextTrackSettings', TextTrackSettings);
@@ -17474,7 +21068,7 @@
       this.ResizeObserver = options.ResizeObserver || window.ResizeObserver;
       this.loadListener_ = null;
       this.resizeObserver_ = null;
-      this.debouncedHandler_ = debounce(() => {
+      this.debouncedHandler_ = debounce$1(() => {
         this.resizeHandler();
       }, 100, false, this);
       if (RESIZE_OBSERVER_AVAILABLE) {
@@ -17554,7 +21148,9 @@
   }
   Component$1.registerComponent('ResizeManager', ResizeManager);
 
-  const defaults = {
+  /** @import Player from './player' */
+
+  const defaults$1 = {
     trackingThreshold: 20,
     liveTolerance: 15
   };
@@ -17570,7 +21166,7 @@
     /**
      * Creates an instance of this class.
      *
-     * @param { import('./player').default } player
+     * @param {Player} player
      *        The `Player` that this class should be attached to.
      *
      * @param {Object} [options]
@@ -17588,7 +21184,7 @@
      */
     constructor(player, options) {
       // LiveTracker does not need an element
-      const options_ = merge$2(defaults, options, {
+      const options_ = merge$2(defaults$1, options, {
         createEl: false
       });
       super(player, options_);
@@ -17940,7 +21536,7 @@
       };
       return createEl('div', {
         className: 'vjs-title-bar'
-      }, {}, Object.values(this.els));
+      }, {}, values$1(this.els));
     }
 
     /**
@@ -18027,6 +21623,122 @@
   }
   Component$1.registerComponent('TitleBar', TitleBar);
 
+  /** @import Player from './player' */
+
+  /**
+   * @typedef {object} TransientButtonOptions
+   * @property {string} [controlText] Control text, usually visible for these buttons
+   * @property {number} [initialDisplay=4000] Time in ms that button should initially remain visible
+   * @property {Array<'top'|'neartop'|'bottom'|'left'|'right'>} [position] Array of position strings to add basic styles for positioning
+   * @property {string} [className] Class(es) to add
+   * @property {boolean} [takeFocus=false] Whether element sohuld take focus when shown
+   * @property {Function} [clickHandler] Function called on button activation
+   */
+
+  /** @type {TransientButtonOptions} */
+  const defaults = {
+    initialDisplay: 4000,
+    position: [],
+    takeFocus: false
+  };
+
+  /**
+   * A floating transient button.
+   * It's recommended to insert these buttons _before_ the control bar with the this argument to `addChild`
+   * for a logical tab order.
+   *
+   * @example
+   * ```
+   * player.addChild(
+   *   'TransientButton',
+   *   options,
+   *   player.children().indexOf(player.getChild("ControlBar"))
+   * )
+   * ```
+   *
+   * @extends Button
+   */
+  class TransientButton extends Button {
+    /**
+     * TransientButton constructor
+     *
+     * @param {Player} player The button's player
+     * @param {TransientButtonOptions} options Options for the transient button
+     */
+    constructor(player, options) {
+      options = merge$2(defaults, options);
+      super(player, options);
+      this.controlText(options.controlText);
+      this.hide();
+
+      // When shown, the float button will be visible even if the user is inactive.
+      // Clear this if there is any interaction.
+      this.on(this.player_, ['useractive', 'userinactive'], e => {
+        this.removeClass('force-display');
+      });
+    }
+
+    /**
+     * Return CSS class including position classes
+     *
+     * @return {string} CSS class list
+     */
+    buildCSSClass() {
+      return `vjs-transient-button focus-visible ${this.options_.position.map(c => `vjs-${c}`).join(' ')}`;
+    }
+
+    /**
+     * Create the button element
+     *
+     * @return {HTMLButtonElement} The button element
+     */
+    createEl() {
+      /** @type HTMLButtonElement */
+      const el = createEl('button', {}, {
+        type: 'button',
+        class: this.buildCSSClass()
+      }, createEl('span'));
+      this.controlTextEl_ = el.querySelector('span');
+      return el;
+    }
+
+    /**
+     * Show the button. The button will remain visible for the `initialDisplay` time, default 4s,
+     * and when there is user activity.
+     */
+    show() {
+      super.show();
+      this.addClass('force-display');
+      if (this.options_.takeFocus) {
+        this.el().focus({
+          preventScroll: true
+        });
+      }
+      this.forceDisplayTimeout = this.player_.setTimeout(() => {
+        this.removeClass('force-display');
+      }, this.options_.initialDisplay);
+    }
+
+    /**
+     * Hide the display, even if during the `initialDisplay` time.
+     */
+    hide() {
+      this.removeClass('force-display');
+      super.hide();
+    }
+
+    /**
+     * Dispose the component
+     */
+    dispose() {
+      this.player_.clearTimeout(this.forceDisplayTimeout);
+      super.dispose();
+    }
+  }
+  Component$1.registerComponent('TransientButton', TransientButton);
+
+  /** @import Html5 from './html5' */
+
   /**
    * This function is used to fire a sourceset when there is something
    * similar to `mediaEl.load()` being called. It will try to find the source via
@@ -18034,7 +21746,7 @@
    * with the source that was found or empty string if we cannot know. If it cannot
    * find a source then `sourceset` will not be fired.
    *
-   * @param { import('./html5').default } tech
+   * @param {Html5} tech
    *        The tech object that sourceset was setup on
    *
    * @return {boolean}
@@ -18999,6 +22711,59 @@
 
       // Setting src through `src` instead of `setSrc` will be deprecated
       this.setSrc(src);
+    }
+
+    /**
+     * Add a <source> element to the <video> element.
+     *
+     * @param {string} srcUrl
+     *        The URL of the video source.
+     *
+     * @param {string} [mimeType]
+     *        The MIME type of the video source. Optional but recommended.
+     *
+     * @return {boolean}
+     *         Returns true if the source element was successfully added, false otherwise.
+     */
+    addSourceElement(srcUrl, mimeType) {
+      if (!srcUrl) {
+        log$1.error('Invalid source URL.');
+        return false;
+      }
+      const sourceAttributes = {
+        src: srcUrl
+      };
+      if (mimeType) {
+        sourceAttributes.type = mimeType;
+      }
+      const sourceElement = createEl('source', {}, sourceAttributes);
+      this.el_.appendChild(sourceElement);
+      return true;
+    }
+
+    /**
+     * Remove a <source> element from the <video> element by its URL.
+     *
+     * @param {string} srcUrl
+     *        The URL of the source to remove.
+     *
+     * @return {boolean}
+     *         Returns true if the source element was successfully removed, false otherwise.
+     */
+    removeSourceElement(srcUrl) {
+      if (!srcUrl) {
+        log$1.error('Source URL is required to remove the source element.');
+        return false;
+      }
+      const sourceElements = this.el_.querySelectorAll('source');
+      for (const sourceElement of sourceElements) {
+        if (sourceElement.src === srcUrl) {
+          this.el_.removeChild(sourceElement);
+          return true;
+        }
+      }
+      log$1.warn(`No matching source element found with src: ${srcUrl}`);
+      return false;
     }
 
     /**
@@ -20224,6 +23989,19 @@
    * @file player.js
    */
 
+  /** @import AudioTrackList from './tracks/audio-track-list' */
+  /** @import HtmlTrackElement from './tracks/html-track-element' */
+  /** @import HtmlTrackElementList from './tracks/html-track-element-list' */
+  /** @import TextTrackList from './tracks/text-track-list' */
+  /** @import { TimeRange } from './utils/time' */
+  /** @import VideoTrackList from './tracks/video-track-list' */
+
+  /**
+   * @callback PlayerReadyCallback
+   * @this     {Player}
+   * @returns  {void}
+   */
+
   // The following tech events are simply re-triggered
   // on the player when they happen
   const TECH_EVENTS_RETRIGGER = [
@@ -20432,8 +24210,8 @@
    *
    * After an instance has been created it can be accessed globally in three ways:
    * 1. By calling `videojs.getPlayer('example_video_1');`
-   * 2. By calling `videojs('example_video_1');` (not recomended)
-   * 2. By using it directly via  `videojs.players.example_video_1;`
+   * 2. By calling `videojs('example_video_1');` (not recommended)
+   * 2. By using it directly via `videojs.players.example_video_1;`
    *
    * @extends Component
    * @global
@@ -20448,11 +24226,12 @@
      * @param {Object} [options]
      *        Object of option names and values.
      *
-     * @param {Function} [ready]
+     * @param {PlayerReadyCallback} [ready]
      *        Ready callback function.
      */
     constructor(tag, options, ready) {
       // Make sure tag ID exists
+      // also here.. probably better
       tag.id = tag.id || options.id || `vjs_video_${newGUID()}`;
 
       // Set Options
@@ -20499,6 +24278,7 @@
       this.boundHandleTechTouchMove_ = e => this.handleTechTouchMove_(e);
       this.boundHandleTechTouchEnd_ = e => this.handleTechTouchEnd_(e);
       this.boundHandleTechTap_ = e => this.handleTechTap_(e);
+      this.boundUpdatePlayerHeightOnAudioOnlyMode_ = e => this.updatePlayerHeightOnAudioOnlyMode_(e);
 
       // default isFullscreen_ to false
       this.isFullscreen_ = false;
@@ -20536,6 +24316,7 @@
 
       // Init state audioOnlyCache_
       this.audioOnlyCache_ = {
+        controlBarHeight: null,
         playerHeight: null,
         hiddenChildren: []
       };
@@ -20569,9 +24350,11 @@
       this.resetCache_();
 
       // Set poster
+      /** @type string */
       this.poster_ = options.poster || '';
 
       // Set controls
+      /** @type {boolean} */
       this.controls_ = !!options.controls;
 
       // Original tag settings stored in options
@@ -20646,6 +24429,21 @@
       this.options_.playerOptions = playerOptionsCopy;
       this.middleware_ = [];
       this.playbackRates(options.playbackRates);
+      if (options.experimentalSvgIcons) {
+        // Add SVG Sprite to the DOM
+        const parser = new window.DOMParser();
+        const parsedSVG = parser.parseFromString(icons, 'image/svg+xml');
+        const errorNode = parsedSVG.querySelector('parsererror');
+        if (errorNode) {
+          log$1.warn('Failed to load SVG Icons. Falling back to Font Icons.');
+          this.options_.experimentalSvgIcons = null;
+        } else {
+          const sprite = parsedSVG.documentElement;
+          sprite.style.display = 'none';
+          this.el_.appendChild(sprite);
+          this.addClass('vjs-svg-icons-enabled');
+        }
+      }
       this.initChildren();
 
       // Set isAudio based on whether or not an audio tag was used
@@ -20668,6 +24466,13 @@
       }
       if (this.isAudio()) {
         this.addClass('vjs-audio');
+      }
+
+      // Check if spatial navigation is enabled in the options.
+      // If enabled, instantiate the SpatialNavigation class.
+      if (options.spatialNavigation && options.spatialNavigation.enabled) {
+        this.spatialNavigation = new SpatialNavigation(this);
+        this.addClass('vjs-spatial-navigation-enabled');
       }
 
       // TODO: Make this smarter. Toggle user state between touching/mousing
@@ -20867,6 +24672,10 @@
       tag.player = el.player = this;
       // Default state of video is paused
       this.addClass('vjs-paused');
+      const deviceClassNames = ['IS_SMART_TV', 'IS_TIZEN', 'IS_WEBOS', 'IS_ANDROID', 'IS_IPAD', 'IS_IPHONE', 'IS_CHROMECAST_RECEIVER'].filter(key => browser[key]).map(key => {
+        return 'vjs-device-' + key.substring(3).toLowerCase().replace(/\_/g, '-');
+      });
+      this.addClass(...deviceClassNames);
 
       // Add a style element in the player that we'll use to set the width/height
       // of the player in a way that's still overridable by CSS, just like the
@@ -20958,11 +24767,12 @@
      * A getter/setter for the `Player`'s width. Returns the player's configured value.
      * To get the current width use `currentWidth()`.
      *
-     * @param {number} [value]
-     *        The value to set the `Player`'s width to.
+     * @param {number|string} [value]
+     *        CSS value to set the `Player`'s width to.
      *
-     * @return {number}
-     *         The current width of the `Player` when getting.
+     * @return {number|undefined}
+     *         - The current width of the `Player` when getting.
+     *         - Nothing when setting
      */
     width(value) {
       return this.dimension('width', value);
@@ -20972,11 +24782,12 @@
      * A getter/setter for the `Player`'s height. Returns the player's configured value.
      * To get the current height use `currentheight()`.
      *
-     * @param {number} [value]
-     *        The value to set the `Player`'s height to.
+     * @param {number|string} [value]
+     *        CSS value to set the `Player`'s height to.
      *
-     * @return {number}
-     *         The current height of the `Player` when getting.
+     * @return {number|undefined}
+     *         - The current height of the `Player` when getting.
+     *         - Nothing when setting
      */
     height(value) {
       return this.dimension('height', value);
@@ -20990,7 +24801,7 @@
      *        - 'width'
      *        - 'height'
      *
-     * @param {number} [value]
+     * @param {number|string} [value]
      *        Value for dimension specified in the first argument.
      *
      * @return {number}
@@ -21368,6 +25179,26 @@
     }
 
     /**
+     * An object that contains Video.js version.
+     *
+     * @typedef {Object} PlayerVersion
+     *
+     * @property {string} 'video.js' - Video.js version
+     */
+
+    /**
+     * Returns an object with Video.js version.
+     *
+     * @return {PlayerVersion}
+     *          An object with Video.js version.
+     */
+    version() {
+      return {
+        'video.js': version$5
+      };
+    }
+
+    /**
      * Set up click and touch listeners for the playback element
      *
      * - On desktops: a click on the video itself will toggle playback
@@ -21667,7 +25498,7 @@
             if (e.type === 'sourceset') {
               return;
             }
-            const techSrc = this.techGet('currentSrc');
+            const techSrc = this.techGet_('currentSrc');
             this.lastSource_.tech = techSrc;
             this.updateSourceCaches_(techSrc);
           });
@@ -21963,7 +25794,8 @@
     }
 
     /**
-     * Handle a double-click on the media element to enter/exit fullscreen
+     * Handle a double-click on the media element to enter/exit fullscreen,
+     * or exit documentPictureInPicture mode
      *
      * @param {Event} event
      *        the event that caused this function to trigger
@@ -21990,6 +25822,12 @@
         if (this.options_ === undefined || this.options_.userActions === undefined || this.options_.userActions.doubleClick === undefined || this.options_.userActions.doubleClick !== false) {
           if (this.options_ !== undefined && this.options_.userActions !== undefined && typeof this.options_.userActions.doubleClick === 'function') {
             this.options_.userActions.doubleClick.call(this, event);
+          } else if (this.isInPictureInPicture() && !document.pictureInPictureElement) {
+            // Checking the presence of `window.documentPictureInPicture.window` complicates
+            // tests, checking `document.pictureInPictureElement` also works. It wouldn't
+            // be null in regular picture in picture.
+            // Exit picture in picture mode. This gesture can't trigger pip on the main window.
+            this.exitPictureInPicture();
           } else if (this.isFullscreen()) {
             this.exitFullscreen();
           } else {
@@ -22075,8 +25913,6 @@
       let isFs = document[this.fsApi_.fullscreenElement] === el;
       if (!isFs && el.matches) {
         isFs = el.matches(':' + this.fsApi_.fullscreen);
-      } else if (!isFs && el.msMatchesSelector) {
-        isFs = el.msMatchesSelector(':' + this.fsApi_.fullscreen);
       }
       this.isFullscreen(isFs);
     }
@@ -22154,7 +25990,9 @@
      */
     handleTechError_() {
       const error = this.tech_.error();
-      this.error(error);
+      if (error) {
+        this.error(error);
+      }
     }
 
     /**
@@ -22224,7 +26062,7 @@
      * @param {string} [method]
      *        the method to call
      *
-     * @param {Object} arg
+     * @param {Object} [arg]
      *        the argument to pass
      *
      * @private
@@ -22398,9 +26236,6 @@
 
     /**
      * Pause the video playback
-     *
-     * @return {Player}
-     *         A reference to the player object this function was called on
      */
     pause() {
       this.techCall_('pause');
@@ -22422,7 +26257,7 @@
      * Get a TimeRange object representing the current ranges of time that the user
      * has played.
      *
-     * @return { import('./utils/time').TimeRange }
+     * @return {TimeRange}
      *         A time range object that represents all the increments of time that have
      *         been played.
      */
@@ -22431,15 +26266,16 @@
     }
 
     /**
-     * Returns whether or not the user is "scrubbing". Scrubbing is
+     * Sets or returns whether or not the user is "scrubbing". Scrubbing is
      * when the user has clicked the progress bar handle and is
      * dragging it along the progress bar.
      *
      * @param {boolean} [isScrubbing]
      *        whether the user is or is not scrubbing
      *
-     * @return {boolean}
-     *         The value of scrubbing when getting
+     * @return {boolean|undefined}
+     *         - The value of scrubbing when getting
+     *         - Nothing when setting
      */
     scrubbing(isScrubbing) {
       if (typeof isScrubbing === 'undefined') {
@@ -22460,33 +26296,35 @@
      * @param {number|string} [seconds]
      *        The time to seek to in seconds
      *
-     * @return {number}
+     * @return {number|undefined}
      *         - the current time in seconds when getting
+     *         - Nothing when setting
      */
     currentTime(seconds) {
-      if (typeof seconds !== 'undefined') {
-        if (seconds < 0) {
-          seconds = 0;
-        }
-        if (!this.isReady_ || this.changingSrc_ || !this.tech_ || !this.tech_.isReady_) {
-          this.cache_.initTime = seconds;
-          this.off('canplay', this.boundApplyInitTime_);
-          this.one('canplay', this.boundApplyInitTime_);
-          return;
-        }
-        this.techCall_('setCurrentTime', seconds);
-        this.cache_.initTime = 0;
+      if (seconds === undefined) {
+        // cache last currentTime and return. default to 0 seconds
+        //
+        // Caching the currentTime is meant to prevent a massive amount of reads on the tech's
+        // currentTime when scrubbing, but may not provide much performance benefit after all.
+        // Should be tested. Also something has to read the actual current time or the cache will
+        // never get updated.
+        this.cache_.currentTime = this.techGet_('currentTime') || 0;
+        return this.cache_.currentTime;
+      }
+      if (seconds < 0) {
+        seconds = 0;
+      }
+      if (!this.isReady_ || this.changingSrc_ || !this.tech_ || !this.tech_.isReady_) {
+        this.cache_.initTime = seconds;
+        this.off('canplay', this.boundApplyInitTime_);
+        this.one('canplay', this.boundApplyInitTime_);
         return;
       }
-
-      // cache last currentTime and return. default to 0 seconds
-      //
-      // Caching the currentTime is meant to prevent a massive amount of reads on the tech's
-      // currentTime when scrubbing, but may not provide much performance benefit after all.
-      // Should be tested. Also something has to read the actual current time or the cache will
-      // never get updated.
-      this.cache_.currentTime = this.techGet_('currentTime') || 0;
-      return this.cache_.currentTime;
+      this.techCall_('setCurrentTime', seconds);
+      this.cache_.initTime = 0;
+      if (isFinite(seconds)) {
+        this.cache_.currentTime = Number(seconds);
+      }
     }
 
     /**
@@ -22511,8 +26349,9 @@
      * @param {number} [seconds]
      *        The duration of the video to set in seconds
      *
-     * @return {number}
+     * @return {number|undefined}
      *         - The duration of the video in seconds when getting
+     *         - Nothing when setting
      */
     duration(seconds) {
       if (seconds === undefined) {
@@ -22578,7 +26417,7 @@
      *
      * @see [Buffered Spec]{@link http://dev.w3.org/html5/spec/video.html#dom-media-buffered}
      *
-     * @return { import('./utils/time').TimeRange }
+     * @return {TimeRange}
      *         A mock {@link TimeRanges} object (following HTML spec)
      */
     buffered() {
@@ -22587,6 +26426,90 @@
         buffered = createTimeRanges$1(0, 0);
       }
       return buffered;
+    }
+
+    /**
+     * Get the TimeRanges of the media that are currently available
+     * for seeking to.
+     *
+     * @see [Seekable Spec]{@link https://html.spec.whatwg.org/multipage/media.html#dom-media-seekable}
+     *
+     * @return {TimeRange}
+     *         A mock {@link TimeRanges} object (following HTML spec)
+     */
+    seekable() {
+      let seekable = this.techGet_('seekable');
+      if (!seekable || !seekable.length) {
+        seekable = createTimeRanges$1(0, 0);
+      }
+      return seekable;
+    }
+
+    /**
+     * Returns whether the player is in the "seeking" state.
+     *
+     * @return {boolean} True if the player is in the seeking state, false if not.
+     */
+    seeking() {
+      return this.techGet_('seeking');
+    }
+
+    /**
+     * Returns whether the player is in the "ended" state.
+     *
+     * @return {boolean} True if the player is in the ended state, false if not.
+     */
+    ended() {
+      return this.techGet_('ended');
+    }
+
+    /**
+     * Returns the current state of network activity for the element, from
+     * the codes in the list below.
+     * - NETWORK_EMPTY (numeric value 0)
+     *   The element has not yet been initialised. All attributes are in
+     *   their initial states.
+     * - NETWORK_IDLE (numeric value 1)
+     *   The element's resource selection algorithm is active and has
+     *   selected a resource, but it is not actually using the network at
+     *   this time.
+     * - NETWORK_LOADING (numeric value 2)
+     *   The user agent is actively trying to download data.
+     * - NETWORK_NO_SOURCE (numeric value 3)
+     *   The element's resource selection algorithm is active, but it has
+     *   not yet found a resource to use.
+     *
+     * @see https://html.spec.whatwg.org/multipage/embedded-content.html#network-states
+     * @return {number} the current network activity state
+     */
+    networkState() {
+      return this.techGet_('networkState');
+    }
+
+    /**
+     * Returns a value that expresses the current state of the element
+     * with respect to rendering the current playback position, from the
+     * codes in the list below.
+     * - HAVE_NOTHING (numeric value 0)
+     *   No information regarding the media resource is available.
+     * - HAVE_METADATA (numeric value 1)
+     *   Enough of the resource has been obtained that the duration of the
+     *   resource is available.
+     * - HAVE_CURRENT_DATA (numeric value 2)
+     *   Data for the immediate current playback position is available.
+     * - HAVE_FUTURE_DATA (numeric value 3)
+     *   Data for the immediate current playback position is available, as
+     *   well as enough data for the user agent to advance the current
+     *   playback position in the direction of playback.
+     * - HAVE_ENOUGH_DATA (numeric value 4)
+     *   The user agent estimates that enough data is available for
+     *   playback to proceed uninterrupted.
+     *
+     * @see https://html.spec.whatwg.org/multipage/embedded-content.html#dom-media-readystate
+     * @return {number} the current playback rendering state
+     */
+    readyState() {
+      return this.techGet_('readyState');
     }
 
     /**
@@ -22627,14 +26550,14 @@
      *         - 1.0 is 100%/full
      *         - 0.5 is half volume or 50%
      *
-     * @return {number}
+     * @return {number|undefined}
      *         The current volume as a percent when getting
      */
     volume(percentAsDecimal) {
       let vol;
       if (percentAsDecimal !== undefined) {
         // Force value to between 0 and 1
-        vol = Math.max(0, Math.min(1, parseFloat(percentAsDecimal)));
+        vol = Math.max(0, Math.min(1, percentAsDecimal));
         this.cache_.volume = vol;
         this.techCall_('setVolume', vol);
         if (vol > 0) {
@@ -22655,9 +26578,10 @@
      *        - true to mute
      *        - false to unmute
      *
-     * @return {boolean}
+     * @return {boolean|undefined}
      *         - true if mute is on and getting
      *         - false if mute is off and getting
+     *         - nothing if setting
      */
     muted(muted) {
       if (muted !== undefined) {
@@ -22688,14 +26612,14 @@
      *        - true to mute
      *        - false to unmute
      *
-     * @return {boolean|Player}
+     * @return {boolean|undefined}
      *         - true if defaultMuted is on and getting
      *         - false if defaultMuted is off and getting
-     *         - A reference to the current player when setting
+     *         - Nothing when setting
      */
     defaultMuted(defaultMuted) {
       if (defaultMuted !== undefined) {
-        return this.techCall_('setDefaultMuted', defaultMuted);
+        this.techCall_('setDefaultMuted', defaultMuted);
       }
       return this.techGet_('defaultMuted') || false;
     }
@@ -22709,8 +26633,9 @@
      *         - 1.0 is 100%/full
      *         - 0.5 is half volume or 50%
      *
-     * @return {number}
-     *         the current value of lastVolume as a percent when getting
+     * @return {number|undefined}
+     *         - The current value of lastVolume as a percent when getting
+     *         - Nothing when setting
      *
      * @private
      */
@@ -22744,9 +26669,10 @@
      * @param  {boolean} [isFS]
      *         Set the players current fullscreen state
      *
-     * @return {boolean}
+     * @return {boolean|undefined}
      *         - true if fullscreen is on and getting
      *         - false if fullscreen is off and getting
+     *         - Nothing when setting
      */
     isFullscreen(isFS) {
       if (isFS !== undefined) {
@@ -22933,7 +26859,7 @@
      *        Event to check for key press
      */
     fullWindowOnEscKey(event) {
-      if (keycode.isEventKey(event, 'Esc')) {
+      if (event.key === 'Escape') {
         if (this.isFullscreen() === true) {
           if (!this.isFullWindow) {
             this.exitFullscreen();
@@ -22970,9 +26896,9 @@
     }
 
     /**
-     * Disable Picture-in-Picture mode.
+     * Get or set disable Picture-in-Picture mode.
      *
-     * @param {boolean} value
+     * @param {boolean} [value]
      *                  - true will disable Picture-in-Picture mode
      *                  - false will enable Picture-in-Picture mode
      */
@@ -22992,9 +26918,10 @@
      * @param  {boolean} [isPiP]
      *         Set the players current Picture-in-Picture state
      *
-     * @return {boolean}
+     * @return {boolean|undefined}
      *         - true if Picture-in-Picture is on and getting
      *         - false if Picture-in-Picture is off and getting
+     *         - nothing if setting
      */
     isInPictureInPicture(isPiP) {
       if (isPiP !== undefined) {
@@ -23040,19 +26967,23 @@
         }, {}, this.localize('Playing in picture-in-picture')));
         return window.documentPictureInPicture.requestWindow({
           // The aspect ratio won't be correct, Chrome bug https://crbug.com/1407629
-          initialAspectRatio: this.videoWidth() / this.videoHeight(),
-          copyStyleSheets: true
+          width: this.videoWidth(),
+          height: this.videoHeight()
         }).then(pipWindow => {
+          copyStyleSheetsToWindow(pipWindow);
           this.el_.parentNode.insertBefore(pipContainer, this.el_);
-          pipWindow.document.body.append(this.el_);
+          pipWindow.document.body.appendChild(this.el_);
           pipWindow.document.body.classList.add('vjs-pip-window');
           this.player_.isInPictureInPicture(true);
-          this.player_.trigger('enterpictureinpicture');
+          this.player_.trigger({
+            type: 'enterpictureinpicture',
+            pipWindow
+          });
 
           // Listen for the PiP closing event to move the video back.
-          pipWindow.addEventListener('unload', event => {
+          pipWindow.addEventListener('pagehide', event => {
             const pipVideo = event.target.querySelector('.video-js');
-            pipContainer.replaceWith(pipVideo);
+            pipContainer.parentNode.replaceChild(pipVideo, pipContainer);
             this.player_.isInPictureInPicture(false);
             this.player_.trigger('leavepictureinpicture');
           });
@@ -23083,7 +27014,7 @@
      */
     exitPictureInPicture() {
       if (window.documentPictureInPicture && window.documentPictureInPicture.window) {
-        // With documentPictureInPicture, Player#leavepictureinpicture is fired in the unload handler
+        // With documentPictureInPicture, Player#leavepictureinpicture is fired in the pagehide handler
         window.documentPictureInPicture.window.close();
         return Promise.resolve();
       }
@@ -23104,7 +27035,7 @@
      * This allows player-wide hotkeys (either as defined below, or optionally
      * by an external function).
      *
-     * @param {Event} event
+     * @param {KeyboardEvent} event
      *        The `keydown` event that caused this function to be called.
      *
      * @listens keydown
@@ -23168,9 +27099,9 @@
 
       // set fullscreenKey, muteKey, playPauseKey from `hotkeys`, use defaults if not set
       const {
-        fullscreenKey = keydownEvent => keycode.isEventKey(keydownEvent, 'f'),
-        muteKey = keydownEvent => keycode.isEventKey(keydownEvent, 'm'),
-        playPauseKey = keydownEvent => keycode.isEventKey(keydownEvent, 'k') || keycode.isEventKey(keydownEvent, 'Space')
+        fullscreenKey = keydownEvent => event.key.toLowerCase() === 'f',
+        muteKey = keydownEvent => event.key.toLowerCase() === 'm',
+        playPauseKey = keydownEvent => event.key.toLowerCase() === 'k' || event.key.toLowerCase() === ' '
       } = hotkeys;
       if (fullscreenKey.call(this, event)) {
         event.preventDefault();
@@ -23308,7 +27239,7 @@
      *        algorithms can take the `type` into account.
      *
      *        If not provided, this method acts as a getter.
-     * @param {boolean} isRetry
+     * @param {boolean} [isRetry]
      *        Indicates whether this is being called internally as a result of a retry
      *
      * @return {string|undefined}
@@ -23470,9 +27401,50 @@
     }
 
     /**
+     * Add a <source> element to the <video> element.
+     *
+     * @param {string} srcUrl
+     *        The URL of the video source.
+     *
+     * @param {string} [mimeType]
+     *        The MIME type of the video source. Optional but recommended.
+     *
+     * @return {boolean}
+     *         Returns true if the source element was successfully added, false otherwise.
+     */
+    addSourceElement(srcUrl, mimeType) {
+      if (!this.tech_) {
+        return false;
+      }
+      return this.tech_.addSourceElement(srcUrl, mimeType);
+    }
+
+    /**
+     * Remove a <source> element from the <video> element by its URL.
+     *
+     * @param {string} srcUrl
+     *        The URL of the source to remove.
+     *
+     * @return {boolean}
+     *         Returns true if the source element was successfully removed, false otherwise.
+     */
+    removeSourceElement(srcUrl) {
+      if (!this.tech_) {
+        return false;
+      }
+      return this.tech_.removeSourceElement(srcUrl);
+    }
+
+    /**
      * Begin loading the src data.
      */
     load() {
+      // Workaround to use the load method with the VHS.
+      // Does not cover the case when the load method is called directly from the mediaElement.
+      if (this.tech_ && this.tech_.vhs) {
+        this.src(this.currentSource());
+        return;
+      }
       this.techCall_('load');
     }
 
@@ -23493,11 +27465,20 @@
       if (this.tech_) {
         this.tech_.clearTracks('text');
       }
+      this.removeClass('vjs-playing');
+      this.addClass('vjs-paused');
       this.resetCache_();
       this.poster('');
       this.loadTech_(this.options_.techOrder[0], null);
       this.techCall_('reset');
       this.resetControlBarUI_();
+      this.error(null);
+      if (this.titleBar) {
+        this.titleBar.update({
+          title: undefined,
+          description: undefined
+        });
+      }
       if (isEvented(this)) {
         this.trigger('playerreset');
       }
@@ -23613,12 +27594,12 @@
     /**
      * Get or set the preload attribute
      *
-     * @param {boolean} [value]
-     *        - true means that we should preload
-     *        - false means that we should not preload
+     * @param {'none'|'auto'|'metadata'} [value]
+     *        Preload mode to pass to tech
      *
-     * @return {string}
-     *         The preload attribute value when getting
+     * @return {string|undefined}
+     *         - The preload attribute value when getting
+     *         - Nothing when setting
      */
     preload(value) {
       if (value !== undefined) {
@@ -23634,7 +27615,7 @@
      * modify the attribute on the tech. When this is a string the attribute on
      * the tech will be removed and `Player` will handle autoplay on loadstarts.
      *
-     * @param {boolean|string} [value]
+     * @param {boolean|'play'|'muted'|'any'} [value]
      *        - true: autoplay using the browser behavior
      *        - false: do not autoplay
      *        - 'play': call play() on every loadstart
@@ -23642,8 +27623,9 @@
      *        - 'any': call play() on every loadstart. if that fails call muted() then play().
      *        - *: values other than those listed here will be set `autoplay` to true
      *
-     * @return {boolean|string}
-     *         The current value of autoplay when getting
+     * @return {boolean|string|undefined}
+     *         - The current value of autoplay when getting
+     *         - Nothing when setting
      */
     autoplay(value) {
       // getter usage
@@ -23688,9 +27670,9 @@
      *          which in most cases is inline. iOS Safari is a notable exception
      *          and plays fullscreen by default.
      *
-     * @return {string|Player}
+     * @return {string|undefined}
      *         - the current value of playsinline
-     *         - the player when setting
+     *         - Nothing when setting
      *
      * @see [Spec]{@link https://html.spec.whatwg.org/#attr-video-playsinline}
      */
@@ -23698,7 +27680,6 @@
       if (value !== undefined) {
         this.techCall_('setPlaysinline', value);
         this.options_.playsinline = value;
-        return this;
       }
       return this.techGet_('playsinline');
     }
@@ -23710,8 +27691,9 @@
      *        - true means that we should loop the video
      *        - false means that we should not loop the video
      *
-     * @return {boolean}
-     *         The current value of loop when getting
+     * @return {boolean|undefined}
+     *         - The current value of loop when getting
+     *         - Nothing when setting
      */
     loop(value) {
       if (value !== undefined) {
@@ -23730,8 +27712,9 @@
      * @param {string} [src]
      *        Poster image source URL
      *
-     * @return {string}
-     *         The current value of poster when getting
+     * @return {string|undefined}
+     *         - The current value of poster when getting
+     *         - Nothing when setting
      */
     poster(src) {
       if (src === undefined) {
@@ -23798,8 +27781,9 @@
      *        - true to turn controls on
      *        - false to turn controls off
      *
-     * @return {boolean}
-     *         The current value of controls when getting
+     * @return {boolean|undefined}
+     *         - The current value of controls when getting
+     *         - Nothing when setting
      */
     controls(bool) {
       if (bool === undefined) {
@@ -23854,8 +27838,9 @@
      *        - true to turn native controls on
      *        - false to turn native controls off
      *
-     * @return {boolean}
-     *         The current value of native controls when getting
+     * @return {boolean|undefined}
+     *         - The current value of native controls when getting
+     *         - Nothing when setting
      */
     usingNativeControls(bool) {
       if (bool === undefined) {
@@ -23900,8 +27885,9 @@
      *         A MediaError or a string/number to be turned
      *         into a MediaError
      *
-     * @return {MediaError|null}
-     *         The current MediaError when getting (or null)
+     * @return {MediaError|null|undefined}
+     *         - The current MediaError when getting (or null)
+     *         - Nothing when setting
      */
     error(err) {
       if (err === undefined) {
@@ -23934,7 +27920,7 @@
 
       // restoring to default
       if (err === null) {
-        this.error_ = err;
+        this.error_ = null;
         this.removeClass('vjs-error');
         if (this.errorDisplay) {
           this.errorDisplay.close();
@@ -23981,8 +27967,9 @@
      *        - true if the user is active
      *        - false if the user is inactive
      *
-     * @return {boolean}
-     *         The current value of userActive when getting
+     * @return {boolean|undefined}
+     *         - The current value of userActive when getting
+     *         - Nothing when setting
      */
     userActive(bool) {
       if (bool === undefined) {
@@ -24097,7 +28084,9 @@
       // then gets picked up by this loop
       // http://ejohn.org/blog/learning-from-twitter/
       let inactivityTimeout;
-      this.setInterval(function () {
+
+      /** @this Player */
+      const activityCheck = function () {
         // Check to see if mouse/touch activity has happened
         if (!this.userActivity_) {
           return;
@@ -24126,7 +28115,8 @@
             this.userActive(false);
           }
         }, timeout);
-      }, 250);
+      };
+      this.setInterval(activityCheck, 250);
     }
 
     /**
@@ -24139,8 +28129,9 @@
      * @param {number} [rate]
      *       New playback rate to set.
      *
-     * @return {number}
-     *         The current playback rate when getting or 1.0
+     * @return {number|undefined}
+     *         - The current playback rate when getting or 1.0
+     *         - Nothing when setting
      */
     playbackRate(rate) {
       if (rate !== undefined) {
@@ -24166,9 +28157,9 @@
      * @param {number} [rate]
      *       New default playback rate to set.
      *
-     * @return {number|Player}
+     * @return {number|undefined}
      *         - The default playback rate when getting or 1.0
-     *         - the player when setting
+     *         - Nothing when setting
      */
     defaultPlaybackRate(rate) {
       if (rate !== undefined) {
@@ -24183,12 +28174,13 @@
     /**
      * Gets or sets the audio flag
      *
-     * @param {boolean} bool
+     * @param {boolean} [bool]
      *        - true signals that this is an audio player
      *        - false signals that this is not an audio player
      *
-     * @return {boolean}
-     *         The current value of isAudio when getting
+     * @return {boolean|undefined}
+     *         - The current value of isAudio when getting
+     *         - Nothing when setting
      */
     isAudio(bool) {
       if (bool !== undefined) {
@@ -24196,6 +28188,14 @@
         return;
       }
       return !!this.isAudio_;
+    }
+    updatePlayerHeightOnAudioOnlyMode_() {
+      const controlBar = this.getChild('ControlBar');
+      if (!controlBar || this.audioOnlyCache_.controlBarHeight === controlBar.currentHeight()) {
+        return;
+      }
+      this.audioOnlyCache_.controlBarHeight = controlBar.currentHeight();
+      this.height(this.audioOnlyCache_.controlBarHeight);
     }
     enableAudioOnlyUI_() {
       // Update styling immediately to show the control bar so we can get its height
@@ -24216,6 +28216,8 @@
         }
       });
       this.audioOnlyCache_.playerHeight = this.currentHeight();
+      this.audioOnlyCache_.controlBarHeight = controlBarHeight;
+      this.on('playerresize', this.boundUpdatePlayerHeightOnAudioOnlyMode_);
 
       // Set the player height the same as the control bar
       this.height(controlBarHeight);
@@ -24223,6 +28225,7 @@
     }
     disableAudioOnlyUI_() {
       this.removeClass('vjs-audio-only-mode');
+      this.off('playerresize', this.boundUpdatePlayerHeightOnAudioOnlyMode_);
 
       // Show player components that were previously hidden
       this.audioOnlyCache_.hiddenChildren.forEach(child => child.show());
@@ -24358,7 +28361,7 @@
      *                                        from the TextTrackList and HtmlTrackElementList
      *                                        after a source change
      *
-     * @return { import('./tracks/html-track-element').default }
+     * @return {HtmlTrackElement}
      *         the HTMLTrackElement that was created and added
      *         to the HtmlTrackElementList and the remote
      *         TextTrackList
@@ -24431,7 +28434,7 @@
     }
 
     /**
-     * The player's language code.
+     * Set or get the player's language code.
      *
      * Changing the language will trigger
      * [languagechange]{@link Player#event:languagechange}
@@ -24444,8 +28447,9 @@
      * @param {string} [code]
      *        the language code to set the player to
      *
-     * @return {string}
-     *         The current language code when getting
+     * @return {string|undefined}
+     *         - The current language code when getting
+     *         - Nothing when setting
      */
     language(code) {
       if (code === undefined) {
@@ -24629,13 +28633,14 @@
      * Get or set a flag indicating whether or not this player should adjust
      * its UI based on its dimensions.
      *
-     * @param  {boolean} value
+     * @param  {boolean} [value]
      *         Should be `true` if the player should adjust its UI based on its
      *         dimensions; otherwise, should be `false`.
      *
-     * @return {boolean}
+     * @return {boolean|undefined}
      *         Will be `true` if this player should adjust its UI based on its
      *         dimensions; otherwise, will be `false`.
+     *         Nothing if setting
      */
     responsive(value) {
       // Used as a getter.
@@ -24748,6 +28753,7 @@
       if (!media || typeof media !== 'object') {
         return;
       }
+      const crossOrigin = this.crossOrigin();
       this.reset();
 
       // Clone the media object so it cannot be mutated from outside.
@@ -24768,6 +28774,9 @@
           src: poster,
           type: getMimetype(poster)
         }];
+      }
+      if (crossOrigin) {
+        this.crossOrigin(crossOrigin);
       }
       if (src) {
         this.src(src);
@@ -24848,12 +28857,12 @@
       // Check if data-setup attr exists.
       if (dataSetup !== null) {
         // Parse options JSON
-        // If empty string, make it a parsable json object.
-        const [err, data] = tuple(dataSetup || '{}');
-        if (err) {
-          log$1.error(err);
+        try {
+          // If empty string, make it a parsable json object.
+          Object.assign(tagOptions, JSON.parse(dataSetup || '{}'));
+        } catch (e) {
+          log$1.error('data-setup', e);
         }
-        Object.assign(tagOptions, data);
       }
       Object.assign(baseOptions, tagOptions);
 
@@ -24880,6 +28889,7 @@
      * @param {boolean} enabled
      * @fires Player#debugon
      * @fires Player#debugoff
+     * @return {boolean|undefined}
      */
     debug(enabled) {
       if (enabled === undefined) {
@@ -24905,7 +28915,7 @@
      * Values other than arrays are ignored.
      *
      * @fires Player#playbackrateschange
-     * @param {number[]} newRates
+     * @param {number[]} [newRates]
      *                   The new rates that the playback rates menu should update to.
      *                   An empty array will hide the menu
      * @return {number[]} When used as a getter will return the current playback rates
@@ -24934,6 +28944,34 @@
       */
       this.trigger('playbackrateschange');
     }
+
+    /**
+     * Reports whether or not a player has a plugin available.
+     *
+     * This does not report whether or not the plugin has ever been initialized
+     * on this player. For that, [usingPlugin]{@link Player#usingPlugin}.
+     *
+     * @method hasPlugin
+     * @param  {string}  name
+     *         The name of a plugin.
+     *
+     * @return {boolean}
+     *         Whether or not this player has the requested plugin available.
+     */
+
+    /**
+     * Reports whether or not a player is using a plugin by name.
+     *
+     * For basic plugins, this only reports whether the plugin has _ever_ been
+     * initialized on this player.
+     *
+     * @method Player#usingPlugin
+     * @param  {string} name
+     *         The name of a plugin.
+     *
+     * @return {boolean}
+     *         Whether or not this player is using the requested plugin.
+     */
   }
 
   /**
@@ -24946,6 +28984,7 @@
    *
    * @method Player.prototype.videoTracks
    */
+  Player.prototype.videoTracks = () => {};
 
   /**
    * Get the {@link AudioTrackList}
@@ -24957,6 +28996,7 @@
    *
    * @method Player.prototype.audioTracks
    */
+  Player.prototype.audioTracks = () => {};
 
   /**
    * Get the {@link TextTrackList}
@@ -24968,6 +29008,7 @@
    *
    * @method Player.prototype.textTracks
    */
+  Player.prototype.textTracks = () => {};
 
   /**
    * Get the remote {@link TextTrackList}
@@ -24977,6 +29018,7 @@
    *
    * @method Player.prototype.remoteTextTracks
    */
+  Player.prototype.remoteTextTracks = () => {};
 
   /**
    * Get the remote {@link HtmlTrackElementList} tracks.
@@ -24986,7 +29028,7 @@
    *
    * @method Player.prototype.remoteTextTrackEls
    */
-
+  Player.prototype.remoteTextTrackEls = () => {};
   ALL.names.forEach(function (name) {
     const props = ALL[name];
     Player.prototype[props.getterName] = function () {
@@ -25066,80 +29108,16 @@
     breakpoints: {},
     responsive: false,
     audioOnlyMode: false,
-    audioPosterMode: false
+    audioPosterMode: false,
+    spatialNavigation: {
+      enabled: false,
+      horizontalSeek: false
+    },
+    // Default smooth seeking to false
+    enableSmoothSeeking: false,
+    disableSeekWhileScrubbingOnMobile: false,
+    disableSeekWhileScrubbingOnSTV: false
   };
-  [
-  /**
-   * Returns whether or not the player is in the "ended" state.
-   *
-   * @return {Boolean} True if the player is in the ended state, false if not.
-   * @method Player#ended
-   */
-  'ended',
-  /**
-   * Returns whether or not the player is in the "seeking" state.
-   *
-   * @return {Boolean} True if the player is in the seeking state, false if not.
-   * @method Player#seeking
-   */
-  'seeking',
-  /**
-   * Returns the TimeRanges of the media that are currently available
-   * for seeking to.
-   *
-   * @return {TimeRanges} the seekable intervals of the media timeline
-   * @method Player#seekable
-   */
-  'seekable',
-  /**
-   * Returns the current state of network activity for the element, from
-   * the codes in the list below.
-   * - NETWORK_EMPTY (numeric value 0)
-   *   The element has not yet been initialised. All attributes are in
-   *   their initial states.
-   * - NETWORK_IDLE (numeric value 1)
-   *   The element's resource selection algorithm is active and has
-   *   selected a resource, but it is not actually using the network at
-   *   this time.
-   * - NETWORK_LOADING (numeric value 2)
-   *   The user agent is actively trying to download data.
-   * - NETWORK_NO_SOURCE (numeric value 3)
-   *   The element's resource selection algorithm is active, but it has
-   *   not yet found a resource to use.
-   *
-   * @see https://html.spec.whatwg.org/multipage/embedded-content.html#network-states
-   * @return {number} the current network activity state
-   * @method Player#networkState
-   */
-  'networkState',
-  /**
-   * Returns a value that expresses the current state of the element
-   * with respect to rendering the current playback position, from the
-   * codes in the list below.
-   * - HAVE_NOTHING (numeric value 0)
-   *   No information regarding the media resource is available.
-   * - HAVE_METADATA (numeric value 1)
-   *   Enough of the resource has been obtained that the duration of the
-   *   resource is available.
-   * - HAVE_CURRENT_DATA (numeric value 2)
-   *   Data for the immediate current playback position is available.
-   * - HAVE_FUTURE_DATA (numeric value 3)
-   *   Data for the immediate current playback position is available, as
-   *   well as enough data for the user agent to advance the current
-   *   playback position in the direction of playback.
-   * - HAVE_ENOUGH_DATA (numeric value 4)
-   *   The user agent estimates that enough data is available for
-   *   playback to proceed uninterrupted.
-   *
-   * @see https://html.spec.whatwg.org/multipage/embedded-content.html#dom-media-readystate
-   * @return {number} the current playback rendering state
-   * @method Player#readyState
-   */
-  'readyState'].forEach(function (fn) {
-    Player.prototype[fn] = function () {
-      return this.techGet_(fn);
-    };
-  });
   TECH_EVENTS_RETRIGGER.forEach(function (event) {
     Player.prototype[`handleTech${toTitleCase$1(event)}_`] = function () {
       return this.trigger(event);
@@ -25174,34 +29152,6 @@
    *
    * @event Player#volumechange
    * @type {Event}
-   */
-
-  /**
-   * Reports whether or not a player has a plugin available.
-   *
-   * This does not report whether or not the plugin has ever been initialized
-   * on this player. For that, [usingPlugin]{@link Player#usingPlugin}.
-   *
-   * @method Player#hasPlugin
-   * @param  {string}  name
-   *         The name of a plugin.
-   *
-   * @return {boolean}
-   *         Whether or not this player has the requested plugin available.
-   */
-
-  /**
-   * Reports whether or not a player is using a plugin by name.
-   *
-   * For basic plugins, this only reports whether the plugin has _ever_ been
-   * initialized on this player.
-   *
-   * @method Player#usingPlugin
-   * @param  {string} name
-   *         The name of a plugin.
-   *
-   * @return {boolean}
-   *         Whether or not this player is using the requested plugin.
    */
 
   Component$1.registerComponent('Player', Player);
@@ -25284,7 +29234,7 @@
    * @param  {Player} player
    *         A Video.js player instance.
    *
-   * @param  {Plugin~PluginEventHash} hash
+   * @param  {PluginEventHash} hash
    *         A plugin event hash.
    *
    * @param  {boolean} [before]
@@ -25437,7 +29387,7 @@
      * @param   {Object} [hash={}]
      *          An object to be used as event an event hash.
      *
-     * @return {Plugin~PluginEventHash}
+     * @return {PluginEventHash}
      *          An event hash object with provided properties mixed-in.
      */
     getEventHash(hash = {}) {
@@ -25456,7 +29406,7 @@
      *
      * @param   {Object} [hash={}]
      *          Additional data hash to merge with a
-     *          {@link Plugin~PluginEventHash|PluginEventHash}.
+     *          {@link PluginEventHash|PluginEventHash}.
      *
      * @return {boolean}
      *          Whether or not default was prevented.
@@ -25672,7 +29622,7 @@
    * Signals that a plugin is about to be set up on a player.
    *
    * @event    Player#beforepluginsetup
-   * @type     {Plugin~PluginEventHash}
+   * @type     {PluginEventHash}
    */
 
   /**
@@ -25680,14 +29630,14 @@
    * is the name of the plugin.
    *
    * @event    Player#beforepluginsetup:$name
-   * @type     {Plugin~PluginEventHash}
+   * @type     {PluginEventHash}
    */
 
   /**
    * Signals that a plugin has just been set up on a player.
    *
    * @event    Player#pluginsetup
-   * @type     {Plugin~PluginEventHash}
+   * @type     {PluginEventHash}
    */
 
   /**
@@ -25695,11 +29645,11 @@
    * is the name of the plugin.
    *
    * @event    Player#pluginsetup:$name
-   * @type     {Plugin~PluginEventHash}
+   * @type     {PluginEventHash}
    */
 
   /**
-   * @typedef  {Object} Plugin~PluginEventHash
+   * @typedef  {Object} PluginEventHash
    *
    * @property {string} instance
    *           For basic plugins, the return value of the plugin function. For
@@ -25758,10 +29708,29 @@
     return deprecate(`${oldName} is deprecated and will be removed in ${major}.0; please use ${newName} instead.`, fn);
   }
 
+  var VjsErrors = {
+    NetworkBadStatus: 'networkbadstatus',
+    NetworkRequestFailed: 'networkrequestfailed',
+    NetworkRequestAborted: 'networkrequestaborted',
+    NetworkRequestTimeout: 'networkrequesttimeout',
+    NetworkBodyParserFailed: 'networkbodyparserfailed',
+    StreamingHlsPlaylistParserError: 'streaminghlsplaylistparsererror',
+    StreamingDashManifestParserError: 'streamingdashmanifestparsererror',
+    StreamingContentSteeringParserError: 'streamingcontentsteeringparsererror',
+    StreamingVttParserError: 'streamingvttparsererror',
+    StreamingFailedToSelectNextSegment: 'streamingfailedtoselectnextsegment',
+    StreamingFailedToDecryptSegment: 'streamingfailedtodecryptsegment',
+    StreamingFailedToTransmuxSegment: 'streamingfailedtotransmuxsegment',
+    StreamingFailedToAppendSegment: 'streamingfailedtoappendsegment',
+    StreamingCodecsChangeError: 'streamingcodecschangeerror'
+  };
+
   /**
    * @file video.js
    * @module videojs
    */
+
+  /** @import { PlayerReadyCallback } from './player' */
 
   /**
    * Normalize an `id` value by trimming off a leading `#`
@@ -25774,13 +29743,6 @@
    *          The string, without any leading `#`.
    */
   const normalizeId = id => id.indexOf('#') === 0 ? id.slice(1) : id;
-
-  /**
-   * A callback that is called when a component is ready. Does not have any
-   * parameters and any callback value will be ignored. See: {@link Component~ReadyCallback}
-   *
-   * @callback ReadyCallback
-   */
 
   /**
    * The `videojs()` function doubles as the main function for users to create a
@@ -25843,7 +29805,7 @@
    *         Options object for providing settings.
    *         See: [Options Guide](https://docs.videojs.com/tutorial-options.html).
    *
-   * @param  {ReadyCallback} [ready]
+   * @param  {PlayerReadyCallback} [ready]
    *         A function to be called when the {@link Player} and {@link Tech} are
    *         ready.
    *
@@ -25872,7 +29834,11 @@
     // This will make sure that the element is indeed in the dom of that document.
     // Additionally, check that the document in question has a default view.
     // If the document is no longer attached to the dom, the defaultView of the document will be null.
-    if (!el.ownerDocument.defaultView || !el.ownerDocument.body.contains(el)) {
+    // If element is inside Shadow DOM (e.g. is part of a Custom element), ownerDocument.body
+    // always returns false. Instead, use the Shadow DOM root.
+    const inShadowDom = 'getRootNode' in el ? el.getRootNode() instanceof window.ShadowRoot : false;
+    const rootNode = inShadowDom ? el.getRootNode() : el.ownerDocument.body;
+    if (!el.ownerDocument.defaultView || !rootNode.contains(el)) {
       log$1.warn('The element supplied is not included in the DOM');
     }
     options = options || {};
@@ -25880,7 +29846,7 @@
     // Store a copy of the el before modification, if it is to be restored in destroy()
     // If div ingest, store the parent div
     if (options.restoreEl === true) {
-      options.restoreEl = (el.parentNode && el.parentNode.hasAttribute('data-vjs-player') ? el.parentNode : el).cloneNode(true);
+      options.restoreEl = (el.parentNode && el.parentNode.hasAttribute && el.parentNode.hasAttribute('data-vjs-player') ? el.parentNode : el).cloneNode(true);
     }
     hooks('beforesetup').forEach(hookFunction => {
       const opts = hookFunction(el, merge$2(options));
@@ -26022,17 +29988,17 @@
    * @param {string} name
    *        The class name of the component
    *
-   * @param {Component} comp
+   * @param {typeof Component} comp
    *        The component class
    *
-   * @return {Component}
+   * @return {typeof Component}
    *         The newly registered component
    */
   videojs.registerComponent = (name, comp) => {
     if (Tech.isTech(comp)) {
       log$1.warn(`The ${name} tech was registered as a component. It should instead be registered using videojs.registerTech(name, tech)`);
     }
-    Component$1.registerComponent.call(Component$1, name, comp);
+    return Component$1.registerComponent.call(Component$1, name, comp);
   };
   videojs.getTech = Tech.getTech;
   videojs.registerTech = Tech.registerTech;
@@ -26108,9 +30074,11 @@
    *
    * @param {string} name
    *        The plugin name
-   *
-   * @param {Plugin|Function} plugin
+  *
+   * @param {typeof Plugin|Function} plugin
    *         The plugin sub-class or function
+   *
+   * @return {typeof Plugin|Function}
    */
   videojs.plugin = (name, plugin) => {
     log$1.warn('videojs.plugin() is deprecated; use videojs.registerPlugin() instead');
@@ -26240,9 +30208,13 @@
    * @see      https://github.com/Raynos/xhr
    */
   videojs.xhr = lib;
+  videojs.TrackList = TrackList;
   videojs.TextTrack = TextTrack;
+  videojs.TextTrackList = TextTrackList;
   videojs.AudioTrack = AudioTrack;
+  videojs.AudioTrackList = AudioTrackList;
   videojs.VideoTrack = VideoTrack;
+  videojs.VideoTrackList = VideoTrackList;
   ['isEl', 'isTextNode', 'createEl', 'hasClass', 'addClass', 'removeClass', 'toggleClass', 'setAttributes', 'getAttributes', 'emptyEl', 'appendContent', 'insertContent'].forEach(k => {
     videojs[k] = function () {
       log$1.warn(`videojs.${k}() is deprecated; use videojs.dom.${k}() instead`);
@@ -26291,8 +30263,11 @@
    */
   videojs.url = Url;
 
+  // The list of possible error types to occur in video.js
+  videojs.Error = VjsErrors;
+
   createCommonjsModule(function (module, exports) {
-    /*! @name videojs-contrib-quality-levels @version 3.0.0 @license Apache-2.0 */
+    /*! @name videojs-contrib-quality-levels @version 4.1.0 @license Apache-2.0 */
     (function (global, factory) {
       module.exports = factory(videojs) ;
     })(commonjsGlobal, function (videojs) {
@@ -26382,40 +30357,44 @@
        * @extends videojs.EventTarget
        * @class QualityLevelList
        */
-
-      class QualityLevelList extends videojs__default['default'].EventTarget {
+      class QualityLevelList extends videojs__default["default"].EventTarget {
+        /**
+         * Creates a QualityLevelList.
+         */
         constructor() {
           super();
           let list = this; // eslint-disable-line
 
           list.levels_ = [];
           list.selectedIndex_ = -1;
+
           /**
            * Get the index of the currently selected QualityLevel.
            *
            * @returns {number} The index of the selected QualityLevel. -1 if none selected.
            * @readonly
            */
-
           Object.defineProperty(list, 'selectedIndex', {
             get() {
               return list.selectedIndex_;
             }
           });
+
           /**
            * Get the length of the list of QualityLevels.
            *
            * @returns {number} The length of the list.
            * @readonly
            */
-
           Object.defineProperty(list, 'length', {
             get() {
               return list.levels_.length;
             }
           });
+          list[Symbol.iterator] = () => list.levels_.values();
           return list;
         }
+
         /**
          * Adds a quality level to the list.
          *
@@ -26429,10 +30408,10 @@
          * @return {QualityLevel} the QualityLevel added to the list
          * @method addQualityLevel
          */
-
         addQualityLevel(representation) {
-          let qualityLevel = this.getQualityLevelById(representation.id); // Do not add duplicate quality levels
+          let qualityLevel = this.getQualityLevelById(representation.id);
 
+          // Do not add duplicate quality levels
           if (qualityLevel) {
             return qualityLevel;
           }
@@ -26452,14 +30431,14 @@
           });
           return qualityLevel;
         }
+
         /**
          * Removes a quality level from the list.
          *
-         * @param {QualityLevel} remove QualityLevel to remove to the list.
+         * @param {QualityLevel} qualityLevel The QualityLevel to remove from the list.
          * @return {QualityLevel|null} the QualityLevel removed or null if nothing removed
          * @method removeQualityLevel
          */
-
         removeQualityLevel(qualityLevel) {
           let removed = null;
           for (let i = 0, l = this.length; i < l; i++) {
@@ -26481,6 +30460,7 @@
           }
           return removed;
         }
+
         /**
          * Searches for a QualityLevel with the given id.
          *
@@ -26488,7 +30468,6 @@
          * @return {QualityLevel|null} The QualityLevel with id, or null if not found.
          * @method getQualityLevelById
          */
-
         getQualityLevelById(id) {
           for (let i = 0, l = this.length; i < l; i++) {
             const level = this[i];
@@ -26498,43 +30477,43 @@
           }
           return null;
         }
+
         /**
          * Resets the list of QualityLevels to empty
          *
          * @method dispose
          */
-
         dispose() {
           this.selectedIndex_ = -1;
           this.levels_.length = 0;
         }
       }
+
       /**
        * change - The selected QualityLevel has changed.
        * addqualitylevel - A QualityLevel has been added to the QualityLevelList.
        * removequalitylevel - A QualityLevel has been removed from the QualityLevelList.
        */
-
       QualityLevelList.prototype.allowedEvents_ = {
         change: 'change',
         addqualitylevel: 'addqualitylevel',
         removequalitylevel: 'removequalitylevel'
-      }; // emulate attribute EventHandler support to allow for feature detection
+      };
 
+      // emulate attribute EventHandler support to allow for feature detection
       for (const event in QualityLevelList.prototype.allowedEvents_) {
         QualityLevelList.prototype['on' + event] = null;
       }
-      var version = "3.0.0";
-      const registerPlugin = videojs__default['default'].registerPlugin || videojs__default['default'].plugin;
+      var version = "4.1.0";
+
       /**
        * Initialization function for the qualityLevels plugin. Sets up the QualityLevelList and
        * event handlers.
        *
        * @param {Player} player Player object.
        * @param {Object} options Plugin options object.
-       * @function initPlugin
+       * @return {QualityLevelList} a list of QualityLevels
        */
-
       const initPlugin = function (player, options) {
         const originalPluginFn = player.qualityLevels;
         const qualityLevelList = new QualityLevelList();
@@ -26548,6 +30527,7 @@
         player.qualityLevels.VERSION = version;
         return qualityLevelList;
       };
+
       /**
        * A video.js plugin.
        *
@@ -26557,174 +30537,23 @@
        * to you; if not, remove the wait for "ready"!
        *
        * @param {Object} options Plugin options object
-       * @function qualityLevels
+       * @return {QualityLevelList} a list of QualityLevels
        */
-
       const qualityLevels = function (options) {
-        return initPlugin(this, videojs__default['default'].mergeOptions({}, options));
-      }; // Register the plugin with video.js.
+        return initPlugin(this, videojs__default["default"].obj.merge({}, options));
+      };
 
-      registerPlugin('qualityLevels', qualityLevels); // Include the version number.
+      // Register the plugin with video.js.
+      videojs__default["default"].registerPlugin('qualityLevels', qualityLevels);
 
+      // Include the version number.
       qualityLevels.VERSION = version;
       return qualityLevels;
     });
   });
 
-  var urlToolkit = createCommonjsModule(function (module, exports) {
-    // see https://tools.ietf.org/html/rfc1808
-
-    (function (root) {
-      var URL_REGEX = /^(?=((?:[a-zA-Z0-9+\-.]+:)?))\1(?=((?:\/\/[^\/?#]*)?))\2(?=((?:(?:[^?#\/]*\/)*[^;?#\/]*)?))\3((?:;[^?#]*)?)(\?[^#]*)?(#[^]*)?$/;
-      var FIRST_SEGMENT_REGEX = /^(?=([^\/?#]*))\1([^]*)$/;
-      var SLASH_DOT_REGEX = /(?:\/|^)\.(?=\/)/g;
-      var SLASH_DOT_DOT_REGEX = /(?:\/|^)\.\.\/(?!\.\.\/)[^\/]*(?=\/)/g;
-      var URLToolkit = {
-        // If opts.alwaysNormalize is true then the path will always be normalized even when it starts with / or //
-        // E.g
-        // With opts.alwaysNormalize = false (default, spec compliant)
-        // http://a.com/b/cd + /e/f/../g => http://a.com/e/f/../g
-        // With opts.alwaysNormalize = true (not spec compliant)
-        // http://a.com/b/cd + /e/f/../g => http://a.com/e/g
-        buildAbsoluteURL: function (baseURL, relativeURL, opts) {
-          opts = opts || {};
-          // remove any remaining space and CRLF
-          baseURL = baseURL.trim();
-          relativeURL = relativeURL.trim();
-          if (!relativeURL) {
-            // 2a) If the embedded URL is entirely empty, it inherits the
-            // entire base URL (i.e., is set equal to the base URL)
-            // and we are done.
-            if (!opts.alwaysNormalize) {
-              return baseURL;
-            }
-            var basePartsForNormalise = URLToolkit.parseURL(baseURL);
-            if (!basePartsForNormalise) {
-              throw new Error('Error trying to parse base URL.');
-            }
-            basePartsForNormalise.path = URLToolkit.normalizePath(basePartsForNormalise.path);
-            return URLToolkit.buildURLFromParts(basePartsForNormalise);
-          }
-          var relativeParts = URLToolkit.parseURL(relativeURL);
-          if (!relativeParts) {
-            throw new Error('Error trying to parse relative URL.');
-          }
-          if (relativeParts.scheme) {
-            // 2b) If the embedded URL starts with a scheme name, it is
-            // interpreted as an absolute URL and we are done.
-            if (!opts.alwaysNormalize) {
-              return relativeURL;
-            }
-            relativeParts.path = URLToolkit.normalizePath(relativeParts.path);
-            return URLToolkit.buildURLFromParts(relativeParts);
-          }
-          var baseParts = URLToolkit.parseURL(baseURL);
-          if (!baseParts) {
-            throw new Error('Error trying to parse base URL.');
-          }
-          if (!baseParts.netLoc && baseParts.path && baseParts.path[0] !== '/') {
-            // If netLoc missing and path doesn't start with '/', assume everthing before the first '/' is the netLoc
-            // This causes 'example.com/a' to be handled as '//example.com/a' instead of '/example.com/a'
-            var pathParts = FIRST_SEGMENT_REGEX.exec(baseParts.path);
-            baseParts.netLoc = pathParts[1];
-            baseParts.path = pathParts[2];
-          }
-          if (baseParts.netLoc && !baseParts.path) {
-            baseParts.path = '/';
-          }
-          var builtParts = {
-            // 2c) Otherwise, the embedded URL inherits the scheme of
-            // the base URL.
-            scheme: baseParts.scheme,
-            netLoc: relativeParts.netLoc,
-            path: null,
-            params: relativeParts.params,
-            query: relativeParts.query,
-            fragment: relativeParts.fragment
-          };
-          if (!relativeParts.netLoc) {
-            // 3) If the embedded URL's <net_loc> is non-empty, we skip to
-            // Step 7.  Otherwise, the embedded URL inherits the <net_loc>
-            // (if any) of the base URL.
-            builtParts.netLoc = baseParts.netLoc;
-            // 4) If the embedded URL path is preceded by a slash "/", the
-            // path is not relative and we skip to Step 7.
-            if (relativeParts.path[0] !== '/') {
-              if (!relativeParts.path) {
-                // 5) If the embedded URL path is empty (and not preceded by a
-                // slash), then the embedded URL inherits the base URL path
-                builtParts.path = baseParts.path;
-                // 5a) if the embedded URL's <params> is non-empty, we skip to
-                // step 7; otherwise, it inherits the <params> of the base
-                // URL (if any) and
-                if (!relativeParts.params) {
-                  builtParts.params = baseParts.params;
-                  // 5b) if the embedded URL's <query> is non-empty, we skip to
-                  // step 7; otherwise, it inherits the <query> of the base
-                  // URL (if any) and we skip to step 7.
-                  if (!relativeParts.query) {
-                    builtParts.query = baseParts.query;
-                  }
-                }
-              } else {
-                // 6) The last segment of the base URL's path (anything
-                // following the rightmost slash "/", or the entire path if no
-                // slash is present) is removed and the embedded URL's path is
-                // appended in its place.
-                var baseURLPath = baseParts.path;
-                var newPath = baseURLPath.substring(0, baseURLPath.lastIndexOf('/') + 1) + relativeParts.path;
-                builtParts.path = URLToolkit.normalizePath(newPath);
-              }
-            }
-          }
-          if (builtParts.path === null) {
-            builtParts.path = opts.alwaysNormalize ? URLToolkit.normalizePath(relativeParts.path) : relativeParts.path;
-          }
-          return URLToolkit.buildURLFromParts(builtParts);
-        },
-        parseURL: function (url) {
-          var parts = URL_REGEX.exec(url);
-          if (!parts) {
-            return null;
-          }
-          return {
-            scheme: parts[1] || '',
-            netLoc: parts[2] || '',
-            path: parts[3] || '',
-            params: parts[4] || '',
-            query: parts[5] || '',
-            fragment: parts[6] || ''
-          };
-        },
-        normalizePath: function (path) {
-          // The following operations are
-          // then applied, in order, to the new path:
-          // 6a) All occurrences of "./", where "." is a complete path
-          // segment, are removed.
-          // 6b) If the path ends with "." as a complete path segment,
-          // that "." is removed.
-          path = path.split('').reverse().join('').replace(SLASH_DOT_REGEX, '');
-          // 6c) All occurrences of "<segment>/../", where <segment> is a
-          // complete path segment not equal to "..", are removed.
-          // Removal of these path segments is performed iteratively,
-          // removing the leftmost matching pattern on each iteration,
-          // until no matching pattern remains.
-          // 6d) If the path ends with "<segment>/..", where <segment> is a
-          // complete path segment not equal to "..", that
-          // "<segment>/.." is removed.
-          while (path.length !== (path = path.replace(SLASH_DOT_DOT_REGEX, '')).length) {}
-          return path.split('').reverse().join('');
-        },
-        buildURLFromParts: function (parts) {
-          return parts.scheme + parts.netLoc + parts.path + parts.params + parts.query + parts.fragment;
-        }
-      };
-      module.exports = URLToolkit;
-    })();
-  });
-
-  var DEFAULT_LOCATION$1 = 'http://example.com';
-  var resolveUrl$2 = function resolveUrl(baseUrl, relativeUrl) {
+  var DEFAULT_LOCATION = 'https://example.com';
+  var resolveUrl$1 = function resolveUrl(baseUrl, relativeUrl) {
     // return early if we don't need to resolve
     if (/^[a-z]+:/i.test(relativeUrl)) {
       return relativeUrl;
@@ -26732,33 +30561,23 @@
 
     if (/^data:/.test(baseUrl)) {
       baseUrl = window.location && window.location.href || '';
-    } // IE11 supports URL but not the URL constructor
-    // feature detect the behavior we want
-
-    var nativeURL = typeof window.URL === 'function';
+    }
     var protocolLess = /^\/\//.test(baseUrl); // remove location if window.location isn't available (i.e. we're in node)
     // and if baseUrl isn't an absolute url
 
     var removeLocation = !window.location && !/\/\//i.test(baseUrl); // if the base URL is relative then combine with the current location
 
-    if (nativeURL) {
-      baseUrl = new window.URL(baseUrl, window.location || DEFAULT_LOCATION$1);
-    } else if (!/\/\//i.test(baseUrl)) {
-      baseUrl = urlToolkit.buildAbsoluteURL(window.location && window.location.href || '', baseUrl);
-    }
-    if (nativeURL) {
-      var newUrl = new URL(relativeUrl, baseUrl); // if we're a protocol-less url, remove the protocol
-      // and if we're location-less, remove the location
-      // otherwise, return the url unmodified
+    baseUrl = new window.URL(baseUrl, window.location || DEFAULT_LOCATION);
+    var newUrl = new URL(relativeUrl, baseUrl); // if we're a protocol-less url, remove the protocol
+    // and if we're location-less, remove the location
+    // otherwise, return the url unmodified
 
-      if (removeLocation) {
-        return newUrl.href.slice(DEFAULT_LOCATION$1.length);
-      } else if (protocolLess) {
-        return newUrl.href.slice(newUrl.protocol.length);
-      }
-      return newUrl.href;
+    if (removeLocation) {
+      return newUrl.href.slice(DEFAULT_LOCATION.length);
+    } else if (protocolLess) {
+      return newUrl.href.slice(newUrl.protocol.length);
     }
-    return urlToolkit.buildAbsoluteURL(baseUrl, relativeUrl);
+    return newUrl.href;
   };
 
   /**
@@ -26797,7 +30616,6 @@
      * type of event through `on`
      * @return {boolean} if we could turn it off or not
      */;
-
     _proto.off = function off(type, listener) {
       if (!this.listeners[type]) {
         return false;
@@ -26821,7 +30639,6 @@
      *
      * @param {string} type the event name
      */;
-
     _proto.trigger = function trigger(type) {
       var callbacks = this.listeners[type];
       if (!callbacks) {
@@ -26847,7 +30664,6 @@
     /**
      * Destroys the stream and cleans up.
      */;
-
     _proto.dispose = function dispose() {
       this.listeners = {};
     }
@@ -26859,7 +30675,6 @@
      * @param {Stream} destination the stream that will receive all `data` events
      * @see http://nodejs.org/api/stream.html#stream_readable_pipe_destination_options
      */;
-
     _proto.pipe = function pipe(destination) {
       this.on('data', function (data) {
         destination.push(data);
@@ -26868,11 +30683,11 @@
     return Stream;
   }();
 
-  var atob$1 = function atob(s) {
+  var atob = function atob(s) {
     return window.atob ? window.atob(s) : Buffer.from(s, 'base64').toString('binary');
   };
-  function decodeB64ToUint8Array$1(b64Text) {
-    var decodedString = atob$1(b64Text);
+  function decodeB64ToUint8Array(b64Text) {
+    var decodedString = atob(b64Text);
     var array = new Uint8Array(decodedString.length);
     for (var i = 0; i < decodedString.length; i++) {
       array[i] = decodedString.charCodeAt(i);
@@ -26880,7 +30695,7 @@
     return array;
   }
 
-  /*! @name m3u8-parser @version 6.0.0 @license Apache-2.0 */
+  /*! @name m3u8-parser @version 7.2.0 @license Apache-2.0 */
 
   /**
    * @file m3u8/line-stream.js
@@ -26969,6 +30784,26 @@
       attr[1] = attr[1].replace(/^\s+|\s+$/g, '');
       attr[1] = attr[1].replace(/^['"](.*)['"]$/g, '$1');
       result[attr[0]] = attr[1];
+    }
+    return result;
+  };
+  /**
+   * Converts a string into a resolution object
+   *
+   * @param {string} resolution a string such as 3840x2160
+   *
+   * @return {Object} An object representing the resolution
+   *
+   */
+
+  const parseResolution = resolution => {
+    const split = resolution.split('x');
+    const result = {};
+    if (split[0]) {
+      result.width = parseInt(split[0], 10);
+    }
+    if (split[1]) {
+      result.height = parseInt(split[1], 10);
     }
     return result;
   };
@@ -27184,15 +31019,7 @@
           if (match[1]) {
             event.attributes = parseAttributes$1(match[1]);
             if (event.attributes.RESOLUTION) {
-              const split = event.attributes.RESOLUTION.split('x');
-              const resolution = {};
-              if (split[0]) {
-                resolution.width = parseInt(split[0], 10);
-              }
-              if (split[1]) {
-                resolution.height = parseInt(split[1], 10);
-              }
-              event.attributes.RESOLUTION = resolution;
+              event.attributes.RESOLUTION = parseResolution(event.attributes.RESOLUTION);
             }
             if (event.attributes.BANDWIDTH) {
               event.attributes.BANDWIDTH = parseInt(event.attributes.BANDWIDTH, 10);
@@ -27314,7 +31141,7 @@
           this.trigger('data', event);
           return;
         }
-        match = /^#EXT-X-CUE-IN:(.*)?$/.exec(newLine);
+        match = /^#EXT-X-CUE-IN:?(.*)?$/.exec(newLine);
         if (match) {
           event = {
             type: 'tag',
@@ -27434,6 +31261,111 @@
               event.attributes[key] = parseInt(event.attributes[key], 10);
             }
           });
+          this.trigger('data', event);
+          return;
+        }
+        match = /^#EXT-X-DATERANGE:(.*)$/.exec(newLine);
+        if (match && match[1]) {
+          event = {
+            type: 'tag',
+            tagType: 'daterange'
+          };
+          event.attributes = parseAttributes$1(match[1]);
+          ['ID', 'CLASS'].forEach(function (key) {
+            if (event.attributes.hasOwnProperty(key)) {
+              event.attributes[key] = String(event.attributes[key]);
+            }
+          });
+          ['START-DATE', 'END-DATE'].forEach(function (key) {
+            if (event.attributes.hasOwnProperty(key)) {
+              event.attributes[key] = new Date(event.attributes[key]);
+            }
+          });
+          ['DURATION', 'PLANNED-DURATION'].forEach(function (key) {
+            if (event.attributes.hasOwnProperty(key)) {
+              event.attributes[key] = parseFloat(event.attributes[key]);
+            }
+          });
+          ['END-ON-NEXT'].forEach(function (key) {
+            if (event.attributes.hasOwnProperty(key)) {
+              event.attributes[key] = /YES/i.test(event.attributes[key]);
+            }
+          });
+          ['SCTE35-CMD', ' SCTE35-OUT', 'SCTE35-IN'].forEach(function (key) {
+            if (event.attributes.hasOwnProperty(key)) {
+              event.attributes[key] = event.attributes[key].toString(16);
+            }
+          });
+          const clientAttributePattern = /^X-([A-Z]+-)+[A-Z]+$/;
+          for (const key in event.attributes) {
+            if (!clientAttributePattern.test(key)) {
+              continue;
+            }
+            const isHexaDecimal = /[0-9A-Fa-f]{6}/g.test(event.attributes[key]);
+            const isDecimalFloating = /^\d+(\.\d+)?$/.test(event.attributes[key]);
+            event.attributes[key] = isHexaDecimal ? event.attributes[key].toString(16) : isDecimalFloating ? parseFloat(event.attributes[key]) : String(event.attributes[key]);
+          }
+          this.trigger('data', event);
+          return;
+        }
+        match = /^#EXT-X-INDEPENDENT-SEGMENTS/.exec(newLine);
+        if (match) {
+          this.trigger('data', {
+            type: 'tag',
+            tagType: 'independent-segments'
+          });
+          return;
+        }
+        match = /^#EXT-X-I-FRAMES-ONLY/.exec(newLine);
+        if (match) {
+          this.trigger('data', {
+            type: 'tag',
+            tagType: 'i-frames-only'
+          });
+          return;
+        }
+        match = /^#EXT-X-CONTENT-STEERING:(.*)$/.exec(newLine);
+        if (match) {
+          event = {
+            type: 'tag',
+            tagType: 'content-steering'
+          };
+          event.attributes = parseAttributes$1(match[1]);
+          this.trigger('data', event);
+          return;
+        }
+        match = /^#EXT-X-I-FRAME-STREAM-INF:(.*)$/.exec(newLine);
+        if (match) {
+          event = {
+            type: 'tag',
+            tagType: 'i-frame-playlist'
+          };
+          event.attributes = parseAttributes$1(match[1]);
+          if (event.attributes.URI) {
+            event.uri = event.attributes.URI;
+          }
+          if (event.attributes.BANDWIDTH) {
+            event.attributes.BANDWIDTH = parseInt(event.attributes.BANDWIDTH, 10);
+          }
+          if (event.attributes.RESOLUTION) {
+            event.attributes.RESOLUTION = parseResolution(event.attributes.RESOLUTION);
+          }
+          if (event.attributes['AVERAGE-BANDWIDTH']) {
+            event.attributes['AVERAGE-BANDWIDTH'] = parseInt(event.attributes['AVERAGE-BANDWIDTH'], 10);
+          }
+          if (event.attributes['FRAME-RATE']) {
+            event.attributes['FRAME-RATE'] = parseFloat(event.attributes['FRAME-RATE']);
+          }
+          this.trigger('data', event);
+          return;
+        }
+        match = /^#EXT-X-DEFINE:(.*)$/.exec(newLine);
+        if (match) {
+          event = {
+            type: 'tag',
+            tagType: 'define'
+          };
+          event.attributes = parseAttributes$1(match[1]);
           this.trigger('data', event);
           return;
         } // unknown tag type
@@ -27569,15 +31501,21 @@
    * requires some property of the manifest object to be defaulted.
    *
    * @class Parser
+   * @param {Object} [opts] Options for the constructor, needed for substitutions
+   * @param {string} [opts.uri] URL to check for query params
+   * @param {Object} [opts.mainDefinitions] Definitions on main playlist that can be imported
    * @extends Stream
    */
 
   class Parser extends Stream {
-    constructor() {
+    constructor(opts = {}) {
       super();
       this.lineStream = new LineStream();
       this.parseStream = new ParseStream();
       this.lineStream.pipe(this.parseStream);
+      this.mainDefinitions = opts.mainDefinitions || {};
+      this.params = new URL(opts.uri, 'https://a.com').searchParams;
+      this.lastProgramDateTime = null;
       /* eslint-disable consistent-this */
 
       const self = this;
@@ -27606,6 +31544,8 @@
       this.manifest = {
         allowCache: true,
         discontinuityStarts: [],
+        dateRanges: [],
+        iFramePlaylists: [],
         segments: []
       }; // keep track of the last seen segment's byte range end, as segments are not required
       // to provide the offset, in which case it defaults to the next byte after the
@@ -27614,6 +31554,7 @@
       let lastByterangeEnd = 0; // keep track of the last seen part's byte range end.
 
       let lastPartByterangeEnd = 0;
+      const dateRangeTags = {};
       this.on('end', () => {
         // only add preloadSegment if we don't yet have a uri for it.
         // and we actually have parts/preloadHints
@@ -27634,7 +31575,22 @@
 
       this.parseStream.on('data', function (entry) {
         let mediaGroup;
-        let rendition;
+        let rendition; // Replace variables in uris and attributes as defined in #EXT-X-DEFINE tags
+
+        if (self.manifest.definitions) {
+          for (const def in self.manifest.definitions) {
+            if (entry.uri) {
+              entry.uri = entry.uri.replace(`{$${def}}`, self.manifest.definitions[def]);
+            }
+            if (entry.attributes) {
+              for (const attr in entry.attributes) {
+                if (typeof entry.attributes[attr] === 'string') {
+                  entry.attributes[attr] = entry.attributes[attr].replace(`{$${def}}`, self.manifest.definitions[def]);
+                }
+              }
+            }
+          }
+        }
         ({
           tag() {
             // switch based on the tag type
@@ -27693,6 +31649,9 @@
                   this.trigger('info', {
                     message: 'defaulting discontinuity sequence to zero'
                   });
+                }
+                if (entry.title) {
+                  currentUri.title = entry.title;
                 }
                 if (entry.duration > 0) {
                   currentUri.duration = entry.duration;
@@ -27776,7 +31735,7 @@
                       keyId: entry.attributes.KEYID.substring(2)
                     },
                     // decode the base64-encoded PSSH box
-                    pssh: decodeB64ToUint8Array$1(entry.attributes.URI.split(',')[1])
+                    pssh: decodeB64ToUint8Array(entry.attributes.URI.split(',')[1])
                   };
                   return;
                 }
@@ -27903,6 +31862,21 @@
                 }
                 currentUri.dateTimeString = entry.dateTimeString;
                 currentUri.dateTimeObject = entry.dateTimeObject;
+                const {
+                  lastProgramDateTime
+                } = this;
+                this.lastProgramDateTime = new Date(entry.dateTimeString).getTime(); // We should extrapolate Program Date Time backward only during first program date time occurrence.
+                // Once we have at least one program date time point, we can always extrapolate it forward using lastProgramDateTime reference.
+
+                if (lastProgramDateTime === null) {
+                  // Extrapolate Program Date Time backward
+                  // Since it is first program date time occurrence we're assuming that
+                  // all this.manifest.segments have no program date time info
+                  this.manifest.segments.reduceRight((programDateTime, segment) => {
+                    segment.programDateTime = programDateTime - segment.duration * 1000;
+                    return segment.programDateTime;
+                  }, this.lastProgramDateTime);
+                }
               },
               targetduration() {
                 if (!isFinite(entry.duration) || entry.duration < 0) {
@@ -28032,6 +32006,165 @@
                   this.manifest.partTargetDuration = this.manifest.partInf.partTarget;
                 }
                 setHoldBack.call(this, this.manifest);
+              },
+              'daterange'() {
+                this.manifest.dateRanges.push(camelCaseKeys(entry.attributes));
+                const index = this.manifest.dateRanges.length - 1;
+                this.warnOnMissingAttributes_(`#EXT-X-DATERANGE #${index}`, entry.attributes, ['ID', 'START-DATE']);
+                const dateRange = this.manifest.dateRanges[index];
+                if (dateRange.endDate && dateRange.startDate && new Date(dateRange.endDate) < new Date(dateRange.startDate)) {
+                  this.trigger('warn', {
+                    message: 'EXT-X-DATERANGE END-DATE must be equal to or later than the value of the START-DATE'
+                  });
+                }
+                if (dateRange.duration && dateRange.duration < 0) {
+                  this.trigger('warn', {
+                    message: 'EXT-X-DATERANGE DURATION must not be negative'
+                  });
+                }
+                if (dateRange.plannedDuration && dateRange.plannedDuration < 0) {
+                  this.trigger('warn', {
+                    message: 'EXT-X-DATERANGE PLANNED-DURATION must not be negative'
+                  });
+                }
+                const endOnNextYes = !!dateRange.endOnNext;
+                if (endOnNextYes && !dateRange.class) {
+                  this.trigger('warn', {
+                    message: 'EXT-X-DATERANGE with an END-ON-NEXT=YES attribute must have a CLASS attribute'
+                  });
+                }
+                if (endOnNextYes && (dateRange.duration || dateRange.endDate)) {
+                  this.trigger('warn', {
+                    message: 'EXT-X-DATERANGE with an END-ON-NEXT=YES attribute must not contain DURATION or END-DATE attributes'
+                  });
+                }
+                if (dateRange.duration && dateRange.endDate) {
+                  const startDate = dateRange.startDate;
+                  const newDateInSeconds = startDate.getTime() + dateRange.duration * 1000;
+                  this.manifest.dateRanges[index].endDate = new Date(newDateInSeconds);
+                }
+                if (!dateRangeTags[dateRange.id]) {
+                  dateRangeTags[dateRange.id] = dateRange;
+                } else {
+                  for (const attribute in dateRangeTags[dateRange.id]) {
+                    if (!!dateRange[attribute] && JSON.stringify(dateRangeTags[dateRange.id][attribute]) !== JSON.stringify(dateRange[attribute])) {
+                      this.trigger('warn', {
+                        message: 'EXT-X-DATERANGE tags with the same ID in a playlist must have the same attributes values'
+                      });
+                      break;
+                    }
+                  } // if tags with the same ID do not have conflicting attributes, merge them
+
+                  const dateRangeWithSameId = this.manifest.dateRanges.findIndex(dateRangeToFind => dateRangeToFind.id === dateRange.id);
+                  this.manifest.dateRanges[dateRangeWithSameId] = _extends$1(this.manifest.dateRanges[dateRangeWithSameId], dateRange);
+                  dateRangeTags[dateRange.id] = _extends$1(dateRangeTags[dateRange.id], dateRange); // after merging, delete the duplicate dateRange that was added last
+
+                  this.manifest.dateRanges.pop();
+                }
+              },
+              'independent-segments'() {
+                this.manifest.independentSegments = true;
+              },
+              'i-frames-only'() {
+                this.manifest.iFramesOnly = true;
+                this.requiredCompatibilityversion(this.manifest.version, 4);
+              },
+              'content-steering'() {
+                this.manifest.contentSteering = camelCaseKeys(entry.attributes);
+                this.warnOnMissingAttributes_('#EXT-X-CONTENT-STEERING', entry.attributes, ['SERVER-URI']);
+              },
+              /** @this {Parser} */
+              define() {
+                this.manifest.definitions = this.manifest.definitions || {};
+                const addDef = (n, v) => {
+                  if (n in this.manifest.definitions) {
+                    // An EXT-X-DEFINE tag MUST NOT specify the same Variable Name as any other
+                    // EXT-X-DEFINE tag in the same Playlist.  Parsers that encounter duplicate
+                    // Variable Name declarations MUST fail to parse the Playlist.
+                    this.trigger('error', {
+                      message: `EXT-X-DEFINE: Duplicate name ${n}`
+                    });
+                    return;
+                  }
+                  this.manifest.definitions[n] = v;
+                };
+                if ('QUERYPARAM' in entry.attributes) {
+                  if ('NAME' in entry.attributes || 'IMPORT' in entry.attributes) {
+                    // An EXT-X-DEFINE tag MUST contain either a NAME, an IMPORT, or a
+                    // QUERYPARAM attribute, but only one of the three.  Otherwise, the
+                    // client MUST fail to parse the Playlist.
+                    this.trigger('error', {
+                      message: 'EXT-X-DEFINE: Invalid attributes'
+                    });
+                    return;
+                  }
+                  const val = this.params.get(entry.attributes.QUERYPARAM);
+                  if (!val) {
+                    // If the QUERYPARAM attribute value does not match any query parameter in
+                    // the URI or the matching parameter has no associated value, the parser
+                    // MUST fail to parse the Playlist.  If more than one parameter matches,
+                    // any of the associated values MAY be used.
+                    this.trigger('error', {
+                      message: `EXT-X-DEFINE: No query param ${entry.attributes.QUERYPARAM}`
+                    });
+                    return;
+                  }
+                  addDef(entry.attributes.QUERYPARAM, decodeURIComponent(val));
+                  return;
+                }
+                if ('NAME' in entry.attributes) {
+                  if ('IMPORT' in entry.attributes) {
+                    // An EXT-X-DEFINE tag MUST contain either a NAME, an IMPORT, or a
+                    // QUERYPARAM attribute, but only one of the three.  Otherwise, the
+                    // client MUST fail to parse the Playlist.
+                    this.trigger('error', {
+                      message: 'EXT-X-DEFINE: Invalid attributes'
+                    });
+                    return;
+                  }
+                  if (!('VALUE' in entry.attributes) || typeof entry.attributes.VALUE !== 'string') {
+                    // This attribute is REQUIRED if the EXT-X-DEFINE tag has a NAME attribute.
+                    // The quoted-string MAY be empty.
+                    this.trigger('error', {
+                      message: `EXT-X-DEFINE: No value for ${entry.attributes.NAME}`
+                    });
+                    return;
+                  }
+                  addDef(entry.attributes.NAME, entry.attributes.VALUE);
+                  return;
+                }
+                if ('IMPORT' in entry.attributes) {
+                  if (!this.mainDefinitions[entry.attributes.IMPORT]) {
+                    // Covers two conditions, as mainDefinitions will always be empty on main
+                    //
+                    // EXT-X-DEFINE tags containing the IMPORT attribute MUST NOT occur in
+                    // Multivariant Playlists; they are only allowed in Media Playlists.
+                    //
+                    // If the IMPORT attribute value does not match any Variable Name in the
+                    // Multivariant Playlist, or if the Media Playlist loaded from a
+                    // Multivariant Playlist, the parser MUST fail the Playlist.
+                    this.trigger('error', {
+                      message: `EXT-X-DEFINE: No value ${entry.attributes.IMPORT} to import, or IMPORT used on main playlist`
+                    });
+                    return;
+                  }
+                  addDef(entry.attributes.IMPORT, this.mainDefinitions[entry.attributes.IMPORT]);
+                  return;
+                } // An EXT-X-DEFINE tag MUST contain either a NAME, an IMPORT, or a QUERYPARAM
+                // attribute, but only one of the three.  Otherwise, the client MUST fail to
+                // parse the Playlist.
+
+                this.trigger('error', {
+                  message: 'EXT-X-DEFINE: No attribute'
+                });
+              },
+              'i-frame-playlist'() {
+                this.manifest.iFramePlaylists.push({
+                  attributes: entry.attributes,
+                  uri: entry.uri,
+                  timeline: currentTimeline
+                });
+                this.warnOnMissingAttributes_('#EXT-X-I-FRAME-STREAM-INF', entry.attributes, ['BANDWIDTH', 'URI']);
               }
             })[entry.tagType] || noop).call(self);
           },
@@ -28055,7 +32188,12 @@
               currentUri.map = currentMap;
             } // reset the last byterange end as it needs to be 0 between parts
 
-            lastPartByterangeEnd = 0; // prepare for the next URI
+            lastPartByterangeEnd = 0; // Once we have at least one program date time we can always extrapolate it forward
+
+            if (this.lastProgramDateTime !== null) {
+              currentUri.programDateTime = this.lastProgramDateTime;
+              this.lastProgramDateTime += currentUri.duration * 1000;
+            } // prepare for the next URI
 
             currentUri = {};
           },
@@ -28073,6 +32211,13 @@
           }
         })[entry.type].call(self);
       });
+    }
+    requiredCompatibilityversion(currentVersion, targetVersion) {
+      if (currentVersion < targetVersion || !currentVersion) {
+        this.trigger('warn', {
+          message: `manifest must be at least version ${targetVersion}`
+        });
+      }
     }
     warnOnMissingAttributes_(identifier, attributes, required) {
       const missing = [];
@@ -28105,6 +32250,12 @@
     end() {
       // flush any buffered input
       this.lineStream.push('\n');
+      if (this.manifest.dateRanges.length && this.lastProgramDateTime === null) {
+        this.trigger('warn', {
+          message: 'A playlist with EXT-X-DATERANGE tag must contain atleast one EXT-X-PROGRAM-DATE-TIME tag'
+        });
+      }
+      this.lastProgramDateTime = null;
       this.trigger('end');
     }
     /**
@@ -28112,7 +32263,7 @@
      *
      * @param {Object}   options              a map of options for the added parser
      * @param {RegExp}   options.expression   a regular expression to match the custom header
-     * @param {string}   options.type         the type to register to the output
+     * @param {string}   options.customType   the custom type to register to the output
      * @param {Function} [options.dataParser] function to parse the line into an object
      * @param {boolean}  [options.segment]    should tag data be attached to the segment object
      */
@@ -28305,11 +32456,25 @@
     }
     return type + "/" + container + ";codecs=\"" + codecString + "\"";
   };
-  var browserSupportsCodec = function browserSupportsCodec(codecString) {
+  /**
+   * Tests whether the codec is supported by MediaSource. Optionally also tests ManagedMediaSource.
+   *
+   * @param {string} codecString
+   *        Codec to test
+   * @param {boolean} [withMMS]
+   *        Whether to check if ManagedMediaSource supports it
+   * @return {boolean}
+   *          Codec is supported
+   */
+
+  var browserSupportsCodec = function browserSupportsCodec(codecString, withMMS) {
     if (codecString === void 0) {
       codecString = '';
     }
-    return window.MediaSource && window.MediaSource.isTypeSupported && window.MediaSource.isTypeSupported(getMimeForCodec(codecString)) || false;
+    if (withMMS === void 0) {
+      withMMS = false;
+    }
+    return window.MediaSource && window.MediaSource.isTypeSupported && window.MediaSource.isTypeSupported(getMimeForCodec(codecString)) || withMMS && window.ManagedMediaSource && window.ManagedMediaSource.isTypeSupported && window.ManagedMediaSource.isTypeSupported(getMimeForCodec(codecString)) || false;
   };
   var muxerSupportsCodec = function muxerSupportsCodec(codecString) {
     if (codecString === void 0) {
@@ -28542,44 +32707,6 @@
     });
   };
 
-  var DEFAULT_LOCATION = 'http://example.com';
-  var resolveUrl$1 = function resolveUrl(baseUrl, relativeUrl) {
-    // return early if we don't need to resolve
-    if (/^[a-z]+:/i.test(relativeUrl)) {
-      return relativeUrl;
-    } // if baseUrl is a data URI, ignore it and resolve everything relative to window.location
-
-    if (/^data:/.test(baseUrl)) {
-      baseUrl = window.location && window.location.href || '';
-    } // IE11 supports URL but not the URL constructor
-    // feature detect the behavior we want
-
-    var nativeURL = typeof window.URL === 'function';
-    var protocolLess = /^\/\//.test(baseUrl); // remove location if window.location isn't available (i.e. we're in node)
-    // and if baseUrl isn't an absolute url
-
-    var removeLocation = !window.location && !/\/\//i.test(baseUrl); // if the base URL is relative then combine with the current location
-
-    if (nativeURL) {
-      baseUrl = new window.URL(baseUrl, window.location || DEFAULT_LOCATION);
-    } else if (!/\/\//i.test(baseUrl)) {
-      baseUrl = urlToolkit.buildAbsoluteURL(window.location && window.location.href || '', baseUrl);
-    }
-    if (nativeURL) {
-      var newUrl = new URL(relativeUrl, baseUrl); // if we're a protocol-less url, remove the protocol
-      // and if we're location-less, remove the location
-      // otherwise, return the url unmodified
-
-      if (removeLocation) {
-        return newUrl.href.slice(DEFAULT_LOCATION.length);
-      } else if (protocolLess) {
-        return newUrl.href.slice(newUrl.protocol.length);
-      }
-      return newUrl.href;
-    }
-    return urlToolkit.buildAbsoluteURL(baseUrl, relativeUrl);
-  };
-
   /**
    * Loops through all supported media groups in master and calls the provided
    * callback for each group
@@ -28601,18 +32728,6 @@
       }
     });
   };
-
-  var atob = function atob(s) {
-    return window.atob ? window.atob(s) : Buffer.from(s, 'base64').toString('binary');
-  };
-  function decodeB64ToUint8Array(b64Text) {
-    var decodedString = atob(b64Text);
-    var array = new Uint8Array(decodedString.length);
-    for (var i = 0; i < decodedString.length; i++) {
-      array[i] = decodedString.charCodeAt(i);
-    }
-    return array;
-  }
 
   /**
    * Ponyfill for `Array.prototype.find` which is only available in ES6 runtimes.
@@ -28980,7 +33095,7 @@
      * 	The node at the indexth position in the NodeList, or null if that is not a valid index.
      */
     item: function (index) {
-      return this[index] || null;
+      return index >= 0 && index < this.length ? this[index] : null;
     },
     toString: function (isHTML, nodeFilter) {
       for (var buf = [], i = 0; i < this.length; i++) {
@@ -29012,17 +33127,23 @@
   }
   function _updateLiveList(list) {
     var inc = list._node._inc || list._node.ownerDocument._inc;
-    if (list._inc != inc) {
+    if (list._inc !== inc) {
       var ls = list._refresh(list._node);
-      //console.log(ls.length)
       __set__(list, 'length', ls.length);
+      if (!list.$$length || ls.length < list.$$length) {
+        for (var i = ls.length; i in list; i++) {
+          if (Object.prototype.hasOwnProperty.call(list, i)) {
+            delete list[i];
+          }
+        }
+      }
       copy(ls, list);
       list._inc = inc;
     }
   }
   LiveNodeList.prototype.item = function (i) {
     _updateLiveList(this);
-    return this[i];
+    return this[i] || null;
   };
   _extends(LiveNodeList, NodeList);
 
@@ -29722,7 +33843,6 @@
     if (cp) {
       cp.removeChild(node); //remove and update
     }
-
     if (node.nodeType === DOCUMENT_FRAGMENT_NODE) {
       var newFirst = node.firstChild;
       if (newFirst == null) {
@@ -29930,7 +34050,7 @@
     createProcessingInstruction: function (target, data) {
       var node = new ProcessingInstruction();
       node.ownerDocument = this;
-      node.tagName = node.target = target;
+      node.tagName = node.nodeName = node.target = target;
       node.nodeValue = node.data = data;
       return node;
     },
@@ -30181,7 +34301,6 @@
         ];
       }
     }
-
     serializeToString(this, buf, isHtml, nodeFilter, visibleNamespaces);
     //console.log('###',this.nodeType,uri,prefix,buf.join(''))
     return buf.join('');
@@ -30244,7 +34363,6 @@
       }
       //buf.sort.apply(attrs, attributeSorter);
     }
-
     switch (node.nodeType) {
       case ELEMENT_NODE:
         var attrs = node.attributes;
@@ -30442,11 +34560,9 @@
       //can not hit in level3
       //default:throw e;
     }
-
     if (!node2) {
       node2 = node.cloneNode(false); //false
     }
-
     node2.ownerDocument = doc;
     node2.parentNode = null;
     if (deep) {
@@ -30579,6 +34695,7 @@
   };
 
   var entities = createCommonjsModule(function (module, exports) {
+
     var freeze = conventions.freeze;
 
     /**
@@ -30597,260 +34714,2145 @@
     });
 
     /**
-     * A map of currently 241 entities that are detected in an HTML document.
+     * A map of all entities that are detected in an HTML document.
      * They contain all entries from `XML_ENTITIES`.
      *
      * @see XML_ENTITIES
      * @see DOMParser.parseFromString
      * @see DOMImplementation.prototype.createHTMLDocument
      * @see https://html.spec.whatwg.org/#named-character-references WHATWG HTML(5) Spec
+     * @see https://html.spec.whatwg.org/entities.json JSON
      * @see https://www.w3.org/TR/xml-entity-names/ W3C XML Entity Names
      * @see https://www.w3.org/TR/html4/sgml/entities.html W3C HTML4/SGML
      * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Character_entity_references_in_HTML Wikipedia (HTML)
      * @see https://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references#Entities_representing_special_characters_in_XHTML Wikpedia (XHTML)
      */
     exports.HTML_ENTITIES = freeze({
-      lt: '<',
-      gt: '>',
-      amp: '&',
-      quot: '"',
-      apos: "'",
-      Agrave: "À",
-      Aacute: "Á",
-      Acirc: "Â",
-      Atilde: "Ã",
-      Auml: "Ä",
-      Aring: "Å",
-      AElig: "Æ",
-      Ccedil: "Ç",
-      Egrave: "È",
-      Eacute: "É",
-      Ecirc: "Ê",
-      Euml: "Ë",
-      Igrave: "Ì",
-      Iacute: "Í",
-      Icirc: "Î",
-      Iuml: "Ï",
-      ETH: "Ð",
-      Ntilde: "Ñ",
-      Ograve: "Ò",
-      Oacute: "Ó",
-      Ocirc: "Ô",
-      Otilde: "Õ",
-      Ouml: "Ö",
-      Oslash: "Ø",
-      Ugrave: "Ù",
-      Uacute: "Ú",
-      Ucirc: "Û",
-      Uuml: "Ü",
-      Yacute: "Ý",
-      THORN: "Þ",
-      szlig: "ß",
-      agrave: "à",
-      aacute: "á",
-      acirc: "â",
-      atilde: "ã",
-      auml: "ä",
-      aring: "å",
-      aelig: "æ",
-      ccedil: "ç",
-      egrave: "è",
-      eacute: "é",
-      ecirc: "ê",
-      euml: "ë",
-      igrave: "ì",
-      iacute: "í",
-      icirc: "î",
-      iuml: "ï",
-      eth: "ð",
-      ntilde: "ñ",
-      ograve: "ò",
-      oacute: "ó",
-      ocirc: "ô",
-      otilde: "õ",
-      ouml: "ö",
-      oslash: "ø",
-      ugrave: "ù",
-      uacute: "ú",
-      ucirc: "û",
-      uuml: "ü",
-      yacute: "ý",
-      thorn: "þ",
-      yuml: "ÿ",
-      nbsp: "\u00a0",
-      iexcl: "¡",
-      cent: "¢",
-      pound: "£",
-      curren: "¤",
-      yen: "¥",
-      brvbar: "¦",
-      sect: "§",
-      uml: "¨",
-      copy: "©",
-      ordf: "ª",
-      laquo: "«",
-      not: "¬",
-      shy: "­­",
-      reg: "®",
-      macr: "¯",
-      deg: "°",
-      plusmn: "±",
-      sup2: "²",
-      sup3: "³",
-      acute: "´",
-      micro: "µ",
-      para: "¶",
-      middot: "·",
-      cedil: "¸",
-      sup1: "¹",
-      ordm: "º",
-      raquo: "»",
-      frac14: "¼",
-      frac12: "½",
-      frac34: "¾",
-      iquest: "¿",
-      times: "×",
-      divide: "÷",
-      forall: "∀",
-      part: "∂",
-      exist: "∃",
-      empty: "∅",
-      nabla: "∇",
-      isin: "∈",
-      notin: "∉",
-      ni: "∋",
-      prod: "∏",
-      sum: "∑",
-      minus: "−",
-      lowast: "∗",
-      radic: "√",
-      prop: "∝",
-      infin: "∞",
-      ang: "∠",
-      and: "∧",
-      or: "∨",
-      cap: "∩",
-      cup: "∪",
-      'int': "∫",
-      there4: "∴",
-      sim: "∼",
-      cong: "≅",
-      asymp: "≈",
-      ne: "≠",
-      equiv: "≡",
-      le: "≤",
-      ge: "≥",
-      sub: "⊂",
-      sup: "⊃",
-      nsub: "⊄",
-      sube: "⊆",
-      supe: "⊇",
-      oplus: "⊕",
-      otimes: "⊗",
-      perp: "⊥",
-      sdot: "⋅",
-      Alpha: "Α",
-      Beta: "Β",
-      Gamma: "Γ",
-      Delta: "Δ",
-      Epsilon: "Ε",
-      Zeta: "Ζ",
-      Eta: "Η",
-      Theta: "Θ",
-      Iota: "Ι",
-      Kappa: "Κ",
-      Lambda: "Λ",
-      Mu: "Μ",
-      Nu: "Ν",
-      Xi: "Ξ",
-      Omicron: "Ο",
-      Pi: "Π",
-      Rho: "Ρ",
-      Sigma: "Σ",
-      Tau: "Τ",
-      Upsilon: "Υ",
-      Phi: "Φ",
-      Chi: "Χ",
-      Psi: "Ψ",
-      Omega: "Ω",
-      alpha: "α",
-      beta: "β",
-      gamma: "γ",
-      delta: "δ",
-      epsilon: "ε",
-      zeta: "ζ",
-      eta: "η",
-      theta: "θ",
-      iota: "ι",
-      kappa: "κ",
-      lambda: "λ",
-      mu: "μ",
-      nu: "ν",
-      xi: "ξ",
-      omicron: "ο",
-      pi: "π",
-      rho: "ρ",
-      sigmaf: "ς",
-      sigma: "σ",
-      tau: "τ",
-      upsilon: "υ",
-      phi: "φ",
-      chi: "χ",
-      psi: "ψ",
-      omega: "ω",
-      thetasym: "ϑ",
-      upsih: "ϒ",
-      piv: "ϖ",
-      OElig: "Œ",
-      oelig: "œ",
-      Scaron: "Š",
-      scaron: "š",
-      Yuml: "Ÿ",
-      fnof: "ƒ",
-      circ: "ˆ",
-      tilde: "˜",
-      ensp: " ",
-      emsp: " ",
-      thinsp: " ",
-      zwnj: "‌",
-      zwj: "‍",
-      lrm: "‎",
-      rlm: "‏",
-      ndash: "–",
-      mdash: "—",
-      lsquo: "‘",
-      rsquo: "’",
-      sbquo: "‚",
-      ldquo: "“",
-      rdquo: "”",
-      bdquo: "„",
-      dagger: "†",
-      Dagger: "‡",
-      bull: "•",
-      hellip: "…",
-      permil: "‰",
-      prime: "′",
-      Prime: "″",
-      lsaquo: "‹",
-      rsaquo: "›",
-      oline: "‾",
-      euro: "€",
-      trade: "™",
-      larr: "←",
-      uarr: "↑",
-      rarr: "→",
-      darr: "↓",
-      harr: "↔",
-      crarr: "↵",
-      lceil: "⌈",
-      rceil: "⌉",
-      lfloor: "⌊",
-      rfloor: "⌋",
-      loz: "◊",
-      spades: "♠",
-      clubs: "♣",
-      hearts: "♥",
-      diams: "♦"
+      Aacute: '\u00C1',
+      aacute: '\u00E1',
+      Abreve: '\u0102',
+      abreve: '\u0103',
+      ac: '\u223E',
+      acd: '\u223F',
+      acE: '\u223E\u0333',
+      Acirc: '\u00C2',
+      acirc: '\u00E2',
+      acute: '\u00B4',
+      Acy: '\u0410',
+      acy: '\u0430',
+      AElig: '\u00C6',
+      aelig: '\u00E6',
+      af: '\u2061',
+      Afr: '\uD835\uDD04',
+      afr: '\uD835\uDD1E',
+      Agrave: '\u00C0',
+      agrave: '\u00E0',
+      alefsym: '\u2135',
+      aleph: '\u2135',
+      Alpha: '\u0391',
+      alpha: '\u03B1',
+      Amacr: '\u0100',
+      amacr: '\u0101',
+      amalg: '\u2A3F',
+      AMP: '\u0026',
+      amp: '\u0026',
+      And: '\u2A53',
+      and: '\u2227',
+      andand: '\u2A55',
+      andd: '\u2A5C',
+      andslope: '\u2A58',
+      andv: '\u2A5A',
+      ang: '\u2220',
+      ange: '\u29A4',
+      angle: '\u2220',
+      angmsd: '\u2221',
+      angmsdaa: '\u29A8',
+      angmsdab: '\u29A9',
+      angmsdac: '\u29AA',
+      angmsdad: '\u29AB',
+      angmsdae: '\u29AC',
+      angmsdaf: '\u29AD',
+      angmsdag: '\u29AE',
+      angmsdah: '\u29AF',
+      angrt: '\u221F',
+      angrtvb: '\u22BE',
+      angrtvbd: '\u299D',
+      angsph: '\u2222',
+      angst: '\u00C5',
+      angzarr: '\u237C',
+      Aogon: '\u0104',
+      aogon: '\u0105',
+      Aopf: '\uD835\uDD38',
+      aopf: '\uD835\uDD52',
+      ap: '\u2248',
+      apacir: '\u2A6F',
+      apE: '\u2A70',
+      ape: '\u224A',
+      apid: '\u224B',
+      apos: '\u0027',
+      ApplyFunction: '\u2061',
+      approx: '\u2248',
+      approxeq: '\u224A',
+      Aring: '\u00C5',
+      aring: '\u00E5',
+      Ascr: '\uD835\uDC9C',
+      ascr: '\uD835\uDCB6',
+      Assign: '\u2254',
+      ast: '\u002A',
+      asymp: '\u2248',
+      asympeq: '\u224D',
+      Atilde: '\u00C3',
+      atilde: '\u00E3',
+      Auml: '\u00C4',
+      auml: '\u00E4',
+      awconint: '\u2233',
+      awint: '\u2A11',
+      backcong: '\u224C',
+      backepsilon: '\u03F6',
+      backprime: '\u2035',
+      backsim: '\u223D',
+      backsimeq: '\u22CD',
+      Backslash: '\u2216',
+      Barv: '\u2AE7',
+      barvee: '\u22BD',
+      Barwed: '\u2306',
+      barwed: '\u2305',
+      barwedge: '\u2305',
+      bbrk: '\u23B5',
+      bbrktbrk: '\u23B6',
+      bcong: '\u224C',
+      Bcy: '\u0411',
+      bcy: '\u0431',
+      bdquo: '\u201E',
+      becaus: '\u2235',
+      Because: '\u2235',
+      because: '\u2235',
+      bemptyv: '\u29B0',
+      bepsi: '\u03F6',
+      bernou: '\u212C',
+      Bernoullis: '\u212C',
+      Beta: '\u0392',
+      beta: '\u03B2',
+      beth: '\u2136',
+      between: '\u226C',
+      Bfr: '\uD835\uDD05',
+      bfr: '\uD835\uDD1F',
+      bigcap: '\u22C2',
+      bigcirc: '\u25EF',
+      bigcup: '\u22C3',
+      bigodot: '\u2A00',
+      bigoplus: '\u2A01',
+      bigotimes: '\u2A02',
+      bigsqcup: '\u2A06',
+      bigstar: '\u2605',
+      bigtriangledown: '\u25BD',
+      bigtriangleup: '\u25B3',
+      biguplus: '\u2A04',
+      bigvee: '\u22C1',
+      bigwedge: '\u22C0',
+      bkarow: '\u290D',
+      blacklozenge: '\u29EB',
+      blacksquare: '\u25AA',
+      blacktriangle: '\u25B4',
+      blacktriangledown: '\u25BE',
+      blacktriangleleft: '\u25C2',
+      blacktriangleright: '\u25B8',
+      blank: '\u2423',
+      blk12: '\u2592',
+      blk14: '\u2591',
+      blk34: '\u2593',
+      block: '\u2588',
+      bne: '\u003D\u20E5',
+      bnequiv: '\u2261\u20E5',
+      bNot: '\u2AED',
+      bnot: '\u2310',
+      Bopf: '\uD835\uDD39',
+      bopf: '\uD835\uDD53',
+      bot: '\u22A5',
+      bottom: '\u22A5',
+      bowtie: '\u22C8',
+      boxbox: '\u29C9',
+      boxDL: '\u2557',
+      boxDl: '\u2556',
+      boxdL: '\u2555',
+      boxdl: '\u2510',
+      boxDR: '\u2554',
+      boxDr: '\u2553',
+      boxdR: '\u2552',
+      boxdr: '\u250C',
+      boxH: '\u2550',
+      boxh: '\u2500',
+      boxHD: '\u2566',
+      boxHd: '\u2564',
+      boxhD: '\u2565',
+      boxhd: '\u252C',
+      boxHU: '\u2569',
+      boxHu: '\u2567',
+      boxhU: '\u2568',
+      boxhu: '\u2534',
+      boxminus: '\u229F',
+      boxplus: '\u229E',
+      boxtimes: '\u22A0',
+      boxUL: '\u255D',
+      boxUl: '\u255C',
+      boxuL: '\u255B',
+      boxul: '\u2518',
+      boxUR: '\u255A',
+      boxUr: '\u2559',
+      boxuR: '\u2558',
+      boxur: '\u2514',
+      boxV: '\u2551',
+      boxv: '\u2502',
+      boxVH: '\u256C',
+      boxVh: '\u256B',
+      boxvH: '\u256A',
+      boxvh: '\u253C',
+      boxVL: '\u2563',
+      boxVl: '\u2562',
+      boxvL: '\u2561',
+      boxvl: '\u2524',
+      boxVR: '\u2560',
+      boxVr: '\u255F',
+      boxvR: '\u255E',
+      boxvr: '\u251C',
+      bprime: '\u2035',
+      Breve: '\u02D8',
+      breve: '\u02D8',
+      brvbar: '\u00A6',
+      Bscr: '\u212C',
+      bscr: '\uD835\uDCB7',
+      bsemi: '\u204F',
+      bsim: '\u223D',
+      bsime: '\u22CD',
+      bsol: '\u005C',
+      bsolb: '\u29C5',
+      bsolhsub: '\u27C8',
+      bull: '\u2022',
+      bullet: '\u2022',
+      bump: '\u224E',
+      bumpE: '\u2AAE',
+      bumpe: '\u224F',
+      Bumpeq: '\u224E',
+      bumpeq: '\u224F',
+      Cacute: '\u0106',
+      cacute: '\u0107',
+      Cap: '\u22D2',
+      cap: '\u2229',
+      capand: '\u2A44',
+      capbrcup: '\u2A49',
+      capcap: '\u2A4B',
+      capcup: '\u2A47',
+      capdot: '\u2A40',
+      CapitalDifferentialD: '\u2145',
+      caps: '\u2229\uFE00',
+      caret: '\u2041',
+      caron: '\u02C7',
+      Cayleys: '\u212D',
+      ccaps: '\u2A4D',
+      Ccaron: '\u010C',
+      ccaron: '\u010D',
+      Ccedil: '\u00C7',
+      ccedil: '\u00E7',
+      Ccirc: '\u0108',
+      ccirc: '\u0109',
+      Cconint: '\u2230',
+      ccups: '\u2A4C',
+      ccupssm: '\u2A50',
+      Cdot: '\u010A',
+      cdot: '\u010B',
+      cedil: '\u00B8',
+      Cedilla: '\u00B8',
+      cemptyv: '\u29B2',
+      cent: '\u00A2',
+      CenterDot: '\u00B7',
+      centerdot: '\u00B7',
+      Cfr: '\u212D',
+      cfr: '\uD835\uDD20',
+      CHcy: '\u0427',
+      chcy: '\u0447',
+      check: '\u2713',
+      checkmark: '\u2713',
+      Chi: '\u03A7',
+      chi: '\u03C7',
+      cir: '\u25CB',
+      circ: '\u02C6',
+      circeq: '\u2257',
+      circlearrowleft: '\u21BA',
+      circlearrowright: '\u21BB',
+      circledast: '\u229B',
+      circledcirc: '\u229A',
+      circleddash: '\u229D',
+      CircleDot: '\u2299',
+      circledR: '\u00AE',
+      circledS: '\u24C8',
+      CircleMinus: '\u2296',
+      CirclePlus: '\u2295',
+      CircleTimes: '\u2297',
+      cirE: '\u29C3',
+      cire: '\u2257',
+      cirfnint: '\u2A10',
+      cirmid: '\u2AEF',
+      cirscir: '\u29C2',
+      ClockwiseContourIntegral: '\u2232',
+      CloseCurlyDoubleQuote: '\u201D',
+      CloseCurlyQuote: '\u2019',
+      clubs: '\u2663',
+      clubsuit: '\u2663',
+      Colon: '\u2237',
+      colon: '\u003A',
+      Colone: '\u2A74',
+      colone: '\u2254',
+      coloneq: '\u2254',
+      comma: '\u002C',
+      commat: '\u0040',
+      comp: '\u2201',
+      compfn: '\u2218',
+      complement: '\u2201',
+      complexes: '\u2102',
+      cong: '\u2245',
+      congdot: '\u2A6D',
+      Congruent: '\u2261',
+      Conint: '\u222F',
+      conint: '\u222E',
+      ContourIntegral: '\u222E',
+      Copf: '\u2102',
+      copf: '\uD835\uDD54',
+      coprod: '\u2210',
+      Coproduct: '\u2210',
+      COPY: '\u00A9',
+      copy: '\u00A9',
+      copysr: '\u2117',
+      CounterClockwiseContourIntegral: '\u2233',
+      crarr: '\u21B5',
+      Cross: '\u2A2F',
+      cross: '\u2717',
+      Cscr: '\uD835\uDC9E',
+      cscr: '\uD835\uDCB8',
+      csub: '\u2ACF',
+      csube: '\u2AD1',
+      csup: '\u2AD0',
+      csupe: '\u2AD2',
+      ctdot: '\u22EF',
+      cudarrl: '\u2938',
+      cudarrr: '\u2935',
+      cuepr: '\u22DE',
+      cuesc: '\u22DF',
+      cularr: '\u21B6',
+      cularrp: '\u293D',
+      Cup: '\u22D3',
+      cup: '\u222A',
+      cupbrcap: '\u2A48',
+      CupCap: '\u224D',
+      cupcap: '\u2A46',
+      cupcup: '\u2A4A',
+      cupdot: '\u228D',
+      cupor: '\u2A45',
+      cups: '\u222A\uFE00',
+      curarr: '\u21B7',
+      curarrm: '\u293C',
+      curlyeqprec: '\u22DE',
+      curlyeqsucc: '\u22DF',
+      curlyvee: '\u22CE',
+      curlywedge: '\u22CF',
+      curren: '\u00A4',
+      curvearrowleft: '\u21B6',
+      curvearrowright: '\u21B7',
+      cuvee: '\u22CE',
+      cuwed: '\u22CF',
+      cwconint: '\u2232',
+      cwint: '\u2231',
+      cylcty: '\u232D',
+      Dagger: '\u2021',
+      dagger: '\u2020',
+      daleth: '\u2138',
+      Darr: '\u21A1',
+      dArr: '\u21D3',
+      darr: '\u2193',
+      dash: '\u2010',
+      Dashv: '\u2AE4',
+      dashv: '\u22A3',
+      dbkarow: '\u290F',
+      dblac: '\u02DD',
+      Dcaron: '\u010E',
+      dcaron: '\u010F',
+      Dcy: '\u0414',
+      dcy: '\u0434',
+      DD: '\u2145',
+      dd: '\u2146',
+      ddagger: '\u2021',
+      ddarr: '\u21CA',
+      DDotrahd: '\u2911',
+      ddotseq: '\u2A77',
+      deg: '\u00B0',
+      Del: '\u2207',
+      Delta: '\u0394',
+      delta: '\u03B4',
+      demptyv: '\u29B1',
+      dfisht: '\u297F',
+      Dfr: '\uD835\uDD07',
+      dfr: '\uD835\uDD21',
+      dHar: '\u2965',
+      dharl: '\u21C3',
+      dharr: '\u21C2',
+      DiacriticalAcute: '\u00B4',
+      DiacriticalDot: '\u02D9',
+      DiacriticalDoubleAcute: '\u02DD',
+      DiacriticalGrave: '\u0060',
+      DiacriticalTilde: '\u02DC',
+      diam: '\u22C4',
+      Diamond: '\u22C4',
+      diamond: '\u22C4',
+      diamondsuit: '\u2666',
+      diams: '\u2666',
+      die: '\u00A8',
+      DifferentialD: '\u2146',
+      digamma: '\u03DD',
+      disin: '\u22F2',
+      div: '\u00F7',
+      divide: '\u00F7',
+      divideontimes: '\u22C7',
+      divonx: '\u22C7',
+      DJcy: '\u0402',
+      djcy: '\u0452',
+      dlcorn: '\u231E',
+      dlcrop: '\u230D',
+      dollar: '\u0024',
+      Dopf: '\uD835\uDD3B',
+      dopf: '\uD835\uDD55',
+      Dot: '\u00A8',
+      dot: '\u02D9',
+      DotDot: '\u20DC',
+      doteq: '\u2250',
+      doteqdot: '\u2251',
+      DotEqual: '\u2250',
+      dotminus: '\u2238',
+      dotplus: '\u2214',
+      dotsquare: '\u22A1',
+      doublebarwedge: '\u2306',
+      DoubleContourIntegral: '\u222F',
+      DoubleDot: '\u00A8',
+      DoubleDownArrow: '\u21D3',
+      DoubleLeftArrow: '\u21D0',
+      DoubleLeftRightArrow: '\u21D4',
+      DoubleLeftTee: '\u2AE4',
+      DoubleLongLeftArrow: '\u27F8',
+      DoubleLongLeftRightArrow: '\u27FA',
+      DoubleLongRightArrow: '\u27F9',
+      DoubleRightArrow: '\u21D2',
+      DoubleRightTee: '\u22A8',
+      DoubleUpArrow: '\u21D1',
+      DoubleUpDownArrow: '\u21D5',
+      DoubleVerticalBar: '\u2225',
+      DownArrow: '\u2193',
+      Downarrow: '\u21D3',
+      downarrow: '\u2193',
+      DownArrowBar: '\u2913',
+      DownArrowUpArrow: '\u21F5',
+      DownBreve: '\u0311',
+      downdownarrows: '\u21CA',
+      downharpoonleft: '\u21C3',
+      downharpoonright: '\u21C2',
+      DownLeftRightVector: '\u2950',
+      DownLeftTeeVector: '\u295E',
+      DownLeftVector: '\u21BD',
+      DownLeftVectorBar: '\u2956',
+      DownRightTeeVector: '\u295F',
+      DownRightVector: '\u21C1',
+      DownRightVectorBar: '\u2957',
+      DownTee: '\u22A4',
+      DownTeeArrow: '\u21A7',
+      drbkarow: '\u2910',
+      drcorn: '\u231F',
+      drcrop: '\u230C',
+      Dscr: '\uD835\uDC9F',
+      dscr: '\uD835\uDCB9',
+      DScy: '\u0405',
+      dscy: '\u0455',
+      dsol: '\u29F6',
+      Dstrok: '\u0110',
+      dstrok: '\u0111',
+      dtdot: '\u22F1',
+      dtri: '\u25BF',
+      dtrif: '\u25BE',
+      duarr: '\u21F5',
+      duhar: '\u296F',
+      dwangle: '\u29A6',
+      DZcy: '\u040F',
+      dzcy: '\u045F',
+      dzigrarr: '\u27FF',
+      Eacute: '\u00C9',
+      eacute: '\u00E9',
+      easter: '\u2A6E',
+      Ecaron: '\u011A',
+      ecaron: '\u011B',
+      ecir: '\u2256',
+      Ecirc: '\u00CA',
+      ecirc: '\u00EA',
+      ecolon: '\u2255',
+      Ecy: '\u042D',
+      ecy: '\u044D',
+      eDDot: '\u2A77',
+      Edot: '\u0116',
+      eDot: '\u2251',
+      edot: '\u0117',
+      ee: '\u2147',
+      efDot: '\u2252',
+      Efr: '\uD835\uDD08',
+      efr: '\uD835\uDD22',
+      eg: '\u2A9A',
+      Egrave: '\u00C8',
+      egrave: '\u00E8',
+      egs: '\u2A96',
+      egsdot: '\u2A98',
+      el: '\u2A99',
+      Element: '\u2208',
+      elinters: '\u23E7',
+      ell: '\u2113',
+      els: '\u2A95',
+      elsdot: '\u2A97',
+      Emacr: '\u0112',
+      emacr: '\u0113',
+      empty: '\u2205',
+      emptyset: '\u2205',
+      EmptySmallSquare: '\u25FB',
+      emptyv: '\u2205',
+      EmptyVerySmallSquare: '\u25AB',
+      emsp: '\u2003',
+      emsp13: '\u2004',
+      emsp14: '\u2005',
+      ENG: '\u014A',
+      eng: '\u014B',
+      ensp: '\u2002',
+      Eogon: '\u0118',
+      eogon: '\u0119',
+      Eopf: '\uD835\uDD3C',
+      eopf: '\uD835\uDD56',
+      epar: '\u22D5',
+      eparsl: '\u29E3',
+      eplus: '\u2A71',
+      epsi: '\u03B5',
+      Epsilon: '\u0395',
+      epsilon: '\u03B5',
+      epsiv: '\u03F5',
+      eqcirc: '\u2256',
+      eqcolon: '\u2255',
+      eqsim: '\u2242',
+      eqslantgtr: '\u2A96',
+      eqslantless: '\u2A95',
+      Equal: '\u2A75',
+      equals: '\u003D',
+      EqualTilde: '\u2242',
+      equest: '\u225F',
+      Equilibrium: '\u21CC',
+      equiv: '\u2261',
+      equivDD: '\u2A78',
+      eqvparsl: '\u29E5',
+      erarr: '\u2971',
+      erDot: '\u2253',
+      Escr: '\u2130',
+      escr: '\u212F',
+      esdot: '\u2250',
+      Esim: '\u2A73',
+      esim: '\u2242',
+      Eta: '\u0397',
+      eta: '\u03B7',
+      ETH: '\u00D0',
+      eth: '\u00F0',
+      Euml: '\u00CB',
+      euml: '\u00EB',
+      euro: '\u20AC',
+      excl: '\u0021',
+      exist: '\u2203',
+      Exists: '\u2203',
+      expectation: '\u2130',
+      ExponentialE: '\u2147',
+      exponentiale: '\u2147',
+      fallingdotseq: '\u2252',
+      Fcy: '\u0424',
+      fcy: '\u0444',
+      female: '\u2640',
+      ffilig: '\uFB03',
+      fflig: '\uFB00',
+      ffllig: '\uFB04',
+      Ffr: '\uD835\uDD09',
+      ffr: '\uD835\uDD23',
+      filig: '\uFB01',
+      FilledSmallSquare: '\u25FC',
+      FilledVerySmallSquare: '\u25AA',
+      fjlig: '\u0066\u006A',
+      flat: '\u266D',
+      fllig: '\uFB02',
+      fltns: '\u25B1',
+      fnof: '\u0192',
+      Fopf: '\uD835\uDD3D',
+      fopf: '\uD835\uDD57',
+      ForAll: '\u2200',
+      forall: '\u2200',
+      fork: '\u22D4',
+      forkv: '\u2AD9',
+      Fouriertrf: '\u2131',
+      fpartint: '\u2A0D',
+      frac12: '\u00BD',
+      frac13: '\u2153',
+      frac14: '\u00BC',
+      frac15: '\u2155',
+      frac16: '\u2159',
+      frac18: '\u215B',
+      frac23: '\u2154',
+      frac25: '\u2156',
+      frac34: '\u00BE',
+      frac35: '\u2157',
+      frac38: '\u215C',
+      frac45: '\u2158',
+      frac56: '\u215A',
+      frac58: '\u215D',
+      frac78: '\u215E',
+      frasl: '\u2044',
+      frown: '\u2322',
+      Fscr: '\u2131',
+      fscr: '\uD835\uDCBB',
+      gacute: '\u01F5',
+      Gamma: '\u0393',
+      gamma: '\u03B3',
+      Gammad: '\u03DC',
+      gammad: '\u03DD',
+      gap: '\u2A86',
+      Gbreve: '\u011E',
+      gbreve: '\u011F',
+      Gcedil: '\u0122',
+      Gcirc: '\u011C',
+      gcirc: '\u011D',
+      Gcy: '\u0413',
+      gcy: '\u0433',
+      Gdot: '\u0120',
+      gdot: '\u0121',
+      gE: '\u2267',
+      ge: '\u2265',
+      gEl: '\u2A8C',
+      gel: '\u22DB',
+      geq: '\u2265',
+      geqq: '\u2267',
+      geqslant: '\u2A7E',
+      ges: '\u2A7E',
+      gescc: '\u2AA9',
+      gesdot: '\u2A80',
+      gesdoto: '\u2A82',
+      gesdotol: '\u2A84',
+      gesl: '\u22DB\uFE00',
+      gesles: '\u2A94',
+      Gfr: '\uD835\uDD0A',
+      gfr: '\uD835\uDD24',
+      Gg: '\u22D9',
+      gg: '\u226B',
+      ggg: '\u22D9',
+      gimel: '\u2137',
+      GJcy: '\u0403',
+      gjcy: '\u0453',
+      gl: '\u2277',
+      gla: '\u2AA5',
+      glE: '\u2A92',
+      glj: '\u2AA4',
+      gnap: '\u2A8A',
+      gnapprox: '\u2A8A',
+      gnE: '\u2269',
+      gne: '\u2A88',
+      gneq: '\u2A88',
+      gneqq: '\u2269',
+      gnsim: '\u22E7',
+      Gopf: '\uD835\uDD3E',
+      gopf: '\uD835\uDD58',
+      grave: '\u0060',
+      GreaterEqual: '\u2265',
+      GreaterEqualLess: '\u22DB',
+      GreaterFullEqual: '\u2267',
+      GreaterGreater: '\u2AA2',
+      GreaterLess: '\u2277',
+      GreaterSlantEqual: '\u2A7E',
+      GreaterTilde: '\u2273',
+      Gscr: '\uD835\uDCA2',
+      gscr: '\u210A',
+      gsim: '\u2273',
+      gsime: '\u2A8E',
+      gsiml: '\u2A90',
+      Gt: '\u226B',
+      GT: '\u003E',
+      gt: '\u003E',
+      gtcc: '\u2AA7',
+      gtcir: '\u2A7A',
+      gtdot: '\u22D7',
+      gtlPar: '\u2995',
+      gtquest: '\u2A7C',
+      gtrapprox: '\u2A86',
+      gtrarr: '\u2978',
+      gtrdot: '\u22D7',
+      gtreqless: '\u22DB',
+      gtreqqless: '\u2A8C',
+      gtrless: '\u2277',
+      gtrsim: '\u2273',
+      gvertneqq: '\u2269\uFE00',
+      gvnE: '\u2269\uFE00',
+      Hacek: '\u02C7',
+      hairsp: '\u200A',
+      half: '\u00BD',
+      hamilt: '\u210B',
+      HARDcy: '\u042A',
+      hardcy: '\u044A',
+      hArr: '\u21D4',
+      harr: '\u2194',
+      harrcir: '\u2948',
+      harrw: '\u21AD',
+      Hat: '\u005E',
+      hbar: '\u210F',
+      Hcirc: '\u0124',
+      hcirc: '\u0125',
+      hearts: '\u2665',
+      heartsuit: '\u2665',
+      hellip: '\u2026',
+      hercon: '\u22B9',
+      Hfr: '\u210C',
+      hfr: '\uD835\uDD25',
+      HilbertSpace: '\u210B',
+      hksearow: '\u2925',
+      hkswarow: '\u2926',
+      hoarr: '\u21FF',
+      homtht: '\u223B',
+      hookleftarrow: '\u21A9',
+      hookrightarrow: '\u21AA',
+      Hopf: '\u210D',
+      hopf: '\uD835\uDD59',
+      horbar: '\u2015',
+      HorizontalLine: '\u2500',
+      Hscr: '\u210B',
+      hscr: '\uD835\uDCBD',
+      hslash: '\u210F',
+      Hstrok: '\u0126',
+      hstrok: '\u0127',
+      HumpDownHump: '\u224E',
+      HumpEqual: '\u224F',
+      hybull: '\u2043',
+      hyphen: '\u2010',
+      Iacute: '\u00CD',
+      iacute: '\u00ED',
+      ic: '\u2063',
+      Icirc: '\u00CE',
+      icirc: '\u00EE',
+      Icy: '\u0418',
+      icy: '\u0438',
+      Idot: '\u0130',
+      IEcy: '\u0415',
+      iecy: '\u0435',
+      iexcl: '\u00A1',
+      iff: '\u21D4',
+      Ifr: '\u2111',
+      ifr: '\uD835\uDD26',
+      Igrave: '\u00CC',
+      igrave: '\u00EC',
+      ii: '\u2148',
+      iiiint: '\u2A0C',
+      iiint: '\u222D',
+      iinfin: '\u29DC',
+      iiota: '\u2129',
+      IJlig: '\u0132',
+      ijlig: '\u0133',
+      Im: '\u2111',
+      Imacr: '\u012A',
+      imacr: '\u012B',
+      image: '\u2111',
+      ImaginaryI: '\u2148',
+      imagline: '\u2110',
+      imagpart: '\u2111',
+      imath: '\u0131',
+      imof: '\u22B7',
+      imped: '\u01B5',
+      Implies: '\u21D2',
+      in: '\u2208',
+      incare: '\u2105',
+      infin: '\u221E',
+      infintie: '\u29DD',
+      inodot: '\u0131',
+      Int: '\u222C',
+      int: '\u222B',
+      intcal: '\u22BA',
+      integers: '\u2124',
+      Integral: '\u222B',
+      intercal: '\u22BA',
+      Intersection: '\u22C2',
+      intlarhk: '\u2A17',
+      intprod: '\u2A3C',
+      InvisibleComma: '\u2063',
+      InvisibleTimes: '\u2062',
+      IOcy: '\u0401',
+      iocy: '\u0451',
+      Iogon: '\u012E',
+      iogon: '\u012F',
+      Iopf: '\uD835\uDD40',
+      iopf: '\uD835\uDD5A',
+      Iota: '\u0399',
+      iota: '\u03B9',
+      iprod: '\u2A3C',
+      iquest: '\u00BF',
+      Iscr: '\u2110',
+      iscr: '\uD835\uDCBE',
+      isin: '\u2208',
+      isindot: '\u22F5',
+      isinE: '\u22F9',
+      isins: '\u22F4',
+      isinsv: '\u22F3',
+      isinv: '\u2208',
+      it: '\u2062',
+      Itilde: '\u0128',
+      itilde: '\u0129',
+      Iukcy: '\u0406',
+      iukcy: '\u0456',
+      Iuml: '\u00CF',
+      iuml: '\u00EF',
+      Jcirc: '\u0134',
+      jcirc: '\u0135',
+      Jcy: '\u0419',
+      jcy: '\u0439',
+      Jfr: '\uD835\uDD0D',
+      jfr: '\uD835\uDD27',
+      jmath: '\u0237',
+      Jopf: '\uD835\uDD41',
+      jopf: '\uD835\uDD5B',
+      Jscr: '\uD835\uDCA5',
+      jscr: '\uD835\uDCBF',
+      Jsercy: '\u0408',
+      jsercy: '\u0458',
+      Jukcy: '\u0404',
+      jukcy: '\u0454',
+      Kappa: '\u039A',
+      kappa: '\u03BA',
+      kappav: '\u03F0',
+      Kcedil: '\u0136',
+      kcedil: '\u0137',
+      Kcy: '\u041A',
+      kcy: '\u043A',
+      Kfr: '\uD835\uDD0E',
+      kfr: '\uD835\uDD28',
+      kgreen: '\u0138',
+      KHcy: '\u0425',
+      khcy: '\u0445',
+      KJcy: '\u040C',
+      kjcy: '\u045C',
+      Kopf: '\uD835\uDD42',
+      kopf: '\uD835\uDD5C',
+      Kscr: '\uD835\uDCA6',
+      kscr: '\uD835\uDCC0',
+      lAarr: '\u21DA',
+      Lacute: '\u0139',
+      lacute: '\u013A',
+      laemptyv: '\u29B4',
+      lagran: '\u2112',
+      Lambda: '\u039B',
+      lambda: '\u03BB',
+      Lang: '\u27EA',
+      lang: '\u27E8',
+      langd: '\u2991',
+      langle: '\u27E8',
+      lap: '\u2A85',
+      Laplacetrf: '\u2112',
+      laquo: '\u00AB',
+      Larr: '\u219E',
+      lArr: '\u21D0',
+      larr: '\u2190',
+      larrb: '\u21E4',
+      larrbfs: '\u291F',
+      larrfs: '\u291D',
+      larrhk: '\u21A9',
+      larrlp: '\u21AB',
+      larrpl: '\u2939',
+      larrsim: '\u2973',
+      larrtl: '\u21A2',
+      lat: '\u2AAB',
+      lAtail: '\u291B',
+      latail: '\u2919',
+      late: '\u2AAD',
+      lates: '\u2AAD\uFE00',
+      lBarr: '\u290E',
+      lbarr: '\u290C',
+      lbbrk: '\u2772',
+      lbrace: '\u007B',
+      lbrack: '\u005B',
+      lbrke: '\u298B',
+      lbrksld: '\u298F',
+      lbrkslu: '\u298D',
+      Lcaron: '\u013D',
+      lcaron: '\u013E',
+      Lcedil: '\u013B',
+      lcedil: '\u013C',
+      lceil: '\u2308',
+      lcub: '\u007B',
+      Lcy: '\u041B',
+      lcy: '\u043B',
+      ldca: '\u2936',
+      ldquo: '\u201C',
+      ldquor: '\u201E',
+      ldrdhar: '\u2967',
+      ldrushar: '\u294B',
+      ldsh: '\u21B2',
+      lE: '\u2266',
+      le: '\u2264',
+      LeftAngleBracket: '\u27E8',
+      LeftArrow: '\u2190',
+      Leftarrow: '\u21D0',
+      leftarrow: '\u2190',
+      LeftArrowBar: '\u21E4',
+      LeftArrowRightArrow: '\u21C6',
+      leftarrowtail: '\u21A2',
+      LeftCeiling: '\u2308',
+      LeftDoubleBracket: '\u27E6',
+      LeftDownTeeVector: '\u2961',
+      LeftDownVector: '\u21C3',
+      LeftDownVectorBar: '\u2959',
+      LeftFloor: '\u230A',
+      leftharpoondown: '\u21BD',
+      leftharpoonup: '\u21BC',
+      leftleftarrows: '\u21C7',
+      LeftRightArrow: '\u2194',
+      Leftrightarrow: '\u21D4',
+      leftrightarrow: '\u2194',
+      leftrightarrows: '\u21C6',
+      leftrightharpoons: '\u21CB',
+      leftrightsquigarrow: '\u21AD',
+      LeftRightVector: '\u294E',
+      LeftTee: '\u22A3',
+      LeftTeeArrow: '\u21A4',
+      LeftTeeVector: '\u295A',
+      leftthreetimes: '\u22CB',
+      LeftTriangle: '\u22B2',
+      LeftTriangleBar: '\u29CF',
+      LeftTriangleEqual: '\u22B4',
+      LeftUpDownVector: '\u2951',
+      LeftUpTeeVector: '\u2960',
+      LeftUpVector: '\u21BF',
+      LeftUpVectorBar: '\u2958',
+      LeftVector: '\u21BC',
+      LeftVectorBar: '\u2952',
+      lEg: '\u2A8B',
+      leg: '\u22DA',
+      leq: '\u2264',
+      leqq: '\u2266',
+      leqslant: '\u2A7D',
+      les: '\u2A7D',
+      lescc: '\u2AA8',
+      lesdot: '\u2A7F',
+      lesdoto: '\u2A81',
+      lesdotor: '\u2A83',
+      lesg: '\u22DA\uFE00',
+      lesges: '\u2A93',
+      lessapprox: '\u2A85',
+      lessdot: '\u22D6',
+      lesseqgtr: '\u22DA',
+      lesseqqgtr: '\u2A8B',
+      LessEqualGreater: '\u22DA',
+      LessFullEqual: '\u2266',
+      LessGreater: '\u2276',
+      lessgtr: '\u2276',
+      LessLess: '\u2AA1',
+      lesssim: '\u2272',
+      LessSlantEqual: '\u2A7D',
+      LessTilde: '\u2272',
+      lfisht: '\u297C',
+      lfloor: '\u230A',
+      Lfr: '\uD835\uDD0F',
+      lfr: '\uD835\uDD29',
+      lg: '\u2276',
+      lgE: '\u2A91',
+      lHar: '\u2962',
+      lhard: '\u21BD',
+      lharu: '\u21BC',
+      lharul: '\u296A',
+      lhblk: '\u2584',
+      LJcy: '\u0409',
+      ljcy: '\u0459',
+      Ll: '\u22D8',
+      ll: '\u226A',
+      llarr: '\u21C7',
+      llcorner: '\u231E',
+      Lleftarrow: '\u21DA',
+      llhard: '\u296B',
+      lltri: '\u25FA',
+      Lmidot: '\u013F',
+      lmidot: '\u0140',
+      lmoust: '\u23B0',
+      lmoustache: '\u23B0',
+      lnap: '\u2A89',
+      lnapprox: '\u2A89',
+      lnE: '\u2268',
+      lne: '\u2A87',
+      lneq: '\u2A87',
+      lneqq: '\u2268',
+      lnsim: '\u22E6',
+      loang: '\u27EC',
+      loarr: '\u21FD',
+      lobrk: '\u27E6',
+      LongLeftArrow: '\u27F5',
+      Longleftarrow: '\u27F8',
+      longleftarrow: '\u27F5',
+      LongLeftRightArrow: '\u27F7',
+      Longleftrightarrow: '\u27FA',
+      longleftrightarrow: '\u27F7',
+      longmapsto: '\u27FC',
+      LongRightArrow: '\u27F6',
+      Longrightarrow: '\u27F9',
+      longrightarrow: '\u27F6',
+      looparrowleft: '\u21AB',
+      looparrowright: '\u21AC',
+      lopar: '\u2985',
+      Lopf: '\uD835\uDD43',
+      lopf: '\uD835\uDD5D',
+      loplus: '\u2A2D',
+      lotimes: '\u2A34',
+      lowast: '\u2217',
+      lowbar: '\u005F',
+      LowerLeftArrow: '\u2199',
+      LowerRightArrow: '\u2198',
+      loz: '\u25CA',
+      lozenge: '\u25CA',
+      lozf: '\u29EB',
+      lpar: '\u0028',
+      lparlt: '\u2993',
+      lrarr: '\u21C6',
+      lrcorner: '\u231F',
+      lrhar: '\u21CB',
+      lrhard: '\u296D',
+      lrm: '\u200E',
+      lrtri: '\u22BF',
+      lsaquo: '\u2039',
+      Lscr: '\u2112',
+      lscr: '\uD835\uDCC1',
+      Lsh: '\u21B0',
+      lsh: '\u21B0',
+      lsim: '\u2272',
+      lsime: '\u2A8D',
+      lsimg: '\u2A8F',
+      lsqb: '\u005B',
+      lsquo: '\u2018',
+      lsquor: '\u201A',
+      Lstrok: '\u0141',
+      lstrok: '\u0142',
+      Lt: '\u226A',
+      LT: '\u003C',
+      lt: '\u003C',
+      ltcc: '\u2AA6',
+      ltcir: '\u2A79',
+      ltdot: '\u22D6',
+      lthree: '\u22CB',
+      ltimes: '\u22C9',
+      ltlarr: '\u2976',
+      ltquest: '\u2A7B',
+      ltri: '\u25C3',
+      ltrie: '\u22B4',
+      ltrif: '\u25C2',
+      ltrPar: '\u2996',
+      lurdshar: '\u294A',
+      luruhar: '\u2966',
+      lvertneqq: '\u2268\uFE00',
+      lvnE: '\u2268\uFE00',
+      macr: '\u00AF',
+      male: '\u2642',
+      malt: '\u2720',
+      maltese: '\u2720',
+      Map: '\u2905',
+      map: '\u21A6',
+      mapsto: '\u21A6',
+      mapstodown: '\u21A7',
+      mapstoleft: '\u21A4',
+      mapstoup: '\u21A5',
+      marker: '\u25AE',
+      mcomma: '\u2A29',
+      Mcy: '\u041C',
+      mcy: '\u043C',
+      mdash: '\u2014',
+      mDDot: '\u223A',
+      measuredangle: '\u2221',
+      MediumSpace: '\u205F',
+      Mellintrf: '\u2133',
+      Mfr: '\uD835\uDD10',
+      mfr: '\uD835\uDD2A',
+      mho: '\u2127',
+      micro: '\u00B5',
+      mid: '\u2223',
+      midast: '\u002A',
+      midcir: '\u2AF0',
+      middot: '\u00B7',
+      minus: '\u2212',
+      minusb: '\u229F',
+      minusd: '\u2238',
+      minusdu: '\u2A2A',
+      MinusPlus: '\u2213',
+      mlcp: '\u2ADB',
+      mldr: '\u2026',
+      mnplus: '\u2213',
+      models: '\u22A7',
+      Mopf: '\uD835\uDD44',
+      mopf: '\uD835\uDD5E',
+      mp: '\u2213',
+      Mscr: '\u2133',
+      mscr: '\uD835\uDCC2',
+      mstpos: '\u223E',
+      Mu: '\u039C',
+      mu: '\u03BC',
+      multimap: '\u22B8',
+      mumap: '\u22B8',
+      nabla: '\u2207',
+      Nacute: '\u0143',
+      nacute: '\u0144',
+      nang: '\u2220\u20D2',
+      nap: '\u2249',
+      napE: '\u2A70\u0338',
+      napid: '\u224B\u0338',
+      napos: '\u0149',
+      napprox: '\u2249',
+      natur: '\u266E',
+      natural: '\u266E',
+      naturals: '\u2115',
+      nbsp: '\u00A0',
+      nbump: '\u224E\u0338',
+      nbumpe: '\u224F\u0338',
+      ncap: '\u2A43',
+      Ncaron: '\u0147',
+      ncaron: '\u0148',
+      Ncedil: '\u0145',
+      ncedil: '\u0146',
+      ncong: '\u2247',
+      ncongdot: '\u2A6D\u0338',
+      ncup: '\u2A42',
+      Ncy: '\u041D',
+      ncy: '\u043D',
+      ndash: '\u2013',
+      ne: '\u2260',
+      nearhk: '\u2924',
+      neArr: '\u21D7',
+      nearr: '\u2197',
+      nearrow: '\u2197',
+      nedot: '\u2250\u0338',
+      NegativeMediumSpace: '\u200B',
+      NegativeThickSpace: '\u200B',
+      NegativeThinSpace: '\u200B',
+      NegativeVeryThinSpace: '\u200B',
+      nequiv: '\u2262',
+      nesear: '\u2928',
+      nesim: '\u2242\u0338',
+      NestedGreaterGreater: '\u226B',
+      NestedLessLess: '\u226A',
+      NewLine: '\u000A',
+      nexist: '\u2204',
+      nexists: '\u2204',
+      Nfr: '\uD835\uDD11',
+      nfr: '\uD835\uDD2B',
+      ngE: '\u2267\u0338',
+      nge: '\u2271',
+      ngeq: '\u2271',
+      ngeqq: '\u2267\u0338',
+      ngeqslant: '\u2A7E\u0338',
+      nges: '\u2A7E\u0338',
+      nGg: '\u22D9\u0338',
+      ngsim: '\u2275',
+      nGt: '\u226B\u20D2',
+      ngt: '\u226F',
+      ngtr: '\u226F',
+      nGtv: '\u226B\u0338',
+      nhArr: '\u21CE',
+      nharr: '\u21AE',
+      nhpar: '\u2AF2',
+      ni: '\u220B',
+      nis: '\u22FC',
+      nisd: '\u22FA',
+      niv: '\u220B',
+      NJcy: '\u040A',
+      njcy: '\u045A',
+      nlArr: '\u21CD',
+      nlarr: '\u219A',
+      nldr: '\u2025',
+      nlE: '\u2266\u0338',
+      nle: '\u2270',
+      nLeftarrow: '\u21CD',
+      nleftarrow: '\u219A',
+      nLeftrightarrow: '\u21CE',
+      nleftrightarrow: '\u21AE',
+      nleq: '\u2270',
+      nleqq: '\u2266\u0338',
+      nleqslant: '\u2A7D\u0338',
+      nles: '\u2A7D\u0338',
+      nless: '\u226E',
+      nLl: '\u22D8\u0338',
+      nlsim: '\u2274',
+      nLt: '\u226A\u20D2',
+      nlt: '\u226E',
+      nltri: '\u22EA',
+      nltrie: '\u22EC',
+      nLtv: '\u226A\u0338',
+      nmid: '\u2224',
+      NoBreak: '\u2060',
+      NonBreakingSpace: '\u00A0',
+      Nopf: '\u2115',
+      nopf: '\uD835\uDD5F',
+      Not: '\u2AEC',
+      not: '\u00AC',
+      NotCongruent: '\u2262',
+      NotCupCap: '\u226D',
+      NotDoubleVerticalBar: '\u2226',
+      NotElement: '\u2209',
+      NotEqual: '\u2260',
+      NotEqualTilde: '\u2242\u0338',
+      NotExists: '\u2204',
+      NotGreater: '\u226F',
+      NotGreaterEqual: '\u2271',
+      NotGreaterFullEqual: '\u2267\u0338',
+      NotGreaterGreater: '\u226B\u0338',
+      NotGreaterLess: '\u2279',
+      NotGreaterSlantEqual: '\u2A7E\u0338',
+      NotGreaterTilde: '\u2275',
+      NotHumpDownHump: '\u224E\u0338',
+      NotHumpEqual: '\u224F\u0338',
+      notin: '\u2209',
+      notindot: '\u22F5\u0338',
+      notinE: '\u22F9\u0338',
+      notinva: '\u2209',
+      notinvb: '\u22F7',
+      notinvc: '\u22F6',
+      NotLeftTriangle: '\u22EA',
+      NotLeftTriangleBar: '\u29CF\u0338',
+      NotLeftTriangleEqual: '\u22EC',
+      NotLess: '\u226E',
+      NotLessEqual: '\u2270',
+      NotLessGreater: '\u2278',
+      NotLessLess: '\u226A\u0338',
+      NotLessSlantEqual: '\u2A7D\u0338',
+      NotLessTilde: '\u2274',
+      NotNestedGreaterGreater: '\u2AA2\u0338',
+      NotNestedLessLess: '\u2AA1\u0338',
+      notni: '\u220C',
+      notniva: '\u220C',
+      notnivb: '\u22FE',
+      notnivc: '\u22FD',
+      NotPrecedes: '\u2280',
+      NotPrecedesEqual: '\u2AAF\u0338',
+      NotPrecedesSlantEqual: '\u22E0',
+      NotReverseElement: '\u220C',
+      NotRightTriangle: '\u22EB',
+      NotRightTriangleBar: '\u29D0\u0338',
+      NotRightTriangleEqual: '\u22ED',
+      NotSquareSubset: '\u228F\u0338',
+      NotSquareSubsetEqual: '\u22E2',
+      NotSquareSuperset: '\u2290\u0338',
+      NotSquareSupersetEqual: '\u22E3',
+      NotSubset: '\u2282\u20D2',
+      NotSubsetEqual: '\u2288',
+      NotSucceeds: '\u2281',
+      NotSucceedsEqual: '\u2AB0\u0338',
+      NotSucceedsSlantEqual: '\u22E1',
+      NotSucceedsTilde: '\u227F\u0338',
+      NotSuperset: '\u2283\u20D2',
+      NotSupersetEqual: '\u2289',
+      NotTilde: '\u2241',
+      NotTildeEqual: '\u2244',
+      NotTildeFullEqual: '\u2247',
+      NotTildeTilde: '\u2249',
+      NotVerticalBar: '\u2224',
+      npar: '\u2226',
+      nparallel: '\u2226',
+      nparsl: '\u2AFD\u20E5',
+      npart: '\u2202\u0338',
+      npolint: '\u2A14',
+      npr: '\u2280',
+      nprcue: '\u22E0',
+      npre: '\u2AAF\u0338',
+      nprec: '\u2280',
+      npreceq: '\u2AAF\u0338',
+      nrArr: '\u21CF',
+      nrarr: '\u219B',
+      nrarrc: '\u2933\u0338',
+      nrarrw: '\u219D\u0338',
+      nRightarrow: '\u21CF',
+      nrightarrow: '\u219B',
+      nrtri: '\u22EB',
+      nrtrie: '\u22ED',
+      nsc: '\u2281',
+      nsccue: '\u22E1',
+      nsce: '\u2AB0\u0338',
+      Nscr: '\uD835\uDCA9',
+      nscr: '\uD835\uDCC3',
+      nshortmid: '\u2224',
+      nshortparallel: '\u2226',
+      nsim: '\u2241',
+      nsime: '\u2244',
+      nsimeq: '\u2244',
+      nsmid: '\u2224',
+      nspar: '\u2226',
+      nsqsube: '\u22E2',
+      nsqsupe: '\u22E3',
+      nsub: '\u2284',
+      nsubE: '\u2AC5\u0338',
+      nsube: '\u2288',
+      nsubset: '\u2282\u20D2',
+      nsubseteq: '\u2288',
+      nsubseteqq: '\u2AC5\u0338',
+      nsucc: '\u2281',
+      nsucceq: '\u2AB0\u0338',
+      nsup: '\u2285',
+      nsupE: '\u2AC6\u0338',
+      nsupe: '\u2289',
+      nsupset: '\u2283\u20D2',
+      nsupseteq: '\u2289',
+      nsupseteqq: '\u2AC6\u0338',
+      ntgl: '\u2279',
+      Ntilde: '\u00D1',
+      ntilde: '\u00F1',
+      ntlg: '\u2278',
+      ntriangleleft: '\u22EA',
+      ntrianglelefteq: '\u22EC',
+      ntriangleright: '\u22EB',
+      ntrianglerighteq: '\u22ED',
+      Nu: '\u039D',
+      nu: '\u03BD',
+      num: '\u0023',
+      numero: '\u2116',
+      numsp: '\u2007',
+      nvap: '\u224D\u20D2',
+      nVDash: '\u22AF',
+      nVdash: '\u22AE',
+      nvDash: '\u22AD',
+      nvdash: '\u22AC',
+      nvge: '\u2265\u20D2',
+      nvgt: '\u003E\u20D2',
+      nvHarr: '\u2904',
+      nvinfin: '\u29DE',
+      nvlArr: '\u2902',
+      nvle: '\u2264\u20D2',
+      nvlt: '\u003C\u20D2',
+      nvltrie: '\u22B4\u20D2',
+      nvrArr: '\u2903',
+      nvrtrie: '\u22B5\u20D2',
+      nvsim: '\u223C\u20D2',
+      nwarhk: '\u2923',
+      nwArr: '\u21D6',
+      nwarr: '\u2196',
+      nwarrow: '\u2196',
+      nwnear: '\u2927',
+      Oacute: '\u00D3',
+      oacute: '\u00F3',
+      oast: '\u229B',
+      ocir: '\u229A',
+      Ocirc: '\u00D4',
+      ocirc: '\u00F4',
+      Ocy: '\u041E',
+      ocy: '\u043E',
+      odash: '\u229D',
+      Odblac: '\u0150',
+      odblac: '\u0151',
+      odiv: '\u2A38',
+      odot: '\u2299',
+      odsold: '\u29BC',
+      OElig: '\u0152',
+      oelig: '\u0153',
+      ofcir: '\u29BF',
+      Ofr: '\uD835\uDD12',
+      ofr: '\uD835\uDD2C',
+      ogon: '\u02DB',
+      Ograve: '\u00D2',
+      ograve: '\u00F2',
+      ogt: '\u29C1',
+      ohbar: '\u29B5',
+      ohm: '\u03A9',
+      oint: '\u222E',
+      olarr: '\u21BA',
+      olcir: '\u29BE',
+      olcross: '\u29BB',
+      oline: '\u203E',
+      olt: '\u29C0',
+      Omacr: '\u014C',
+      omacr: '\u014D',
+      Omega: '\u03A9',
+      omega: '\u03C9',
+      Omicron: '\u039F',
+      omicron: '\u03BF',
+      omid: '\u29B6',
+      ominus: '\u2296',
+      Oopf: '\uD835\uDD46',
+      oopf: '\uD835\uDD60',
+      opar: '\u29B7',
+      OpenCurlyDoubleQuote: '\u201C',
+      OpenCurlyQuote: '\u2018',
+      operp: '\u29B9',
+      oplus: '\u2295',
+      Or: '\u2A54',
+      or: '\u2228',
+      orarr: '\u21BB',
+      ord: '\u2A5D',
+      order: '\u2134',
+      orderof: '\u2134',
+      ordf: '\u00AA',
+      ordm: '\u00BA',
+      origof: '\u22B6',
+      oror: '\u2A56',
+      orslope: '\u2A57',
+      orv: '\u2A5B',
+      oS: '\u24C8',
+      Oscr: '\uD835\uDCAA',
+      oscr: '\u2134',
+      Oslash: '\u00D8',
+      oslash: '\u00F8',
+      osol: '\u2298',
+      Otilde: '\u00D5',
+      otilde: '\u00F5',
+      Otimes: '\u2A37',
+      otimes: '\u2297',
+      otimesas: '\u2A36',
+      Ouml: '\u00D6',
+      ouml: '\u00F6',
+      ovbar: '\u233D',
+      OverBar: '\u203E',
+      OverBrace: '\u23DE',
+      OverBracket: '\u23B4',
+      OverParenthesis: '\u23DC',
+      par: '\u2225',
+      para: '\u00B6',
+      parallel: '\u2225',
+      parsim: '\u2AF3',
+      parsl: '\u2AFD',
+      part: '\u2202',
+      PartialD: '\u2202',
+      Pcy: '\u041F',
+      pcy: '\u043F',
+      percnt: '\u0025',
+      period: '\u002E',
+      permil: '\u2030',
+      perp: '\u22A5',
+      pertenk: '\u2031',
+      Pfr: '\uD835\uDD13',
+      pfr: '\uD835\uDD2D',
+      Phi: '\u03A6',
+      phi: '\u03C6',
+      phiv: '\u03D5',
+      phmmat: '\u2133',
+      phone: '\u260E',
+      Pi: '\u03A0',
+      pi: '\u03C0',
+      pitchfork: '\u22D4',
+      piv: '\u03D6',
+      planck: '\u210F',
+      planckh: '\u210E',
+      plankv: '\u210F',
+      plus: '\u002B',
+      plusacir: '\u2A23',
+      plusb: '\u229E',
+      pluscir: '\u2A22',
+      plusdo: '\u2214',
+      plusdu: '\u2A25',
+      pluse: '\u2A72',
+      PlusMinus: '\u00B1',
+      plusmn: '\u00B1',
+      plussim: '\u2A26',
+      plustwo: '\u2A27',
+      pm: '\u00B1',
+      Poincareplane: '\u210C',
+      pointint: '\u2A15',
+      Popf: '\u2119',
+      popf: '\uD835\uDD61',
+      pound: '\u00A3',
+      Pr: '\u2ABB',
+      pr: '\u227A',
+      prap: '\u2AB7',
+      prcue: '\u227C',
+      prE: '\u2AB3',
+      pre: '\u2AAF',
+      prec: '\u227A',
+      precapprox: '\u2AB7',
+      preccurlyeq: '\u227C',
+      Precedes: '\u227A',
+      PrecedesEqual: '\u2AAF',
+      PrecedesSlantEqual: '\u227C',
+      PrecedesTilde: '\u227E',
+      preceq: '\u2AAF',
+      precnapprox: '\u2AB9',
+      precneqq: '\u2AB5',
+      precnsim: '\u22E8',
+      precsim: '\u227E',
+      Prime: '\u2033',
+      prime: '\u2032',
+      primes: '\u2119',
+      prnap: '\u2AB9',
+      prnE: '\u2AB5',
+      prnsim: '\u22E8',
+      prod: '\u220F',
+      Product: '\u220F',
+      profalar: '\u232E',
+      profline: '\u2312',
+      profsurf: '\u2313',
+      prop: '\u221D',
+      Proportion: '\u2237',
+      Proportional: '\u221D',
+      propto: '\u221D',
+      prsim: '\u227E',
+      prurel: '\u22B0',
+      Pscr: '\uD835\uDCAB',
+      pscr: '\uD835\uDCC5',
+      Psi: '\u03A8',
+      psi: '\u03C8',
+      puncsp: '\u2008',
+      Qfr: '\uD835\uDD14',
+      qfr: '\uD835\uDD2E',
+      qint: '\u2A0C',
+      Qopf: '\u211A',
+      qopf: '\uD835\uDD62',
+      qprime: '\u2057',
+      Qscr: '\uD835\uDCAC',
+      qscr: '\uD835\uDCC6',
+      quaternions: '\u210D',
+      quatint: '\u2A16',
+      quest: '\u003F',
+      questeq: '\u225F',
+      QUOT: '\u0022',
+      quot: '\u0022',
+      rAarr: '\u21DB',
+      race: '\u223D\u0331',
+      Racute: '\u0154',
+      racute: '\u0155',
+      radic: '\u221A',
+      raemptyv: '\u29B3',
+      Rang: '\u27EB',
+      rang: '\u27E9',
+      rangd: '\u2992',
+      range: '\u29A5',
+      rangle: '\u27E9',
+      raquo: '\u00BB',
+      Rarr: '\u21A0',
+      rArr: '\u21D2',
+      rarr: '\u2192',
+      rarrap: '\u2975',
+      rarrb: '\u21E5',
+      rarrbfs: '\u2920',
+      rarrc: '\u2933',
+      rarrfs: '\u291E',
+      rarrhk: '\u21AA',
+      rarrlp: '\u21AC',
+      rarrpl: '\u2945',
+      rarrsim: '\u2974',
+      Rarrtl: '\u2916',
+      rarrtl: '\u21A3',
+      rarrw: '\u219D',
+      rAtail: '\u291C',
+      ratail: '\u291A',
+      ratio: '\u2236',
+      rationals: '\u211A',
+      RBarr: '\u2910',
+      rBarr: '\u290F',
+      rbarr: '\u290D',
+      rbbrk: '\u2773',
+      rbrace: '\u007D',
+      rbrack: '\u005D',
+      rbrke: '\u298C',
+      rbrksld: '\u298E',
+      rbrkslu: '\u2990',
+      Rcaron: '\u0158',
+      rcaron: '\u0159',
+      Rcedil: '\u0156',
+      rcedil: '\u0157',
+      rceil: '\u2309',
+      rcub: '\u007D',
+      Rcy: '\u0420',
+      rcy: '\u0440',
+      rdca: '\u2937',
+      rdldhar: '\u2969',
+      rdquo: '\u201D',
+      rdquor: '\u201D',
+      rdsh: '\u21B3',
+      Re: '\u211C',
+      real: '\u211C',
+      realine: '\u211B',
+      realpart: '\u211C',
+      reals: '\u211D',
+      rect: '\u25AD',
+      REG: '\u00AE',
+      reg: '\u00AE',
+      ReverseElement: '\u220B',
+      ReverseEquilibrium: '\u21CB',
+      ReverseUpEquilibrium: '\u296F',
+      rfisht: '\u297D',
+      rfloor: '\u230B',
+      Rfr: '\u211C',
+      rfr: '\uD835\uDD2F',
+      rHar: '\u2964',
+      rhard: '\u21C1',
+      rharu: '\u21C0',
+      rharul: '\u296C',
+      Rho: '\u03A1',
+      rho: '\u03C1',
+      rhov: '\u03F1',
+      RightAngleBracket: '\u27E9',
+      RightArrow: '\u2192',
+      Rightarrow: '\u21D2',
+      rightarrow: '\u2192',
+      RightArrowBar: '\u21E5',
+      RightArrowLeftArrow: '\u21C4',
+      rightarrowtail: '\u21A3',
+      RightCeiling: '\u2309',
+      RightDoubleBracket: '\u27E7',
+      RightDownTeeVector: '\u295D',
+      RightDownVector: '\u21C2',
+      RightDownVectorBar: '\u2955',
+      RightFloor: '\u230B',
+      rightharpoondown: '\u21C1',
+      rightharpoonup: '\u21C0',
+      rightleftarrows: '\u21C4',
+      rightleftharpoons: '\u21CC',
+      rightrightarrows: '\u21C9',
+      rightsquigarrow: '\u219D',
+      RightTee: '\u22A2',
+      RightTeeArrow: '\u21A6',
+      RightTeeVector: '\u295B',
+      rightthreetimes: '\u22CC',
+      RightTriangle: '\u22B3',
+      RightTriangleBar: '\u29D0',
+      RightTriangleEqual: '\u22B5',
+      RightUpDownVector: '\u294F',
+      RightUpTeeVector: '\u295C',
+      RightUpVector: '\u21BE',
+      RightUpVectorBar: '\u2954',
+      RightVector: '\u21C0',
+      RightVectorBar: '\u2953',
+      ring: '\u02DA',
+      risingdotseq: '\u2253',
+      rlarr: '\u21C4',
+      rlhar: '\u21CC',
+      rlm: '\u200F',
+      rmoust: '\u23B1',
+      rmoustache: '\u23B1',
+      rnmid: '\u2AEE',
+      roang: '\u27ED',
+      roarr: '\u21FE',
+      robrk: '\u27E7',
+      ropar: '\u2986',
+      Ropf: '\u211D',
+      ropf: '\uD835\uDD63',
+      roplus: '\u2A2E',
+      rotimes: '\u2A35',
+      RoundImplies: '\u2970',
+      rpar: '\u0029',
+      rpargt: '\u2994',
+      rppolint: '\u2A12',
+      rrarr: '\u21C9',
+      Rrightarrow: '\u21DB',
+      rsaquo: '\u203A',
+      Rscr: '\u211B',
+      rscr: '\uD835\uDCC7',
+      Rsh: '\u21B1',
+      rsh: '\u21B1',
+      rsqb: '\u005D',
+      rsquo: '\u2019',
+      rsquor: '\u2019',
+      rthree: '\u22CC',
+      rtimes: '\u22CA',
+      rtri: '\u25B9',
+      rtrie: '\u22B5',
+      rtrif: '\u25B8',
+      rtriltri: '\u29CE',
+      RuleDelayed: '\u29F4',
+      ruluhar: '\u2968',
+      rx: '\u211E',
+      Sacute: '\u015A',
+      sacute: '\u015B',
+      sbquo: '\u201A',
+      Sc: '\u2ABC',
+      sc: '\u227B',
+      scap: '\u2AB8',
+      Scaron: '\u0160',
+      scaron: '\u0161',
+      sccue: '\u227D',
+      scE: '\u2AB4',
+      sce: '\u2AB0',
+      Scedil: '\u015E',
+      scedil: '\u015F',
+      Scirc: '\u015C',
+      scirc: '\u015D',
+      scnap: '\u2ABA',
+      scnE: '\u2AB6',
+      scnsim: '\u22E9',
+      scpolint: '\u2A13',
+      scsim: '\u227F',
+      Scy: '\u0421',
+      scy: '\u0441',
+      sdot: '\u22C5',
+      sdotb: '\u22A1',
+      sdote: '\u2A66',
+      searhk: '\u2925',
+      seArr: '\u21D8',
+      searr: '\u2198',
+      searrow: '\u2198',
+      sect: '\u00A7',
+      semi: '\u003B',
+      seswar: '\u2929',
+      setminus: '\u2216',
+      setmn: '\u2216',
+      sext: '\u2736',
+      Sfr: '\uD835\uDD16',
+      sfr: '\uD835\uDD30',
+      sfrown: '\u2322',
+      sharp: '\u266F',
+      SHCHcy: '\u0429',
+      shchcy: '\u0449',
+      SHcy: '\u0428',
+      shcy: '\u0448',
+      ShortDownArrow: '\u2193',
+      ShortLeftArrow: '\u2190',
+      shortmid: '\u2223',
+      shortparallel: '\u2225',
+      ShortRightArrow: '\u2192',
+      ShortUpArrow: '\u2191',
+      shy: '\u00AD',
+      Sigma: '\u03A3',
+      sigma: '\u03C3',
+      sigmaf: '\u03C2',
+      sigmav: '\u03C2',
+      sim: '\u223C',
+      simdot: '\u2A6A',
+      sime: '\u2243',
+      simeq: '\u2243',
+      simg: '\u2A9E',
+      simgE: '\u2AA0',
+      siml: '\u2A9D',
+      simlE: '\u2A9F',
+      simne: '\u2246',
+      simplus: '\u2A24',
+      simrarr: '\u2972',
+      slarr: '\u2190',
+      SmallCircle: '\u2218',
+      smallsetminus: '\u2216',
+      smashp: '\u2A33',
+      smeparsl: '\u29E4',
+      smid: '\u2223',
+      smile: '\u2323',
+      smt: '\u2AAA',
+      smte: '\u2AAC',
+      smtes: '\u2AAC\uFE00',
+      SOFTcy: '\u042C',
+      softcy: '\u044C',
+      sol: '\u002F',
+      solb: '\u29C4',
+      solbar: '\u233F',
+      Sopf: '\uD835\uDD4A',
+      sopf: '\uD835\uDD64',
+      spades: '\u2660',
+      spadesuit: '\u2660',
+      spar: '\u2225',
+      sqcap: '\u2293',
+      sqcaps: '\u2293\uFE00',
+      sqcup: '\u2294',
+      sqcups: '\u2294\uFE00',
+      Sqrt: '\u221A',
+      sqsub: '\u228F',
+      sqsube: '\u2291',
+      sqsubset: '\u228F',
+      sqsubseteq: '\u2291',
+      sqsup: '\u2290',
+      sqsupe: '\u2292',
+      sqsupset: '\u2290',
+      sqsupseteq: '\u2292',
+      squ: '\u25A1',
+      Square: '\u25A1',
+      square: '\u25A1',
+      SquareIntersection: '\u2293',
+      SquareSubset: '\u228F',
+      SquareSubsetEqual: '\u2291',
+      SquareSuperset: '\u2290',
+      SquareSupersetEqual: '\u2292',
+      SquareUnion: '\u2294',
+      squarf: '\u25AA',
+      squf: '\u25AA',
+      srarr: '\u2192',
+      Sscr: '\uD835\uDCAE',
+      sscr: '\uD835\uDCC8',
+      ssetmn: '\u2216',
+      ssmile: '\u2323',
+      sstarf: '\u22C6',
+      Star: '\u22C6',
+      star: '\u2606',
+      starf: '\u2605',
+      straightepsilon: '\u03F5',
+      straightphi: '\u03D5',
+      strns: '\u00AF',
+      Sub: '\u22D0',
+      sub: '\u2282',
+      subdot: '\u2ABD',
+      subE: '\u2AC5',
+      sube: '\u2286',
+      subedot: '\u2AC3',
+      submult: '\u2AC1',
+      subnE: '\u2ACB',
+      subne: '\u228A',
+      subplus: '\u2ABF',
+      subrarr: '\u2979',
+      Subset: '\u22D0',
+      subset: '\u2282',
+      subseteq: '\u2286',
+      subseteqq: '\u2AC5',
+      SubsetEqual: '\u2286',
+      subsetneq: '\u228A',
+      subsetneqq: '\u2ACB',
+      subsim: '\u2AC7',
+      subsub: '\u2AD5',
+      subsup: '\u2AD3',
+      succ: '\u227B',
+      succapprox: '\u2AB8',
+      succcurlyeq: '\u227D',
+      Succeeds: '\u227B',
+      SucceedsEqual: '\u2AB0',
+      SucceedsSlantEqual: '\u227D',
+      SucceedsTilde: '\u227F',
+      succeq: '\u2AB0',
+      succnapprox: '\u2ABA',
+      succneqq: '\u2AB6',
+      succnsim: '\u22E9',
+      succsim: '\u227F',
+      SuchThat: '\u220B',
+      Sum: '\u2211',
+      sum: '\u2211',
+      sung: '\u266A',
+      Sup: '\u22D1',
+      sup: '\u2283',
+      sup1: '\u00B9',
+      sup2: '\u00B2',
+      sup3: '\u00B3',
+      supdot: '\u2ABE',
+      supdsub: '\u2AD8',
+      supE: '\u2AC6',
+      supe: '\u2287',
+      supedot: '\u2AC4',
+      Superset: '\u2283',
+      SupersetEqual: '\u2287',
+      suphsol: '\u27C9',
+      suphsub: '\u2AD7',
+      suplarr: '\u297B',
+      supmult: '\u2AC2',
+      supnE: '\u2ACC',
+      supne: '\u228B',
+      supplus: '\u2AC0',
+      Supset: '\u22D1',
+      supset: '\u2283',
+      supseteq: '\u2287',
+      supseteqq: '\u2AC6',
+      supsetneq: '\u228B',
+      supsetneqq: '\u2ACC',
+      supsim: '\u2AC8',
+      supsub: '\u2AD4',
+      supsup: '\u2AD6',
+      swarhk: '\u2926',
+      swArr: '\u21D9',
+      swarr: '\u2199',
+      swarrow: '\u2199',
+      swnwar: '\u292A',
+      szlig: '\u00DF',
+      Tab: '\u0009',
+      target: '\u2316',
+      Tau: '\u03A4',
+      tau: '\u03C4',
+      tbrk: '\u23B4',
+      Tcaron: '\u0164',
+      tcaron: '\u0165',
+      Tcedil: '\u0162',
+      tcedil: '\u0163',
+      Tcy: '\u0422',
+      tcy: '\u0442',
+      tdot: '\u20DB',
+      telrec: '\u2315',
+      Tfr: '\uD835\uDD17',
+      tfr: '\uD835\uDD31',
+      there4: '\u2234',
+      Therefore: '\u2234',
+      therefore: '\u2234',
+      Theta: '\u0398',
+      theta: '\u03B8',
+      thetasym: '\u03D1',
+      thetav: '\u03D1',
+      thickapprox: '\u2248',
+      thicksim: '\u223C',
+      ThickSpace: '\u205F\u200A',
+      thinsp: '\u2009',
+      ThinSpace: '\u2009',
+      thkap: '\u2248',
+      thksim: '\u223C',
+      THORN: '\u00DE',
+      thorn: '\u00FE',
+      Tilde: '\u223C',
+      tilde: '\u02DC',
+      TildeEqual: '\u2243',
+      TildeFullEqual: '\u2245',
+      TildeTilde: '\u2248',
+      times: '\u00D7',
+      timesb: '\u22A0',
+      timesbar: '\u2A31',
+      timesd: '\u2A30',
+      tint: '\u222D',
+      toea: '\u2928',
+      top: '\u22A4',
+      topbot: '\u2336',
+      topcir: '\u2AF1',
+      Topf: '\uD835\uDD4B',
+      topf: '\uD835\uDD65',
+      topfork: '\u2ADA',
+      tosa: '\u2929',
+      tprime: '\u2034',
+      TRADE: '\u2122',
+      trade: '\u2122',
+      triangle: '\u25B5',
+      triangledown: '\u25BF',
+      triangleleft: '\u25C3',
+      trianglelefteq: '\u22B4',
+      triangleq: '\u225C',
+      triangleright: '\u25B9',
+      trianglerighteq: '\u22B5',
+      tridot: '\u25EC',
+      trie: '\u225C',
+      triminus: '\u2A3A',
+      TripleDot: '\u20DB',
+      triplus: '\u2A39',
+      trisb: '\u29CD',
+      tritime: '\u2A3B',
+      trpezium: '\u23E2',
+      Tscr: '\uD835\uDCAF',
+      tscr: '\uD835\uDCC9',
+      TScy: '\u0426',
+      tscy: '\u0446',
+      TSHcy: '\u040B',
+      tshcy: '\u045B',
+      Tstrok: '\u0166',
+      tstrok: '\u0167',
+      twixt: '\u226C',
+      twoheadleftarrow: '\u219E',
+      twoheadrightarrow: '\u21A0',
+      Uacute: '\u00DA',
+      uacute: '\u00FA',
+      Uarr: '\u219F',
+      uArr: '\u21D1',
+      uarr: '\u2191',
+      Uarrocir: '\u2949',
+      Ubrcy: '\u040E',
+      ubrcy: '\u045E',
+      Ubreve: '\u016C',
+      ubreve: '\u016D',
+      Ucirc: '\u00DB',
+      ucirc: '\u00FB',
+      Ucy: '\u0423',
+      ucy: '\u0443',
+      udarr: '\u21C5',
+      Udblac: '\u0170',
+      udblac: '\u0171',
+      udhar: '\u296E',
+      ufisht: '\u297E',
+      Ufr: '\uD835\uDD18',
+      ufr: '\uD835\uDD32',
+      Ugrave: '\u00D9',
+      ugrave: '\u00F9',
+      uHar: '\u2963',
+      uharl: '\u21BF',
+      uharr: '\u21BE',
+      uhblk: '\u2580',
+      ulcorn: '\u231C',
+      ulcorner: '\u231C',
+      ulcrop: '\u230F',
+      ultri: '\u25F8',
+      Umacr: '\u016A',
+      umacr: '\u016B',
+      uml: '\u00A8',
+      UnderBar: '\u005F',
+      UnderBrace: '\u23DF',
+      UnderBracket: '\u23B5',
+      UnderParenthesis: '\u23DD',
+      Union: '\u22C3',
+      UnionPlus: '\u228E',
+      Uogon: '\u0172',
+      uogon: '\u0173',
+      Uopf: '\uD835\uDD4C',
+      uopf: '\uD835\uDD66',
+      UpArrow: '\u2191',
+      Uparrow: '\u21D1',
+      uparrow: '\u2191',
+      UpArrowBar: '\u2912',
+      UpArrowDownArrow: '\u21C5',
+      UpDownArrow: '\u2195',
+      Updownarrow: '\u21D5',
+      updownarrow: '\u2195',
+      UpEquilibrium: '\u296E',
+      upharpoonleft: '\u21BF',
+      upharpoonright: '\u21BE',
+      uplus: '\u228E',
+      UpperLeftArrow: '\u2196',
+      UpperRightArrow: '\u2197',
+      Upsi: '\u03D2',
+      upsi: '\u03C5',
+      upsih: '\u03D2',
+      Upsilon: '\u03A5',
+      upsilon: '\u03C5',
+      UpTee: '\u22A5',
+      UpTeeArrow: '\u21A5',
+      upuparrows: '\u21C8',
+      urcorn: '\u231D',
+      urcorner: '\u231D',
+      urcrop: '\u230E',
+      Uring: '\u016E',
+      uring: '\u016F',
+      urtri: '\u25F9',
+      Uscr: '\uD835\uDCB0',
+      uscr: '\uD835\uDCCA',
+      utdot: '\u22F0',
+      Utilde: '\u0168',
+      utilde: '\u0169',
+      utri: '\u25B5',
+      utrif: '\u25B4',
+      uuarr: '\u21C8',
+      Uuml: '\u00DC',
+      uuml: '\u00FC',
+      uwangle: '\u29A7',
+      vangrt: '\u299C',
+      varepsilon: '\u03F5',
+      varkappa: '\u03F0',
+      varnothing: '\u2205',
+      varphi: '\u03D5',
+      varpi: '\u03D6',
+      varpropto: '\u221D',
+      vArr: '\u21D5',
+      varr: '\u2195',
+      varrho: '\u03F1',
+      varsigma: '\u03C2',
+      varsubsetneq: '\u228A\uFE00',
+      varsubsetneqq: '\u2ACB\uFE00',
+      varsupsetneq: '\u228B\uFE00',
+      varsupsetneqq: '\u2ACC\uFE00',
+      vartheta: '\u03D1',
+      vartriangleleft: '\u22B2',
+      vartriangleright: '\u22B3',
+      Vbar: '\u2AEB',
+      vBar: '\u2AE8',
+      vBarv: '\u2AE9',
+      Vcy: '\u0412',
+      vcy: '\u0432',
+      VDash: '\u22AB',
+      Vdash: '\u22A9',
+      vDash: '\u22A8',
+      vdash: '\u22A2',
+      Vdashl: '\u2AE6',
+      Vee: '\u22C1',
+      vee: '\u2228',
+      veebar: '\u22BB',
+      veeeq: '\u225A',
+      vellip: '\u22EE',
+      Verbar: '\u2016',
+      verbar: '\u007C',
+      Vert: '\u2016',
+      vert: '\u007C',
+      VerticalBar: '\u2223',
+      VerticalLine: '\u007C',
+      VerticalSeparator: '\u2758',
+      VerticalTilde: '\u2240',
+      VeryThinSpace: '\u200A',
+      Vfr: '\uD835\uDD19',
+      vfr: '\uD835\uDD33',
+      vltri: '\u22B2',
+      vnsub: '\u2282\u20D2',
+      vnsup: '\u2283\u20D2',
+      Vopf: '\uD835\uDD4D',
+      vopf: '\uD835\uDD67',
+      vprop: '\u221D',
+      vrtri: '\u22B3',
+      Vscr: '\uD835\uDCB1',
+      vscr: '\uD835\uDCCB',
+      vsubnE: '\u2ACB\uFE00',
+      vsubne: '\u228A\uFE00',
+      vsupnE: '\u2ACC\uFE00',
+      vsupne: '\u228B\uFE00',
+      Vvdash: '\u22AA',
+      vzigzag: '\u299A',
+      Wcirc: '\u0174',
+      wcirc: '\u0175',
+      wedbar: '\u2A5F',
+      Wedge: '\u22C0',
+      wedge: '\u2227',
+      wedgeq: '\u2259',
+      weierp: '\u2118',
+      Wfr: '\uD835\uDD1A',
+      wfr: '\uD835\uDD34',
+      Wopf: '\uD835\uDD4E',
+      wopf: '\uD835\uDD68',
+      wp: '\u2118',
+      wr: '\u2240',
+      wreath: '\u2240',
+      Wscr: '\uD835\uDCB2',
+      wscr: '\uD835\uDCCC',
+      xcap: '\u22C2',
+      xcirc: '\u25EF',
+      xcup: '\u22C3',
+      xdtri: '\u25BD',
+      Xfr: '\uD835\uDD1B',
+      xfr: '\uD835\uDD35',
+      xhArr: '\u27FA',
+      xharr: '\u27F7',
+      Xi: '\u039E',
+      xi: '\u03BE',
+      xlArr: '\u27F8',
+      xlarr: '\u27F5',
+      xmap: '\u27FC',
+      xnis: '\u22FB',
+      xodot: '\u2A00',
+      Xopf: '\uD835\uDD4F',
+      xopf: '\uD835\uDD69',
+      xoplus: '\u2A01',
+      xotime: '\u2A02',
+      xrArr: '\u27F9',
+      xrarr: '\u27F6',
+      Xscr: '\uD835\uDCB3',
+      xscr: '\uD835\uDCCD',
+      xsqcup: '\u2A06',
+      xuplus: '\u2A04',
+      xutri: '\u25B3',
+      xvee: '\u22C1',
+      xwedge: '\u22C0',
+      Yacute: '\u00DD',
+      yacute: '\u00FD',
+      YAcy: '\u042F',
+      yacy: '\u044F',
+      Ycirc: '\u0176',
+      ycirc: '\u0177',
+      Ycy: '\u042B',
+      ycy: '\u044B',
+      yen: '\u00A5',
+      Yfr: '\uD835\uDD1C',
+      yfr: '\uD835\uDD36',
+      YIcy: '\u0407',
+      yicy: '\u0457',
+      Yopf: '\uD835\uDD50',
+      yopf: '\uD835\uDD6A',
+      Yscr: '\uD835\uDCB4',
+      yscr: '\uD835\uDCCE',
+      YUcy: '\u042E',
+      yucy: '\u044E',
+      Yuml: '\u0178',
+      yuml: '\u00FF',
+      Zacute: '\u0179',
+      zacute: '\u017A',
+      Zcaron: '\u017D',
+      zcaron: '\u017E',
+      Zcy: '\u0417',
+      zcy: '\u0437',
+      Zdot: '\u017B',
+      zdot: '\u017C',
+      zeetrf: '\u2128',
+      ZeroWidthSpace: '\u200B',
+      Zeta: '\u0396',
+      zeta: '\u03B6',
+      Zfr: '\u2128',
+      zfr: '\uD835\uDD37',
+      ZHcy: '\u0416',
+      zhcy: '\u0436',
+      zigrarr: '\u21DD',
+      Zopf: '\u2124',
+      zopf: '\uD835\uDD6B',
+      Zscr: '\uD835\uDCB5',
+      zscr: '\uD835\uDCCF',
+      zwj: '\u200D',
+      zwnj: '\u200C'
     });
 
     /**
@@ -30949,7 +36951,6 @@
         locator.lineNumber++;
         //console.log('line++:',locator,startPos,endPos)
       }
-
       locator.columnNumber = p - lineStart + 1;
     }
     var lineStart = 0;
@@ -31118,7 +37119,6 @@
             //fatalError: equal must after attrName or space after attrName
             throw new Error('attribute equal must after attrName'); // No known test case
           }
-
           break;
         case '\'':
         case '"':
@@ -31149,7 +37149,6 @@
             //fatalError: no equal before
             throw new Error('attribute value must after "="'); // No known test case
           }
-
           break;
         case '/':
           switch (s) {
@@ -31162,14 +37161,15 @@
               el.closed = true;
             case S_ATTR_NOQUOT_VALUE:
             case S_ATTR:
+              break;
             case S_ATTR_SPACE:
+              el.closed = true;
               break;
             //case S_EQ:
             default:
               throw new Error("attribute invalid close char('/')");
             // No known test case
           }
-
           break;
         case '':
           //end document
@@ -31311,7 +37311,6 @@
           _copy(currentNSMap, currentNSMap = {});
           //console.log(currentNSMap,1)
         }
-
         currentNSMap[nsPrefix] = localNSMap[nsPrefix] = value;
         a.uri = NAMESPACE$1.XMLNS;
         domBuilder.startPrefixMapping(nsPrefix, value);
@@ -31333,7 +37332,6 @@
         }
       }
     }
-
     var nsp = tagName.indexOf(':');
     if (nsp > 0) {
       prefix = el.prefix = tagName.slice(0, nsp);
@@ -31382,7 +37380,6 @@
         //}
       }
     }
-
     return elStartEnd + 1;
   }
   function fixSelfClosed(source, elStartEnd, tagName, closeMap) {
@@ -31400,7 +37397,6 @@
     return pos < elStartEnd;
     //}
   }
-
   function _copy(source, target) {
     for (var n in source) {
       if (Object.prototype.hasOwnProperty.call(source, n)) {
@@ -31522,7 +37518,6 @@
     //	getType:function(uri,localName){}
     //	getType:function(i){},
   };
-
   function split(source, start) {
     var match;
     var buf = [];
@@ -31733,7 +37728,6 @@
           this.doc.appendChild(charNode);
           //process xml
         }
-
         this.locator && position(this.locator, charNode);
       }
     },
@@ -31858,7 +37852,7 @@
 
   var DOMParser = domParser.DOMParser;
 
-  /*! @name mpd-parser @version 1.0.1 @license Apache-2.0 */
+  /*! @name mpd-parser @version 1.3.1 @license Apache-2.0 */
   const isObject = obj => {
     return !!obj && typeof obj === 'object';
   };
@@ -31923,6 +37917,7 @@
   };
   var errors = {
     INVALID_NUMBER_OF_PERIOD: 'INVALID_NUMBER_OF_PERIOD',
+    INVALID_NUMBER_OF_CONTENT_STEERING: 'INVALID_NUMBER_OF_CONTENT_STEERING',
     DASH_EMPTY_MANIFEST: 'DASH_EMPTY_MANIFEST',
     DASH_INVALID_XML: 'DASH_INVALID_XML',
     NO_BASE_URL: 'NO_BASE_URL',
@@ -32549,39 +38544,51 @@
   };
   const generateSidxKey = sidx => sidx && sidx.uri + '-' + byteRangeToString(sidx.byterange);
   const mergeDiscontiguousPlaylists = playlists => {
-    const mergedPlaylists = values(playlists.reduce((acc, playlist) => {
-      // assuming playlist IDs are the same across periods
-      // TODO: handle multiperiod where representation sets are not the same
-      // across periods
-      const name = playlist.attributes.id + (playlist.attributes.lang || '');
-      if (!acc[name]) {
-        // First Period
-        acc[name] = playlist;
-        acc[name].attributes.timelineStarts = [];
-      } else {
-        // Subsequent Periods
-        if (playlist.segments) {
-          // first segment of subsequent periods signal a discontinuity
-          if (playlist.segments[0]) {
-            playlist.segments[0].discontinuity = true;
-          }
-          acc[name].segments.push(...playlist.segments);
-        } // bubble up contentProtection, this assumes all DRM content
-        // has the same contentProtection
-
-        if (playlist.attributes.contentProtection) {
-          acc[name].attributes.contentProtection = playlist.attributes.contentProtection;
-        }
+    // Break out playlists into groups based on their baseUrl
+    const playlistsByBaseUrl = playlists.reduce(function (acc, cur) {
+      if (!acc[cur.attributes.baseUrl]) {
+        acc[cur.attributes.baseUrl] = [];
       }
-      acc[name].attributes.timelineStarts.push({
-        // Although they represent the same number, it's important to have both to make it
-        // compatible with HLS potentially having a similar attribute.
-        start: playlist.attributes.periodStart,
-        timeline: playlist.attributes.periodStart
-      });
+      acc[cur.attributes.baseUrl].push(cur);
       return acc;
-    }, {}));
-    return mergedPlaylists.map(playlist => {
+    }, {});
+    let allPlaylists = [];
+    Object.values(playlistsByBaseUrl).forEach(playlistGroup => {
+      const mergedPlaylists = values(playlistGroup.reduce((acc, playlist) => {
+        // assuming playlist IDs are the same across periods
+        // TODO: handle multiperiod where representation sets are not the same
+        // across periods
+        const name = playlist.attributes.id + (playlist.attributes.lang || '');
+        if (!acc[name]) {
+          // First Period
+          acc[name] = playlist;
+          acc[name].attributes.timelineStarts = [];
+        } else {
+          // Subsequent Periods
+          if (playlist.segments) {
+            // first segment of subsequent periods signal a discontinuity
+            if (playlist.segments[0]) {
+              playlist.segments[0].discontinuity = true;
+            }
+            acc[name].segments.push(...playlist.segments);
+          } // bubble up contentProtection, this assumes all DRM content
+          // has the same contentProtection
+
+          if (playlist.attributes.contentProtection) {
+            acc[name].attributes.contentProtection = playlist.attributes.contentProtection;
+          }
+        }
+        acc[name].attributes.timelineStarts.push({
+          // Although they represent the same number, it's important to have both to make it
+          // compatible with HLS potentially having a similar attribute.
+          start: playlist.attributes.periodStart,
+          timeline: playlist.attributes.periodStart
+        });
+        return acc;
+      }, {}));
+      allPlaylists = allPlaylists.concat(mergedPlaylists);
+    });
+    return allPlaylists.map(playlist => {
       playlist.discontinuityStarts = findIndexes(playlist.segments || [], 'discontinuity');
       return playlist;
     });
@@ -32621,7 +38628,7 @@
       uri: '',
       endList: attributes.type === 'static',
       timeline: attributes.periodStart,
-      resolvedUri: '',
+      resolvedUri: attributes.baseUrl || '',
       targetDuration: attributes.duration,
       discontinuitySequence,
       discontinuityStarts,
@@ -32631,6 +38638,9 @@
     };
     if (attributes.contentProtection) {
       playlist.contentProtection = attributes.contentProtection;
+    }
+    if (attributes.serviceLocation) {
+      playlist.attributes.serviceLocation = attributes.serviceLocation;
     }
     if (sidx) {
       playlist.sidx = sidx;
@@ -32668,7 +38678,7 @@
     if (attributes.codecs) {
       m3u8Attributes.CODECS = attributes.codecs;
     }
-    return {
+    const vttPlaylist = {
       attributes: m3u8Attributes,
       uri: '',
       endList: attributes.type === 'static',
@@ -32681,6 +38691,10 @@
       mediaSequence,
       segments
     };
+    if (attributes.serviceLocation) {
+      vttPlaylist.attributes.serviceLocation = attributes.serviceLocation;
+    }
+    return vttPlaylist;
   };
   const organizeAudioPlaylists = (playlists, sidxMapping = {}, isAudioOnly = false) => {
     let mainPlaylist;
@@ -32718,10 +38732,11 @@
   };
   const organizeVttPlaylists = (playlists, sidxMapping = {}) => {
     return playlists.reduce((a, playlist) => {
-      const label = playlist.attributes.lang || 'text';
+      const label = playlist.attributes.label || playlist.attributes.lang || 'text';
+      const language = playlist.attributes.lang || 'und';
       if (!a[label]) {
         a[label] = {
-          language: label,
+          language,
           default: false,
           autoselect: false,
           playlists: [],
@@ -32781,7 +38796,7 @@
       uri: '',
       endList: attributes.type === 'static',
       timeline: attributes.periodStart,
-      resolvedUri: '',
+      resolvedUri: attributes.baseUrl || '',
       targetDuration: attributes.duration,
       discontinuityStarts,
       timelineStarts: attributes.timelineStarts,
@@ -32792,6 +38807,9 @@
     }
     if (attributes.contentProtection) {
       playlist.contentProtection = attributes.contentProtection;
+    }
+    if (attributes.serviceLocation) {
+      playlist.attributes.serviceLocation = attributes.serviceLocation;
     }
     if (sidx) {
       playlist.sidx = sidx;
@@ -32877,8 +38895,10 @@
   const toM3u8 = ({
     dashPlaylists,
     locations,
+    contentSteering,
     sidxMapping = {},
-    previousManifest
+    previousManifest,
+    eventStream
   }) => {
     if (!dashPlaylists.length) {
       return {};
@@ -32915,8 +38935,14 @@
     if (locations) {
       manifest.locations = locations;
     }
+    if (contentSteering) {
+      manifest.contentSteering = contentSteering;
+    }
     if (type === 'dynamic') {
       manifest.suggestedPresentationDelay = suggestedPresentationDelay;
+    }
+    if (eventStream && eventStream.length > 0) {
+      manifest.eventStream = eventStream;
     }
     const isAudioOnly = manifest.playlists.length === 0;
     const organizedAudioGroup = audioPlaylists.length ? organizeAudioPlaylists(audioPlaylists, sidxMapping, isAudioOnly) : null;
@@ -33625,6 +39651,18 @@
       return parseInt(value, 10);
     },
     /**
+     * Specifies the presentationTime.
+     *
+     * @param {string} value
+     *        value of the attribute as a string
+     *
+     * @return {number}
+     *         The parsed presentationTime
+     */
+    presentationTime(value) {
+      return parseInt(value, 10);
+    },
+    /**
      * Default parser for all other attributes. Acts as a no-op and just returns the value
      * as a string
      *
@@ -33661,26 +39699,38 @@
     'urn:uuid:1077efec-c0b2-4d02-ace3-3c1e52e2fb4b': 'org.w3.clearkey',
     'urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed': 'com.widevine.alpha',
     'urn:uuid:9a04f079-9840-4286-ab92-e65be0885f95': 'com.microsoft.playready',
-    'urn:uuid:f239e769-efa3-4850-9c16-a903c6932efb': 'com.adobe.primetime'
+    'urn:uuid:f239e769-efa3-4850-9c16-a903c6932efb': 'com.adobe.primetime',
+    // ISO_IEC 23009-1_2022 5.8.5.2.2 The mp4 Protection Scheme
+    'urn:mpeg:dash:mp4protection:2011': 'mp4protection'
   };
   /**
    * Builds a list of urls that is the product of the reference urls and BaseURL values
    *
-   * @param {string[]} referenceUrls
-   *        List of reference urls to resolve to
+   * @param {Object[]} references
+   *        List of objects containing the reference URL as well as its attributes
    * @param {Node[]} baseUrlElements
    *        List of BaseURL nodes from the mpd
-   * @return {string[]}
-   *         List of resolved urls
+   * @return {Object[]}
+   *         List of objects with resolved urls and attributes
    */
 
-  const buildBaseUrls = (referenceUrls, baseUrlElements) => {
+  const buildBaseUrls = (references, baseUrlElements) => {
     if (!baseUrlElements.length) {
-      return referenceUrls;
+      return references;
     }
-    return flatten(referenceUrls.map(function (reference) {
+    return flatten(references.map(function (reference) {
       return baseUrlElements.map(function (baseUrlElement) {
-        return resolveUrl$1(reference, getContent(baseUrlElement));
+        const initialBaseUrl = getContent(baseUrlElement);
+        const resolvedBaseUrl = resolveUrl$1(reference.baseUrl, initialBaseUrl);
+        const finalBaseUrl = merge$1(parseAttributes(baseUrlElement), {
+          baseUrl: resolvedBaseUrl
+        }); // If the URL is resolved, we want to get the serviceLocation from the reference
+        // assuming there is no serviceLocation on the initialBaseUrl
+
+        if (resolvedBaseUrl !== initialBaseUrl && !finalBaseUrl.serviceLocation && reference.serviceLocation) {
+          finalBaseUrl.serviceLocation = reference.serviceLocation;
+        }
+        return finalBaseUrl;
       });
     }));
   };
@@ -33780,8 +39830,9 @@
    *
    * @param {Object} adaptationSetAttributes
    *        Contains attributes inherited by the AdaptationSet
-   * @param {string[]} adaptationSetBaseUrls
-   *        Contains list of resolved base urls inherited by the AdaptationSet
+   * @param {Object[]} adaptationSetBaseUrls
+   *        List of objects containing resolved base URLs and attributes
+   *        inherited by the AdaptationSet
    * @param {SegmentInformation} adaptationSetSegmentInfo
    *        Contains Segment information for the AdaptationSet
    * @return {inheritBaseUrlsCallback}
@@ -33796,9 +39847,7 @@
     return repBaseUrls.map(baseUrl => {
       return {
         segmentInfo: merge$1(adaptationSetSegmentInfo, representationSegmentInfo),
-        attributes: merge$1(attributes, {
-          baseUrl
-        })
+        attributes: merge$1(attributes, baseUrl)
       };
     });
   };
@@ -33904,6 +39953,40 @@
     }
   };
   /**
+   * A map callback that will parse all event stream data for a collection of periods
+   * DASH ISO_IEC_23009 5.10.2.2
+   * https://dashif-documents.azurewebsites.net/Events/master/event.html#mpd-event-timing
+   *
+   * @param {PeriodInformation} period object containing necessary period information
+   * @return a collection of parsed eventstream event objects
+   */
+
+  const toEventStream = period => {
+    // get and flatten all EventStreams tags and parse attributes and children
+    return flatten(findChildren(period.node, 'EventStream').map(eventStream => {
+      const eventStreamAttributes = parseAttributes(eventStream);
+      const schemeIdUri = eventStreamAttributes.schemeIdUri; // find all Events per EventStream tag and map to return objects
+
+      return findChildren(eventStream, 'Event').map(event => {
+        const eventAttributes = parseAttributes(event);
+        const presentationTime = eventAttributes.presentationTime || 0;
+        const timescale = eventStreamAttributes.timescale || 1;
+        const duration = eventAttributes.duration || 0;
+        const start = presentationTime / timescale + period.attributes.start;
+        return {
+          schemeIdUri,
+          value: eventStreamAttributes.value,
+          id: eventAttributes.id,
+          start,
+          end: start + duration / timescale,
+          messageData: getContent(event) || eventAttributes.messageData,
+          contentEncoding: eventStreamAttributes.contentEncoding,
+          presentationTimeOffset: eventStreamAttributes.presentationTimeOffset || 0
+        };
+      });
+    }));
+  };
+  /**
    * Maps an AdaptationSet node to a list of Representation information objects
    *
    * @name toRepresentationsCallback
@@ -33920,8 +40003,9 @@
    *
    * @param {Object} periodAttributes
    *        Contains attributes inherited by the Period
-   * @param {string[]} periodBaseUrls
-   *        Contains list of resolved base urls inherited by the Period
+   * @param {Object[]} periodBaseUrls
+   *        Contains list of objects with resolved base urls and attributes
+   *        inherited by the Period
    * @param {string[]} periodSegmentInfo
    *        Contains Segment Information at the period level
    * @return {toRepresentationsCallback}
@@ -33991,8 +40075,9 @@
    *
    * @param {Object} mpdAttributes
    *        Contains attributes inherited by the mpd
-   * @param {string[]} mpdBaseUrls
-   *        Contains list of resolved base urls inherited by the mpd
+    * @param {Object[]} mpdBaseUrls
+   *        Contains list of objects with resolved base urls and attributes
+   *        inherited by the mpd
    * @return {toAdaptationSetsCallback}
    *         Callback map function
    */
@@ -34008,6 +40093,41 @@
     const adaptationSets = findChildren(period.node, 'AdaptationSet');
     const periodSegmentInfo = getSegmentInformation(period.node);
     return flatten(adaptationSets.map(toRepresentations(periodAttributes, periodBaseUrls, periodSegmentInfo)));
+  };
+  /**
+   * Tranforms an array of content steering nodes into an object
+   * containing CDN content steering information from the MPD manifest.
+   *
+   * For more information on the DASH spec for Content Steering parsing, see:
+   * https://dashif.org/docs/DASH-IF-CTS-00XX-Content-Steering-Community-Review.pdf
+   *
+   * @param {Node[]} contentSteeringNodes
+   *        Content steering nodes
+   * @param {Function} eventHandler
+   *        The event handler passed into the parser options to handle warnings
+   * @return {Object}
+   *        Object containing content steering data
+   */
+
+  const generateContentSteeringInformation = (contentSteeringNodes, eventHandler) => {
+    // If there are more than one ContentSteering tags, throw an error
+    if (contentSteeringNodes.length > 1) {
+      eventHandler({
+        type: 'warn',
+        message: 'The MPD manifest should contain no more than one ContentSteering tag'
+      });
+    } // Return a null value if there are no ContentSteering tags
+
+    if (!contentSteeringNodes.length) {
+      return null;
+    }
+    const infoFromContentSteeringTag = merge$1({
+      serverURL: getContent(contentSteeringNodes[0])
+    }, parseAttributes(contentSteeringNodes[0])); // Converts `queryBeforeStart` to a boolean, as well as setting the default value
+    // to `false` if it doesn't exist
+
+    infoFromContentSteeringTag.queryBeforeStart = infoFromContentSteeringTag.queryBeforeStart === 'true';
+    return infoFromContentSteeringTag;
   };
   /**
    * Gets Period@start property for a given period.
@@ -34085,7 +40205,14 @@
     const {
       manifestUri = '',
       NOW = Date.now(),
-      clientOffset = 0
+      clientOffset = 0,
+      // TODO: For now, we are expecting an eventHandler callback function
+      // to be passed into the mpd parser as an option.
+      // In the future, we should enable stream parsing by using the Stream class from vhs-utils.
+      // This will support new features including a standardized event handler.
+      // See the m3u8 parser for examples of how stream parsing is currently used for HLS parsing.
+      // https://github.com/videojs/vhs-utils/blob/88d6e10c631e57a5af02c5a62bc7376cd456b4f5/src/stream.js#L9
+      eventHandler = function () {}
     } = options;
     const periodNodes = findChildren(mpd, 'Period');
     if (!periodNodes.length) {
@@ -34093,7 +40220,10 @@
     }
     const locations = findChildren(mpd, 'Location');
     const mpdAttributes = parseAttributes(mpd);
-    const mpdBaseUrls = buildBaseUrls([manifestUri], findChildren(mpd, 'BaseURL')); // See DASH spec section 5.3.1.2, Semantics of MPD element. Default type to 'static'.
+    const mpdBaseUrls = buildBaseUrls([{
+      baseUrl: manifestUri
+    }], findChildren(mpd, 'BaseURL'));
+    const contentSteeringNodes = findChildren(mpd, 'ContentSteering'); // See DASH spec section 5.3.1.2, Semantics of MPD element. Default type to 'static'.
 
     mpdAttributes.type = mpdAttributes.type || 'static';
     mpdAttributes.sourceDuration = mpdAttributes.mediaPresentationDuration || 0;
@@ -34124,7 +40254,16 @@
     });
     return {
       locations: mpdAttributes.locations,
-      representationInfo: flatten(periods.map(toAdaptationSets(mpdAttributes, mpdBaseUrls)))
+      contentSteeringInfo: generateContentSteeringInformation(contentSteeringNodes, eventHandler),
+      // TODO: There are occurences where this `representationInfo` array contains undesired
+      // duplicates. This generally occurs when there are multiple BaseURL nodes that are
+      // direct children of the MPD node. When we attempt to resolve URLs from a combination of the
+      // parent BaseURL and a child BaseURL, and the value does not resolve,
+      // we end up returning the child BaseURL multiple times.
+      // We need to determine a way to remove these duplicates in a safe way.
+      // See: https://github.com/videojs/mpd-parser/pull/17#discussion_r162750527
+      representationInfo: flatten(periods.map(toAdaptationSets(mpdAttributes, mpdBaseUrls))),
+      eventStream: flatten(periods.map(toEventStream))
     };
   };
   const stringToMpdXml = manifestString => {
@@ -34137,7 +40276,7 @@
     try {
       xml = parser.parseFromString(manifestString, 'application/xml');
       mpd = xml && xml.documentElement.tagName === 'MPD' ? xml.documentElement : null;
-    } catch (e) {// ie 11 throwsw on invalid xml
+    } catch (e) {// ie 11 throws on invalid xml
     }
     if (!mpd || mpd && mpd.getElementsByTagName('parsererror').length > 0) {
       throw new Error(errors.DASH_INVALID_XML);
@@ -34204,8 +40343,10 @@
     return toM3u8({
       dashPlaylists: playlists,
       locations: parsedManifestInfo.locations,
+      contentSteering: parsedManifestInfo.contentSteeringInfo,
       sidxMapping: options.sidxMapping,
-      previousManifest: options.previousManifest
+      previousManifest: options.previousManifest,
+      eventStream: parsedManifestInfo.eventStream
     });
   };
   /**
@@ -34879,12 +41020,12 @@
   };
   var clock_1 = clock.ONE_SECOND_IN_TS;
 
-  /*! @name @videojs/http-streaming @version 3.0.2 @license Apache-2.0 */
+  /*! @name @videojs/http-streaming @version 3.17.0 @license Apache-2.0 */
 
   /**
    * @file resolve-url.js - Handling how URLs are resolved and manipulated
    */
-  const resolveUrl = resolveUrl$2;
+  const resolveUrl = resolveUrl$1;
   /**
    * If the xhr request was redirected, return the responseURL, otherwise,
    * return the original url.
@@ -34935,6 +41076,26 @@
     const context = videojs.time || videojs;
     const fn = context.createTimeRanges || context.createTimeRanges;
     return fn.apply(context, args);
+  }
+  /**
+   * Converts provided buffered ranges to a descriptive string
+   *
+   * @param {TimeRanges} buffered - received buffered time ranges
+   *
+   * @return {string} - descriptive string
+   */
+
+  function bufferedRangesToString(buffered) {
+    if (buffered.length === 0) {
+      return 'Buffered Ranges are empty';
+    }
+    let bufferedRangesStr = 'Buffered Ranges: \n';
+    for (let i = 0; i < buffered.length; i++) {
+      const start = buffered.start(i);
+      const end = buffered.end(i);
+      bufferedRangesStr += `${start} --> ${end}. Duration (${end - start})\n`;
+    }
+    return bufferedRangesStr;
   }
 
   /**
@@ -35593,9 +41754,13 @@
   const seekable = function (playlist, expired, liveEdgePadding) {
     const useSafeLiveEnd = true;
     const seekableStart = expired || 0;
-    const seekableEnd = playlistEnd(playlist, expired, useSafeLiveEnd, liveEdgePadding);
+    let seekableEnd = playlistEnd(playlist, expired, useSafeLiveEnd, liveEdgePadding);
     if (seekableEnd === null) {
       return createTimeRanges();
+    } // Clamp seekable end since it can not be less than the seekable start
+
+    if (seekableEnd < seekableStart) {
+      seekableEnd = seekableStart;
     }
     return createTimeRanges(seekableStart, seekableEnd);
   };
@@ -35691,6 +41856,26 @@
     for (let i = startIndex; i < partsAndSegments.length; i++) {
       const partAndSegment = partsAndSegments[i];
       time -= partAndSegment.duration;
+      const canUseFudgeFactor = partAndSegment.duration > TIME_FUDGE_FACTOR;
+      const isExactlyAtTheEnd = time === 0;
+      const isExtremelyCloseToTheEnd = canUseFudgeFactor && time + TIME_FUDGE_FACTOR >= 0;
+      if (isExactlyAtTheEnd || isExtremelyCloseToTheEnd) {
+        // 1) We are exactly at the end of the current segment.
+        // 2) We are extremely close to the end of the current segment (The difference is less than  1 / 30).
+        //    We may encounter this situation when
+        //    we don't have exact match between segment duration info in the manifest and the actual duration of the segment
+        //    For example:
+        //    We appended 3 segments 10 seconds each, meaning we should have 30 sec buffered,
+        //    but we the actual buffered is 29.99999
+        //
+        // In both cases:
+        // if we passed current time -> it means that we already played current segment
+        // if we passed buffered.end -> it means that this segment is already loaded and buffered
+        // we should select the next segment if we have one:
+        if (i !== partsAndSegments.length - 1) {
+          continue;
+        }
+      }
       if (exactManifestTimings) {
         if (time > 0) {
           continue;
@@ -35999,7 +42184,9 @@
         targetDuration = manifest.segments.reduce((acc, s) => Math.max(acc, s.duration), 0);
       }
       if (onwarn) {
-        onwarn(`manifest has no targetDuration defaulting to ${targetDuration}`);
+        onwarn({
+          message: `manifest has no targetDuration defaulting to ${targetDuration}`
+        });
       }
       manifest.targetDuration = targetDuration;
     }
@@ -36007,7 +42194,9 @@
     if (parts.length && !manifest.partTargetDuration) {
       const partTargetDuration = parts.reduce((acc, p) => Math.max(acc, p.duration), 0);
       if (onwarn) {
-        onwarn(`manifest has no partTargetDuration defaulting to ${partTargetDuration}`);
+        onwarn({
+          message: `manifest has no partTargetDuration defaulting to ${partTargetDuration}`
+        });
         log.error('LL-HLS manifest has parts but lacks required #EXT-X-PART-INF:PART-TARGET value. See https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis-09#section-4.4.3.7. Playback is not guaranteed.');
       }
       manifest.partTargetDuration = partTargetDuration;
@@ -36226,14 +42415,228 @@
     setupMediaPlaylists(main);
     resolveMediaGroupUris(main);
   };
+  class DateRangesStorage {
+    constructor() {
+      this.offset_ = null;
+      this.pendingDateRanges_ = new Map();
+      this.processedDateRanges_ = new Map();
+    }
+    setOffset(segments = []) {
+      // already set
+      if (this.offset_ !== null) {
+        return;
+      } // no segment to process
+
+      if (!segments.length) {
+        return;
+      }
+      const [firstSegment] = segments; // no program date time
+
+      if (firstSegment.programDateTime === undefined) {
+        return;
+      } // Set offset as ProgramDateTime for the very first segment of the very first playlist load:
+
+      this.offset_ = firstSegment.programDateTime / 1000;
+    }
+    setPendingDateRanges(dateRanges = []) {
+      if (!dateRanges.length) {
+        return;
+      }
+      const [dateRange] = dateRanges;
+      const startTime = dateRange.startDate.getTime();
+      this.trimProcessedDateRanges_(startTime);
+      this.pendingDateRanges_ = dateRanges.reduce((map, pendingDateRange) => {
+        map.set(pendingDateRange.id, pendingDateRange);
+        return map;
+      }, new Map());
+    }
+    processDateRange(dateRange) {
+      this.pendingDateRanges_.delete(dateRange.id);
+      this.processedDateRanges_.set(dateRange.id, dateRange);
+    }
+    getDateRangesToProcess() {
+      if (this.offset_ === null) {
+        return [];
+      }
+      const dateRangeClasses = {};
+      const dateRangesToProcess = [];
+      this.pendingDateRanges_.forEach((dateRange, id) => {
+        if (this.processedDateRanges_.has(id)) {
+          return;
+        }
+        dateRange.startTime = dateRange.startDate.getTime() / 1000 - this.offset_;
+        dateRange.processDateRange = () => this.processDateRange(dateRange);
+        dateRangesToProcess.push(dateRange);
+        if (!dateRange.class) {
+          return;
+        }
+        if (dateRangeClasses[dateRange.class]) {
+          const length = dateRangeClasses[dateRange.class].push(dateRange);
+          dateRange.classListIndex = length - 1;
+        } else {
+          dateRangeClasses[dateRange.class] = [dateRange];
+          dateRange.classListIndex = 0;
+        }
+      });
+      for (const dateRange of dateRangesToProcess) {
+        const classList = dateRangeClasses[dateRange.class] || [];
+        if (dateRange.endDate) {
+          dateRange.endTime = dateRange.endDate.getTime() / 1000 - this.offset_;
+        } else if (dateRange.endOnNext && classList[dateRange.classListIndex + 1]) {
+          dateRange.endTime = classList[dateRange.classListIndex + 1].startTime;
+        } else if (dateRange.duration) {
+          dateRange.endTime = dateRange.startTime + dateRange.duration;
+        } else if (dateRange.plannedDuration) {
+          dateRange.endTime = dateRange.startTime + dateRange.plannedDuration;
+        } else {
+          dateRange.endTime = dateRange.startTime;
+        }
+      }
+      return dateRangesToProcess;
+    }
+    trimProcessedDateRanges_(startTime) {
+      const copy = new Map(this.processedDateRanges_);
+      copy.forEach((dateRange, id) => {
+        if (dateRange.startDate.getTime() < startTime) {
+          this.processedDateRanges_.delete(id);
+        }
+      });
+    }
+  }
+  const QUOTA_EXCEEDED_ERR = 22;
+  const getStreamingNetworkErrorMetadata = ({
+    requestType,
+    request,
+    error,
+    parseFailure
+  }) => {
+    const isBadStatus = request.status < 200 || request.status > 299;
+    const isFailure = request.status >= 400 && request.status <= 499;
+    const errorMetadata = {
+      uri: request.uri,
+      requestType
+    };
+    const isBadStatusOrParseFailure = isBadStatus && !isFailure || parseFailure;
+    if (error && isFailure) {
+      // copy original error and add to the metadata.
+      errorMetadata.error = _extends$1({}, error);
+      errorMetadata.errorType = videojs.Error.NetworkRequestFailed;
+    } else if (request.aborted) {
+      errorMetadata.errorType = videojs.Error.NetworkRequestAborted;
+    } else if (request.timedout) {
+      errorMetadata.erroType = videojs.Error.NetworkRequestTimeout;
+    } else if (isBadStatusOrParseFailure) {
+      const errorType = parseFailure ? videojs.Error.NetworkBodyParserFailed : videojs.Error.NetworkBadStatus;
+      errorMetadata.errorType = errorType;
+      errorMetadata.status = request.status;
+      errorMetadata.headers = request.headers;
+    }
+    return errorMetadata;
+  };
 
   /**
-   * @file playlist-loader.js
-   *
-   * A state machine that manages the loading, caching, and updating of
-   * M3U8 playlists.
-   *
+   * @file - codecs.js - Handles tasks regarding codec strings such as translating them to
+   * codec strings, or translating codec strings into objects that can be examined.
    */
+  const logFn$1 = logger('CodecUtils');
+  /**
+   * Returns a set of codec strings parsed from the playlist or the default
+   * codec strings if no codecs were specified in the playlist
+   *
+   * @param {Playlist} media the current media playlist
+   * @return {Object} an object with the video and audio codecs
+   */
+
+  const getCodecs = function (media) {
+    // if the codecs were explicitly specified, use them instead of the
+    // defaults
+    const mediaAttributes = media.attributes || {};
+    if (mediaAttributes.CODECS) {
+      return parseCodecs(mediaAttributes.CODECS);
+    }
+  };
+  const isMaat = (main, media) => {
+    const mediaAttributes = media.attributes || {};
+    return main && main.mediaGroups && main.mediaGroups.AUDIO && mediaAttributes.AUDIO && main.mediaGroups.AUDIO[mediaAttributes.AUDIO];
+  };
+  const isMuxed = (main, media) => {
+    if (!isMaat(main, media)) {
+      return true;
+    }
+    const mediaAttributes = media.attributes || {};
+    const audioGroup = main.mediaGroups.AUDIO[mediaAttributes.AUDIO];
+    for (const groupId in audioGroup) {
+      // If an audio group has a URI (the case for HLS, as HLS will use external playlists),
+      // or there are listed playlists (the case for DASH, as the manifest will have already
+      // provided all of the details necessary to generate the audio playlist, as opposed to
+      // HLS' externally requested playlists), then the content is demuxed.
+      if (!audioGroup[groupId].uri && !audioGroup[groupId].playlists) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const unwrapCodecList = function (codecList) {
+    const codecs = {};
+    codecList.forEach(({
+      mediaType,
+      type,
+      details
+    }) => {
+      codecs[mediaType] = codecs[mediaType] || [];
+      codecs[mediaType].push(translateLegacyCodec(`${type}${details}`));
+    });
+    Object.keys(codecs).forEach(function (mediaType) {
+      if (codecs[mediaType].length > 1) {
+        logFn$1(`multiple ${mediaType} codecs found as attributes: ${codecs[mediaType].join(', ')}. Setting playlist codecs to null so that we wait for mux.js to probe segments for real codecs.`);
+        codecs[mediaType] = null;
+        return;
+      }
+      codecs[mediaType] = codecs[mediaType][0];
+    });
+    return codecs;
+  };
+  const codecCount = function (codecObj) {
+    let count = 0;
+    if (codecObj.audio) {
+      count++;
+    }
+    if (codecObj.video) {
+      count++;
+    }
+    return count;
+  };
+  /**
+   * Calculates the codec strings for a working configuration of
+   * SourceBuffers to play variant streams in a main playlist. If
+   * there is no possible working configuration, an empty object will be
+   * returned.
+   *
+   * @param main {Object} the m3u8 object for the main playlist
+   * @param media {Object} the m3u8 object for the variant playlist
+   * @return {Object} the codec strings.
+   *
+   * @private
+   */
+
+  const codecsForPlaylist = function (main, media) {
+    const mediaAttributes = media.attributes || {};
+    const codecInfo = unwrapCodecList(getCodecs(media) || []); // HLS with multiple-audio tracks must always get an audio codec.
+    // Put another way, there is no way to have a video-only multiple-audio HLS!
+
+    if (isMaat(main, media) && !codecInfo.audio) {
+      if (!isMuxed(main, media)) {
+        // It is possible for codecs to be specified on the audio media group playlist but
+        // not on the rendition playlist. This is mostly the case for DASH, where audio and
+        // video are always separate (and separately specified).
+        const defaultCodecs = unwrapCodecList(codecsFromDefault(main, mediaAttributes.AUDIO) || []);
+        if (defaultCodecs.audio) {
+          codecInfo.audio = defaultCodecs.audio;
+        }
+      }
+    }
+    return codecInfo;
+  };
   const {
     EventTarget: EventTarget$1
   } = videojs;
@@ -36533,6 +42936,34 @@
 
     return (media.partTargetDuration || media.targetDuration || 10) * 500;
   };
+  const playlistMetadataPayload = (playlists, type, isLive) => {
+    if (!playlists) {
+      return;
+    }
+    const renditions = [];
+    playlists.forEach(playlist => {
+      // we need attributes to populate rendition data.
+      if (!playlist.attributes) {
+        return;
+      }
+      const {
+        BANDWIDTH,
+        RESOLUTION,
+        CODECS
+      } = playlist.attributes;
+      renditions.push({
+        id: playlist.id,
+        bandwidth: BANDWIDTH,
+        resolution: RESOLUTION,
+        codecs: CODECS
+      });
+    });
+    return {
+      type,
+      isLive,
+      renditions
+    };
+  };
   /**
    * Load a playlist from a remote location
    *
@@ -36556,15 +42987,31 @@
       this.src = src;
       this.vhs_ = vhs;
       this.withCredentials = withCredentials;
+      this.addDateRangesToTextTrack_ = options.addDateRangesToTextTrack;
       const vhsOptions = vhs.options_;
       this.customTagParsers = vhsOptions && vhsOptions.customTagParsers || [];
       this.customTagMappers = vhsOptions && vhsOptions.customTagMappers || [];
-      this.llhls = vhsOptions && vhsOptions.llhls; // initialize the loader state
+      this.llhls = vhsOptions && vhsOptions.llhls;
+      this.dateRangesStorage_ = new DateRangesStorage(); // initialize the loader state
 
       this.state = 'HAVE_NOTHING'; // live playlist staleness timeout
 
       this.handleMediaupdatetimeout_ = this.handleMediaupdatetimeout_.bind(this);
       this.on('mediaupdatetimeout', this.handleMediaupdatetimeout_);
+      this.on('loadedplaylist', this.handleLoadedPlaylist_.bind(this));
+    }
+    handleLoadedPlaylist_() {
+      const mediaPlaylist = this.media();
+      if (!mediaPlaylist) {
+        return;
+      }
+      this.dateRangesStorage_.setOffset(mediaPlaylist.segments);
+      this.dateRangesStorage_.setPendingDateRanges(mediaPlaylist.dateRanges);
+      const availableDateRanges = this.dateRangesStorage_.getDateRangesToProcess();
+      if (!availableDateRanges.length || !this.addDateRangesToTextTrack_) {
+        return;
+      }
+      this.addDateRangesToTextTrack_(availableDateRanges);
     }
     handleMediaupdatetimeout_() {
       if (this.state !== 'HAVE_METADATA') {
@@ -36579,7 +43026,8 @@
       this.state = 'HAVE_CURRENT_METADATA';
       this.request = this.vhs_.xhr({
         uri,
-        withCredentials: this.withCredentials
+        withCredentials: this.withCredentials,
+        requestType: 'hls-playlist'
       }, (error, req) => {
         // disposed
         if (!this.request) {
@@ -36610,7 +43058,12 @@
         status: xhr.status,
         message: `HLS playlist request error at URL: ${uri}.`,
         responseText: xhr.responseText,
-        code: xhr.status >= 500 ? 4 : 2
+        code: xhr.status >= 500 ? 4 : 2,
+        metadata: getStreamingNetworkErrorMetadata({
+          requestType: xhr.requestType,
+          request: xhr,
+          error: xhr.error
+        })
       };
       this.trigger('error');
     }
@@ -36618,18 +43071,61 @@
       url,
       manifestString
     }) {
-      return parseManifest({
-        onwarn: ({
-          message
-        }) => this.logger_(`m3u8-parser warn for ${url}: ${message}`),
-        oninfo: ({
-          message
-        }) => this.logger_(`m3u8-parser info for ${url}: ${message}`),
-        manifestString,
-        customTagParsers: this.customTagParsers,
-        customTagMappers: this.customTagMappers,
-        llhls: this.llhls
-      });
+      try {
+        const parsed = parseManifest({
+          onwarn: ({
+            message
+          }) => this.logger_(`m3u8-parser warn for ${url}: ${message}`),
+          oninfo: ({
+            message
+          }) => this.logger_(`m3u8-parser info for ${url}: ${message}`),
+          manifestString,
+          customTagParsers: this.customTagParsers,
+          customTagMappers: this.customTagMappers,
+          llhls: this.llhls
+        });
+        /**
+         * VHS does not support switching between variants with and without audio and video
+         * so we want to filter out audio-only variants when variants with video and(or) audio are also detected.
+         */
+
+        if (!parsed.playlists || !parsed.playlists.length) {
+          return parsed;
+        }
+        this.excludeAudioOnlyVariants(parsed.playlists);
+        return parsed;
+      } catch (error) {
+        this.error = error;
+        this.error.metadata = {
+          errorType: videojs.Error.StreamingHlsPlaylistParserError,
+          error
+        };
+      }
+    }
+    excludeAudioOnlyVariants(playlists) {
+      // helper function
+      const hasVideo = playlist => {
+        const attributes = playlist.attributes || {};
+        const {
+          width,
+          height
+        } = attributes.RESOLUTION || {};
+        if (width && height) {
+          return true;
+        } // parse codecs string from playlist attributes
+
+        const codecsList = getCodecs(playlist) || []; // unwrap list
+
+        const codecsInfo = unwrapCodecList(codecsList);
+        return Boolean(codecsInfo.video);
+      };
+      if (playlists.some(hasVideo)) {
+        playlists.forEach(playlist => {
+          if (!hasVideo(playlist)) {
+            playlist.excludeUntil = Infinity;
+          }
+        });
+      }
     }
     /**
      * Update the playlist loader's state in response to a new or updated playlist.
@@ -36653,6 +43149,16 @@
       // any in-flight request is now finished
       this.request = null;
       this.state = 'HAVE_METADATA';
+      const metadata = {
+        playlistInfo: {
+          type: 'media',
+          uri: url
+        }
+      };
+      this.trigger({
+        type: 'playlistparsestart',
+        metadata
+      });
       const playlist = playlistObject || this.parseManifest_({
         url,
         manifestString: playlistString
@@ -36674,6 +43180,11 @@
         this.trigger('playlistunchanged');
       }
       this.updateMediaUpdateTimeout_(refreshDelay(this.media(), !!update));
+      metadata.parsedPlaylist = playlistMetadataPayload(this.main.playlists, metadata.playlistInfo.type, !this.media_.endList);
+      this.trigger({
+        type: 'playlistparsecomplete',
+        metadata
+      });
       this.trigger('loadedplaylist');
     }
     /**
@@ -36685,6 +43196,7 @@
       this.stopRequest();
       window.clearTimeout(this.mediaUpdateTimeout);
       window.clearTimeout(this.finalRenditionTimeout);
+      this.dateRangesStorage_ = new DateRangesStorage();
       this.off();
     }
     stopRequest() {
@@ -36792,9 +43304,20 @@
         this.trigger('mediachanging');
       }
       this.pendingMedia_ = playlist;
+      const metadata = {
+        playlistInfo: {
+          type: 'media',
+          uri: playlist.uri
+        }
+      };
+      this.trigger({
+        type: 'playlistrequeststart',
+        metadata
+      });
       this.request = this.vhs_.xhr({
         uri: playlist.resolvedUri,
-        withCredentials: this.withCredentials
+        withCredentials: this.withCredentials,
+        requestType: 'hls-playlist'
       }, (error, req) => {
         // disposed
         if (!this.request) {
@@ -36805,6 +43328,10 @@
         if (error) {
           return this.playlistRequestError(this.request, playlist, startingState);
         }
+        this.trigger({
+          type: 'playlistrequestcomplete',
+          metadata
+        });
         this.haveMetadata({
           playlistString: req.responseText,
           url: playlist.uri,
@@ -36918,11 +43445,22 @@
           this.setupInitialPlaylist(this.src);
         }, 0);
         return;
-      } // request the specified URL
+      }
+      const metadata = {
+        playlistInfo: {
+          type: 'multivariant',
+          uri: this.src
+        }
+      };
+      this.trigger({
+        type: 'playlistrequeststart',
+        metadata
+      }); // request the specified URL
 
       this.request = this.vhs_.xhr({
         uri: this.src,
-        withCredentials: this.withCredentials
+        withCredentials: this.withCredentials,
+        requestType: 'hls-playlist'
       }, (error, req) => {
         // disposed
         if (!this.request) {
@@ -36936,17 +43474,36 @@
             message: `HLS playlist request error at URL: ${this.src}.`,
             responseText: req.responseText,
             // MEDIA_ERR_NETWORK
-            code: 2
+            code: 2,
+            metadata: getStreamingNetworkErrorMetadata({
+              requestType: req.requestType,
+              request: req,
+              error
+            })
           };
           if (this.state === 'HAVE_NOTHING') {
             this.started = false;
           }
           return this.trigger('error');
         }
+        this.trigger({
+          type: 'playlistrequestcomplete',
+          metadata
+        });
         this.src = resolveManifestRedirect(this.src, req);
+        this.trigger({
+          type: 'playlistparsestart',
+          metadata
+        });
         const manifest = this.parseManifest_({
           manifestString: req.responseText,
           url: this.src
+        }); // we haven't loaded any variant playlists here so we default to false for isLive.
+
+        metadata.parsedPlaylist = playlistMetadataPayload(manifest.playlists, metadata.playlistInfo.type, false);
+        this.trigger({
+          type: 'playlistparsecomplete',
+          metadata
         });
         this.setupInitialPlaylist(manifest);
       });
@@ -37007,14 +43564,259 @@
       });
       this.trigger('loadedmetadata');
     }
+    /**
+     * Updates or deletes a preexisting pathway clone.
+     * Ensures that all playlists related to the old pathway clone are
+     * either updated or deleted.
+     *
+     * @param {Object} clone On update, the pathway clone object for the newly updated pathway clone.
+     *        On delete, the old pathway clone object to be deleted.
+     * @param {boolean} isUpdate True if the pathway is to be updated,
+     *        false if it is meant to be deleted.
+     */
+
+    updateOrDeleteClone(clone, isUpdate) {
+      const main = this.main;
+      const pathway = clone.ID;
+      let i = main.playlists.length; // Iterate backwards through the playlist so we can remove playlists if necessary.
+
+      while (i--) {
+        const p = main.playlists[i];
+        if (p.attributes['PATHWAY-ID'] === pathway) {
+          const oldPlaylistUri = p.resolvedUri;
+          const oldPlaylistId = p.id; // update the indexed playlist and add new playlists by ID and URI
+
+          if (isUpdate) {
+            const newPlaylistUri = this.createCloneURI_(p.resolvedUri, clone);
+            const newPlaylistId = createPlaylistID(pathway, newPlaylistUri);
+            const attributes = this.createCloneAttributes_(pathway, p.attributes);
+            const updatedPlaylist = this.createClonePlaylist_(p, newPlaylistId, clone, attributes);
+            main.playlists[i] = updatedPlaylist;
+            main.playlists[newPlaylistId] = updatedPlaylist;
+            main.playlists[newPlaylistUri] = updatedPlaylist;
+          } else {
+            // Remove the indexed playlist.
+            main.playlists.splice(i, 1);
+          } // Remove playlists by the old ID and URI.
+
+          delete main.playlists[oldPlaylistId];
+          delete main.playlists[oldPlaylistUri];
+        }
+      }
+      this.updateOrDeleteCloneMedia(clone, isUpdate);
+    }
+    /**
+     * Updates or deletes media data based on the pathway clone object.
+     * Due to the complexity of the media groups and playlists, in all cases
+     * we remove all of the old media groups and playlists.
+     * On updates, we then create new media groups and playlists based on the
+     * new pathway clone object.
+     *
+     * @param {Object} clone The pathway clone object for the newly updated pathway clone.
+     * @param {boolean} isUpdate True if the pathway is to be updated,
+     *        false if it is meant to be deleted.
+     */
+
+    updateOrDeleteCloneMedia(clone, isUpdate) {
+      const main = this.main;
+      const id = clone.ID;
+      ['AUDIO', 'SUBTITLES', 'CLOSED-CAPTIONS'].forEach(mediaType => {
+        if (!main.mediaGroups[mediaType] || !main.mediaGroups[mediaType][id]) {
+          return;
+        }
+        for (const groupKey in main.mediaGroups[mediaType]) {
+          // Remove all media playlists for the media group for this pathway clone.
+          if (groupKey === id) {
+            for (const labelKey in main.mediaGroups[mediaType][groupKey]) {
+              const oldMedia = main.mediaGroups[mediaType][groupKey][labelKey];
+              oldMedia.playlists.forEach((p, i) => {
+                const oldMediaPlaylist = main.playlists[p.id];
+                const oldPlaylistId = oldMediaPlaylist.id;
+                const oldPlaylistUri = oldMediaPlaylist.resolvedUri;
+                delete main.playlists[oldPlaylistId];
+                delete main.playlists[oldPlaylistUri];
+              });
+            } // Delete the old media group.
+
+            delete main.mediaGroups[mediaType][groupKey];
+          }
+        }
+      }); // Create the new media groups and playlists if there is an update.
+
+      if (isUpdate) {
+        this.createClonedMediaGroups_(clone);
+      }
+    }
+    /**
+     * Given a pathway clone object, clones all necessary playlists.
+     *
+     * @param {Object} clone The pathway clone object.
+     * @param {Object} basePlaylist The original playlist to clone from.
+     */
+
+    addClonePathway(clone, basePlaylist = {}) {
+      const main = this.main;
+      const index = main.playlists.length;
+      const uri = this.createCloneURI_(basePlaylist.resolvedUri, clone);
+      const playlistId = createPlaylistID(clone.ID, uri);
+      const attributes = this.createCloneAttributes_(clone.ID, basePlaylist.attributes);
+      const playlist = this.createClonePlaylist_(basePlaylist, playlistId, clone, attributes);
+      main.playlists[index] = playlist; // add playlist by ID and URI
+
+      main.playlists[playlistId] = playlist;
+      main.playlists[uri] = playlist;
+      this.createClonedMediaGroups_(clone);
+    }
+    /**
+     * Given a pathway clone object we create clones of all media.
+     * In this function, all necessary information and updated playlists
+     * are added to the `mediaGroup` object.
+     * Playlists are also added to the `playlists` array so the media groups
+     * will be properly linked.
+     *
+     * @param {Object} clone The pathway clone object.
+     */
+
+    createClonedMediaGroups_(clone) {
+      const id = clone.ID;
+      const baseID = clone['BASE-ID'];
+      const main = this.main;
+      ['AUDIO', 'SUBTITLES', 'CLOSED-CAPTIONS'].forEach(mediaType => {
+        // If the media type doesn't exist, or there is already a clone, skip
+        // to the next media type.
+        if (!main.mediaGroups[mediaType] || main.mediaGroups[mediaType][id]) {
+          return;
+        }
+        for (const groupKey in main.mediaGroups[mediaType]) {
+          if (groupKey === baseID) {
+            // Create the group.
+            main.mediaGroups[mediaType][id] = {};
+          } else {
+            // There is no need to iterate over label keys in this case.
+            continue;
+          }
+          for (const labelKey in main.mediaGroups[mediaType][groupKey]) {
+            const oldMedia = main.mediaGroups[mediaType][groupKey][labelKey];
+            main.mediaGroups[mediaType][id][labelKey] = _extends$1({}, oldMedia);
+            const newMedia = main.mediaGroups[mediaType][id][labelKey]; // update URIs on the media
+
+            const newUri = this.createCloneURI_(oldMedia.resolvedUri, clone);
+            newMedia.resolvedUri = newUri;
+            newMedia.uri = newUri; // Reset playlists in the new media group.
+
+            newMedia.playlists = []; // Create new playlists in the newly cloned media group.
+
+            oldMedia.playlists.forEach((p, i) => {
+              const oldMediaPlaylist = main.playlists[p.id];
+              const group = groupID(mediaType, id, labelKey);
+              const newPlaylistID = createPlaylistID(id, group); // Check to see if it already exists
+
+              if (oldMediaPlaylist && !main.playlists[newPlaylistID]) {
+                const newMediaPlaylist = this.createClonePlaylist_(oldMediaPlaylist, newPlaylistID, clone);
+                const newPlaylistUri = newMediaPlaylist.resolvedUri;
+                main.playlists[newPlaylistID] = newMediaPlaylist;
+                main.playlists[newPlaylistUri] = newMediaPlaylist;
+              }
+              newMedia.playlists[i] = this.createClonePlaylist_(p, newPlaylistID, clone);
+            });
+          }
+        }
+      });
+    }
+    /**
+     * Using the original playlist to be cloned, and the pathway clone object
+     * information, we create a new playlist.
+     *
+     * @param {Object} basePlaylist  The original playlist to be cloned from.
+     * @param {string} id The desired id of the newly cloned playlist.
+     * @param {Object} clone The pathway clone object.
+     * @param {Object} attributes An optional object to populate the `attributes` property in the playlist.
+     *
+     * @return {Object} The combined cloned playlist.
+     */
+
+    createClonePlaylist_(basePlaylist, id, clone, attributes) {
+      const uri = this.createCloneURI_(basePlaylist.resolvedUri, clone);
+      const newProps = {
+        resolvedUri: uri,
+        uri,
+        id
+      }; // Remove all segments from previous playlist in the clone.
+
+      if (basePlaylist.segments) {
+        newProps.segments = [];
+      }
+      if (attributes) {
+        newProps.attributes = attributes;
+      }
+      return merge(basePlaylist, newProps);
+    }
+    /**
+     * Generates an updated URI for a cloned pathway based on the original
+     * pathway's URI and the paramaters from the pathway clone object in the
+     * content steering server response.
+     *
+     * @param {string} baseUri URI to be updated in the cloned pathway.
+     * @param {Object} clone The pathway clone object.
+     *
+     * @return {string} The updated URI for the cloned pathway.
+     */
+
+    createCloneURI_(baseURI, clone) {
+      const uri = new URL(baseURI);
+      uri.hostname = clone['URI-REPLACEMENT'].HOST;
+      const params = clone['URI-REPLACEMENT'].PARAMS; // Add params to the cloned URL.
+
+      for (const key of Object.keys(params)) {
+        uri.searchParams.set(key, params[key]);
+      }
+      return uri.href;
+    }
+    /**
+     * Helper function to create the attributes needed for the new clone.
+     * This mainly adds the necessary media attributes.
+     *
+     * @param {string} id The pathway clone object ID.
+     * @param {Object} oldAttributes The old attributes to compare to.
+     * @return {Object} The new attributes to add to the playlist.
+     */
+
+    createCloneAttributes_(id, oldAttributes) {
+      const attributes = {
+        ['PATHWAY-ID']: id
+      };
+      ['AUDIO', 'SUBTITLES', 'CLOSED-CAPTIONS'].forEach(mediaType => {
+        if (oldAttributes[mediaType]) {
+          attributes[mediaType] = id;
+        }
+      });
+      return attributes;
+    }
+    /**
+     * Returns the key ID set from a playlist
+     *
+     * @param {playlist} playlist to fetch the key ID set from.
+     * @return a Set of 32 digit hex strings that represent the unique keyIds for that playlist.
+     */
+
+    getKeyIdSet(playlist) {
+      if (playlist.contentProtection) {
+        const keyIds = new Set();
+        for (const keysystem in playlist.contentProtection) {
+          const keyId = playlist.contentProtection[keysystem].attributes.keyId;
+          if (keyId) {
+            keyIds.add(keyId.toLowerCase());
+          }
+        }
+        return keyIds;
+      }
+    }
   }
 
   /**
    * @file xhr.js
    */
-  const {
-    xhr: videojsXHR
-  } = videojs;
+
   const callbackWrapper = function (request, error, response, callback) {
     const reqResponse = request.responseType === 'arraybuffer' ? request.response : request.responseText;
     if (!error && reqResponse) {
@@ -37042,6 +43844,41 @@
     }
     callback(error, request);
   };
+  /**
+   * Iterates over the request hooks Set and calls them in order
+   *
+   * @param {Set} hooks the hook Set to iterate over
+   * @param {Object} options the request options to pass to the xhr wrapper
+   * @return the callback hook function return value, the modified or new options Object.
+   */
+
+  const callAllRequestHooks = (requestSet, options) => {
+    if (!requestSet || !requestSet.size) {
+      return;
+    }
+    let newOptions = options;
+    requestSet.forEach(requestCallback => {
+      newOptions = requestCallback(newOptions);
+    });
+    return newOptions;
+  };
+  /**
+   * Iterates over the response hooks Set and calls them in order.
+   *
+   * @param {Set} hooks the hook Set to iterate over
+   * @param {Object} request the xhr request object
+   * @param {Object} error the xhr error object
+   * @param {Object} response the xhr response object
+   */
+
+  const callAllResponseHooks = (responseSet, request, error, response) => {
+    if (!responseSet || !responseSet.size) {
+      return;
+    }
+    responseSet.forEach(responseCallback => {
+      responseCallback(request, error, response);
+    });
+  };
   const xhrFactory = function () {
     const xhr = function XhrFunction(options, callback) {
       // Add a default timeout
@@ -37049,18 +43886,28 @@
         timeout: 45e3
       }, options); // Allow an optional user-specified function to modify the option
       // object before we construct the xhr request
+      // TODO: Remove beforeRequest in the next major release.
 
-      const beforeRequest = XhrFunction.beforeRequest || videojs.Vhs.xhr.beforeRequest;
+      const beforeRequest = XhrFunction.beforeRequest || videojs.Vhs.xhr.beforeRequest; // onRequest and onResponse hooks as a Set, at either the player or global level.
+      // TODO: new Set added here for beforeRequest alias. Remove this when beforeRequest is removed.
+
+      const _requestCallbackSet = XhrFunction._requestCallbackSet || videojs.Vhs.xhr._requestCallbackSet || new Set();
+      const _responseCallbackSet = XhrFunction._responseCallbackSet || videojs.Vhs.xhr._responseCallbackSet;
       if (beforeRequest && typeof beforeRequest === 'function') {
-        const newOptions = beforeRequest(options);
-        if (newOptions) {
-          options = newOptions;
-        }
+        videojs.log.warn('beforeRequest is deprecated, use onRequest instead.');
+        _requestCallbackSet.add(beforeRequest);
       } // Use the standard videojs.xhr() method unless `videojs.Vhs.xhr` has been overriden
       // TODO: switch back to videojs.Vhs.xhr.name === 'XhrFunction' when we drop IE11
 
-      const xhrMethod = videojs.Vhs.xhr.original === true ? videojsXHR : videojs.Vhs.xhr;
-      const request = xhrMethod(options, function (error, response) {
+      const xhrMethod = videojs.Vhs.xhr.original === true ? videojs.xhr : videojs.Vhs.xhr; // call all registered onRequest hooks, assign new options.
+
+      const beforeRequestOptions = callAllRequestHooks(_requestCallbackSet, options); // Remove the beforeRequest function from the hooks set so stale beforeRequest functions are not called.
+
+      _requestCallbackSet.delete(beforeRequest); // xhrMethod will call XMLHttpRequest.open and XMLHttpRequest.send
+
+      const request = xhrMethod(beforeRequestOptions || options, function (error, response) {
+        // call all registered onResponse hooks
+        callAllResponseHooks(_responseCallbackSet, request, error, response);
         return callbackWrapper(request, error, response, callback);
       });
       const originalAbort = request.abort;
@@ -37069,6 +43916,7 @@
         return originalAbort.apply(request, arguments);
       };
       request.uri = options.uri;
+      request.requestType = options.requestType;
       request.requestTime = Date.now();
       return request;
     };
@@ -37298,13 +44146,13 @@
       return null;
     }
     let segment = playlist.segments[0];
-    if (dateTimeObject < segment.dateTimeObject) {
+    if (dateTimeObject < new Date(segment.dateTimeObject)) {
       // Requested time is before stream start.
       return null;
     }
     for (let i = 0; i < playlist.segments.length - 1; i++) {
       segment = playlist.segments[i];
-      const nextSegmentStart = playlist.segments[i + 1].dateTimeObject;
+      const nextSegmentStart = new Date(playlist.segments[i + 1].dateTimeObject);
       if (dateTimeObject < nextSegmentStart) {
         break;
       }
@@ -37317,7 +44165,7 @@
       // Beyond the end of the stream, or our best guess of the end of the stream.
       return null;
     }
-    if (dateTimeObject > lastSegmentStart) {
+    if (dateTimeObject > new Date(lastSegmentStart)) {
       segment = lastSegment;
     }
     return {
@@ -37572,7 +44420,7 @@
     }
     return;
   };
-  const containerRequest = (uri, xhr, cb) => {
+  const containerRequest = (uri, xhr, cb, requestType) => {
     let bytes = [];
     let id3Offset;
     let finished = false;
@@ -37586,6 +44434,11 @@
         return;
       }
       if (error) {
+        error.metadata = getStreamingNetworkErrorMetadata({
+          requestType,
+          request,
+          error
+        });
         return endRequestAndCallback(error, request, '', bytes);
       } // grap the new part of content that was just downloaded
 
@@ -37741,7 +44594,7 @@
 
   const removeOldMediaGroupLabels = (update, newMain) => {
     forEachMediaGroup(update, (properties, type, group, label) => {
-      if (!(label in newMain.mediaGroups[type][group])) {
+      if (!newMain.mediaGroups[type][group] || !(label in newMain.mediaGroups[type][group])) {
         delete update.mediaGroups[type][group][label];
       }
     });
@@ -37864,6 +44717,7 @@
     // (since there aren't external URLs to media playlists with DASH)
     constructor(srcUrlOrPlaylist, vhs, options = {}, mainPlaylistLoader) {
       super();
+      this.isPaused_ = true;
       this.mainPlaylistLoader_ = mainPlaylistLoader || this;
       if (!mainPlaylistLoader) {
         this.isMain_ = true;
@@ -37873,6 +44727,7 @@
       } = options;
       this.vhs_ = vhs;
       this.withCredentials = withCredentials;
+      this.addMetadataToTextTrack = options.addMetadataToTextTrack;
       if (!srcUrlOrPlaylist) {
         throw new Error('A non-empty playlist URL or object is required');
       } // event naming?
@@ -37898,6 +44753,9 @@
         this.childPlaylist_ = srcUrlOrPlaylist;
       }
     }
+    get isPaused() {
+      return this.isPaused_;
+    }
     requestErrored_(err, request, startingState) {
       // disposed
       if (!this.request) {
@@ -37913,7 +44771,8 @@
           message: 'DASH request error at URL: ' + request.uri,
           response: request.response,
           // MEDIA_ERR_NETWORK
-          code: 2
+          code: 2,
+          metadata: err.metadata
         };
         if (startingState) {
           this.state = startingState;
@@ -37932,6 +44791,7 @@
 
       if (!playlist.sidx || !sidxKey || this.mainPlaylistLoader_.sidxMapping_[sidxKey]) {
         // keep this function async
+        window.clearTimeout(this.mediaRequest_);
         this.mediaRequest_ = window.setTimeout(() => cb(false), 0);
         return;
       } // resolve the segment URL relative to the playlist
@@ -37942,11 +44802,19 @@
           return;
         }
         const sidxMapping = this.mainPlaylistLoader_.sidxMapping_;
+        const {
+          requestType
+        } = request;
         let sidx;
         try {
           sidx = parseSidx_1(toUint8(request.response).subarray(8));
         } catch (e) {
-          // sidx parsing failed.
+          e.metadata = getStreamingNetworkErrorMetadata({
+            requestType,
+            request,
+            parseFailure: true
+          }); // sidx parsing failed.
+
           this.requestErrored_(e, request, startingState);
           return;
         }
@@ -37957,14 +44825,16 @@
         addSidxSegmentsToPlaylist$1(playlist, sidx, playlist.sidx.resolvedUri);
         return cb(true);
       };
+      const REQUEST_TYPE = 'dash-sidx';
       this.request = containerRequest(uri, this.vhs_.xhr, (err, request, container, bytes) => {
         if (err) {
           return fin(err, request);
         }
         if (!container || container !== 'mp4') {
+          const sidxContainer = container || 'unknown';
           return fin({
             status: request.status,
-            message: `Unsupported ${container || 'unknown'} container type for sidx segment at URL: ${uri}`,
+            message: `Unsupported ${sidxContainer} container type for sidx segment at URL: ${uri}`,
             // response is just bytes in this case
             // but we really don't want to return that.
             response: '',
@@ -37991,13 +44861,15 @@
         this.request = this.vhs_.xhr({
           uri,
           responseType: 'arraybuffer',
+          requestType: 'dash-sidx',
           headers: segmentXhrHeaders({
             byterange: playlist.sidx.byterange
           })
         }, fin);
-      });
+      }, REQUEST_TYPE);
     }
     dispose() {
+      this.isPaused_ = true;
       this.trigger('dispose');
       this.stopRequest();
       this.loadedPlaylists_ = {};
@@ -38075,6 +44947,7 @@
     }) {
       this.state = 'HAVE_METADATA';
       this.loadedPlaylists_[playlist.id] = playlist;
+      window.clearTimeout(this.mediaRequest_);
       this.mediaRequest_ = null; // This will trigger loadedplaylist
 
       this.refreshMedia_(playlist.id); // fire loadedmetadata the first time a media playlist is loaded
@@ -38088,6 +44961,7 @@
       }
     }
     pause() {
+      this.isPaused_ = true;
       if (this.mainPlaylistLoader_.createMupOnMedia_) {
         this.off('loadedmetadata', this.mainPlaylistLoader_.createMupOnMedia_);
         this.mainPlaylistLoader_.createMupOnMedia_ = null;
@@ -38106,6 +44980,7 @@
       }
     }
     load(isFinalRendition) {
+      this.isPaused_ = false;
       window.clearTimeout(this.mediaUpdateTimeout);
       this.mediaUpdateTimeout = null;
       const media = this.media();
@@ -38140,6 +45015,7 @@
       // Call this asynchronously to match the xhr request behavior below
 
       if (!this.isMain_) {
+        window.clearTimeout(this.mediaRequest_);
         this.mediaRequest_ = window.setTimeout(() => this.haveMain_(), 0);
         return;
       }
@@ -38151,16 +45027,40 @@
       });
     }
     requestMain_(cb) {
+      const metadata = {
+        manifestInfo: {
+          uri: this.mainPlaylistLoader_.srcUrl
+        }
+      };
+      this.trigger({
+        type: 'manifestrequeststart',
+        metadata
+      });
       this.request = this.vhs_.xhr({
         uri: this.mainPlaylistLoader_.srcUrl,
-        withCredentials: this.withCredentials
+        withCredentials: this.withCredentials,
+        requestType: 'dash-manifest'
       }, (error, req) => {
+        if (error) {
+          const {
+            requestType
+          } = req;
+          error.metadata = getStreamingNetworkErrorMetadata({
+            requestType,
+            request: req,
+            error
+          });
+        }
         if (this.requestErrored_(error, req)) {
           if (this.state === 'HAVE_NOTHING') {
             this.started = false;
           }
           return;
         }
+        this.trigger({
+          type: 'manifestrequestcomplete',
+          metadata
+        });
         const mainChanged = req.responseText !== this.mainPlaylistLoader_.mainXml_;
         this.mainPlaylistLoader_.mainXml_ = req.responseText;
         if (req.responseHeaders && req.responseHeaders.date) {
@@ -38202,15 +45102,24 @@
       this.request = this.vhs_.xhr({
         uri: resolveUrl(this.mainPlaylistLoader_.srcUrl, utcTiming.value),
         method: utcTiming.method,
-        withCredentials: this.withCredentials
+        withCredentials: this.withCredentials,
+        requestType: 'dash-clock-sync'
       }, (error, req) => {
         // disposed
         if (!this.request) {
           return;
         }
         if (error) {
-          // sync request failed, fall back to using date header from mpd
+          const {
+            requestType
+          } = req;
+          this.error.metadata = getStreamingNetworkErrorMetadata({
+            requestType,
+            request: req,
+            error
+          }); // sync request failed, fall back to using date header from mpd
           // TODO: log warning
+
           this.mainPlaylistLoader_.clientOffset_ = this.mainLoaded_ - Date.now();
           return done();
         }
@@ -38245,15 +45154,35 @@
     }
     handleMain_() {
       // clear media request
+      window.clearTimeout(this.mediaRequest_);
       this.mediaRequest_ = null;
       const oldMain = this.mainPlaylistLoader_.main;
-      let newMain = parseMainXml({
-        mainXml: this.mainPlaylistLoader_.mainXml_,
-        srcUrl: this.mainPlaylistLoader_.srcUrl,
-        clientOffset: this.mainPlaylistLoader_.clientOffset_,
-        sidxMapping: this.mainPlaylistLoader_.sidxMapping_,
-        previousManifest: oldMain
-      }); // if we have an old main to compare the new main against
+      const metadata = {
+        manifestInfo: {
+          uri: this.mainPlaylistLoader_.srcUrl
+        }
+      };
+      this.trigger({
+        type: 'manifestparsestart',
+        metadata
+      });
+      let newMain;
+      try {
+        newMain = parseMainXml({
+          mainXml: this.mainPlaylistLoader_.mainXml_,
+          srcUrl: this.mainPlaylistLoader_.srcUrl,
+          clientOffset: this.mainPlaylistLoader_.clientOffset_,
+          sidxMapping: this.mainPlaylistLoader_.sidxMapping_,
+          previousManifest: oldMain
+        });
+      } catch (error) {
+        this.error = error;
+        this.error.metadata = {
+          errorType: videojs.Error.StreamingDashManifestParserError,
+          error
+        };
+        this.trigger('error');
+      } // if we have an old main to compare the new main against
 
       if (oldMain) {
         newMain = updateMain(oldMain, newMain, this.mainPlaylistLoader_.sidxMapping_);
@@ -38266,6 +45195,32 @@
       }
       if (!oldMain || newMain && newMain.minimumUpdatePeriod !== oldMain.minimumUpdatePeriod) {
         this.updateMinimumUpdatePeriodTimeout_();
+      }
+      this.addEventStreamToMetadataTrack_(newMain);
+      if (newMain) {
+        const {
+          duration,
+          endList
+        } = newMain;
+        const renditions = [];
+        newMain.playlists.forEach(playlist => {
+          renditions.push({
+            id: playlist.id,
+            bandwidth: playlist.attributes.BANDWIDTH,
+            resolution: playlist.attributes.RESOLUTION,
+            codecs: playlist.attributes.CODECS
+          });
+        });
+        const parsedManifest = {
+          duration,
+          isLive: !endList,
+          renditions
+        };
+        metadata.parsedManifest = parsedManifest;
+        this.trigger({
+          type: 'manifestparsecomplete',
+          metadata
+        });
       }
       return Boolean(newMain);
     }
@@ -38373,6 +45328,47 @@
       }
       this.trigger('loadedplaylist');
     }
+    /**
+     * Takes eventstream data from a parsed DASH manifest and adds it to the metadata text track.
+     *
+     * @param {manifest} newMain the newly parsed manifest
+     */
+
+    addEventStreamToMetadataTrack_(newMain) {
+      // Only add new event stream metadata if we have a new manifest.
+      if (newMain && this.mainPlaylistLoader_.main.eventStream) {
+        // convert EventStream to ID3-like data.
+        const metadataArray = this.mainPlaylistLoader_.main.eventStream.map(eventStreamNode => {
+          return {
+            cueTime: eventStreamNode.start,
+            frames: [{
+              data: eventStreamNode.messageData
+            }]
+          };
+        });
+        this.addMetadataToTextTrack('EventStream', metadataArray, this.mainPlaylistLoader_.main.duration);
+      }
+    }
+    /**
+     * Returns the key ID set from a playlist
+     *
+     * @param {playlist} playlist to fetch the key ID set from.
+     * @return a Set of 32 digit hex strings that represent the unique keyIds for that playlist.
+     */
+
+    getKeyIdSet(playlist) {
+      if (playlist.contentProtection) {
+        const keyIds = new Set();
+        for (const keysystem in playlist.contentProtection) {
+          const defaultKID = playlist.contentProtection[keysystem].attributes['cenc:default_KID'];
+          if (defaultKID) {
+            // DASH keyIds are separated by dashes.
+            keyIds.add(defaultKID.replace(/-/g, '').toLowerCase());
+          }
+        }
+        return keyIds;
+      }
+    }
   }
   var Config = {
     GOAL_BUFFER_LENGTH: 30,
@@ -38442,7 +45438,7 @@
     return fn.toString().replace(/^function.+?{/, '').slice(0, -1);
   };
 
-  /* rollup-plugin-worker-factory start for worker!/Users/ddashkevich/projects/http-streaming/src/transmuxer-worker.js */
+  /* rollup-plugin-worker-factory start for worker!/home/runner/work/http-streaming/http-streaming/src/transmuxer-worker.js */
   const workerCode$1 = transform(getWorkerString(function () {
     var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
     /**
@@ -38579,7 +45575,7 @@
     };
     var stream = Stream$8;
     var MAX_UINT32$1 = Math.pow(2, 32);
-    var getUint64$3 = function (uint8) {
+    var getUint64$5 = function (uint8) {
       var dv = new DataView(uint8.buffer, uint8.byteOffset, uint8.byteLength);
       var value;
       if (dv.getBigUint64) {
@@ -38592,7 +45588,7 @@
       return dv.getUint32(0) * MAX_UINT32$1 + dv.getUint32(4);
     };
     var numbers = {
-      getUint64: getUint64$3,
+      getUint64: getUint64$5,
       MAX_UINT32: MAX_UINT32$1
     };
     /**
@@ -38679,7 +45675,6 @@
       // reserved
       0x56, 0x69, 0x64, 0x65, 0x6f, 0x48, 0x61, 0x6e, 0x64, 0x6c, 0x65, 0x72, 0x00 // name: 'VideoHandler'
       ]);
-
       AUDIO_HDLR = new Uint8Array([0x00,
       // version 0
       0x00, 0x00, 0x00,
@@ -38696,7 +45691,6 @@
       // reserved
       0x53, 0x6f, 0x75, 0x6e, 0x64, 0x48, 0x61, 0x6e, 0x64, 0x6c, 0x65, 0x72, 0x00 // name: 'SoundHandler'
       ]);
-
       HDLR_TYPES = {
         video: VIDEO_HDLR,
         audio: AUDIO_HDLR
@@ -38715,7 +45709,6 @@
       // version 0
       0x00, 0x00, 0x01 // entry_flags
       ]);
-
       SMHD = new Uint8Array([0x00,
       // version
       0x00, 0x00, 0x00,
@@ -38724,14 +45717,12 @@
       // balance, 0 means centered
       0x00, 0x00 // reserved
       ]);
-
       STCO = new Uint8Array([0x00,
       // version
       0x00, 0x00, 0x00,
       // flags
       0x00, 0x00, 0x00, 0x00 // entry_count
       ]);
-
       STSC = STCO;
       STSZ = new Uint8Array([0x00,
       // version
@@ -38741,7 +45732,6 @@
       // sample_size
       0x00, 0x00, 0x00, 0x00 // sample_count
       ]);
-
       STTS = STCO;
       VMHD = new Uint8Array([0x00,
       // version
@@ -38752,7 +45742,6 @@
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // opcolor
       ]);
     })();
-
     box = function (type) {
       var payload = [],
         size = 0,
@@ -38820,7 +45809,6 @@
       track.audioobjecttype << 3 | track.samplingfrequencyindex >>> 1, track.samplingfrequencyindex << 7 | track.channelcount << 3, 0x06, 0x01, 0x02 // GASpecificConfig
       ]));
     };
-
     ftyp = function () {
       return box(types.ftyp, MAJOR_BRAND, MINOR_VERSION, MAJOR_BRAND, AVC1_BRAND);
     };
@@ -38866,7 +45854,6 @@
       (sequenceNumber & 0xFF000000) >> 24, (sequenceNumber & 0xFF0000) >> 16, (sequenceNumber & 0xFF00) >> 8, sequenceNumber & 0xFF // sequence_number
       ]));
     };
-
     minf = function (track) {
       return box(types.minf, track.type === 'video' ? box(types.vmhd, VMHD) : box(types.smhd, SMHD), dinf(), stbl(track));
     };
@@ -38930,7 +45917,6 @@
       // pre_defined
       0xff, 0xff, 0xff, 0xff // next_track_ID
       ]);
-
       return box(types.mvhd, bytes);
     };
     sdtp = function (track) {
@@ -39027,7 +46013,6 @@
         // maxBitrate
         0x00, 0x2d, 0xc6, 0xc0 // avgBitrate
         ]))];
-
         if (track.sarRatio) {
           var hSpacing = track.sarRatio[0],
             vSpacing = track.sarRatio[1];
@@ -39091,7 +46076,6 @@
       // width
       (track.height & 0xFF00) >> 8, track.height & 0xFF, 0x00, 0x00 // height
       ]);
-
       return box(types.tkhd, result);
     };
     /**
@@ -39115,7 +46099,6 @@
       // default_sample_size
       0x00, 0x00, 0x00, 0x00 // default_sample_flags
       ]));
-
       upperWordBaseMediaDecodeTime = Math.floor(track.baseMediaDecodeTime / MAX_UINT32);
       lowerWordBaseMediaDecodeTime = Math.floor(track.baseMediaDecodeTime % MAX_UINT32);
       trackFragmentDecodeTime = box(types.tfdt, new Uint8Array([0x01,
@@ -39220,7 +46203,6 @@
         (offset & 0xFF000000) >>> 24, (offset & 0xFF0000) >>> 16, (offset & 0xFF00) >>> 8, offset & 0xFF // data_offset
         ];
       };
-
       videoTrun = function (track, offset) {
         var bytesOffest, bytes, header, samples, sample, i;
         samples = track.samples || [];
@@ -39251,7 +46233,6 @@
           bytes[bytesOffest++] = (sample.compositionTimeOffset & 0xFF00) >>> 8;
           bytes[bytesOffest++] = sample.compositionTimeOffset & 0xFF; // sample_composition_time_offset
         }
-
         return box(types.trun, bytes);
       };
       audioTrun = function (track, offset) {
@@ -39274,7 +46255,6 @@
           bytes[bytesOffest++] = (sample.size & 0xFF00) >>> 8;
           bytes[bytesOffest++] = sample.size & 0xFF; // sample_size
         }
-
         return box(types.trun, bytes);
       };
       trun$1 = function (track, offset) {
@@ -39773,7 +46753,6 @@
           duration: 1024 // For AAC audio, all samples contain 1024 samples
         });
       }
-
       return samples;
     }; // generate the track's sample table from an array of frames
 
@@ -40087,13 +47066,11 @@
       // eslint-disable-line no-use-before-define
       new Cea608Stream(1, 1) // eslint-disable-line no-use-before-define
       ];
-
       if (this.parse708captions_) {
         this.cc708Stream_ = new Cea708Stream({
           captionServices: options.captionServices
         }); // eslint-disable-line no-use-before-define
       }
-
       this.reset(); // forward data and done events from CCs to this CaptionStream
 
       this.ccStreams_.forEach(function (cc) {
@@ -40328,7 +47305,6 @@
       // ⎡
       0x10a0: 0x3138 // ㄸ (CC char)
     };
-
     var get708CharFromCode = function (code) {
       var newCode = CHARACTER_TRANSLATION_708[code] || code;
       if (code & 0x1000 && code === newCode) {
@@ -40690,18 +47666,31 @@
       var nextByte = packetData[i + 1];
       var win = service.currentWindow;
       var char;
-      var charCodeArray; // Use the TextDecoder if one was created for this service
+      var charCodeArray; // Converts an array of bytes to a unicode hex string.
+
+      function toHexString(byteArray) {
+        return byteArray.map(byte => {
+          return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+        }).join('');
+      }
+      if (isMultiByte) {
+        charCodeArray = [currentByte, nextByte];
+        i++;
+      } else {
+        charCodeArray = [currentByte];
+      } // Use the TextDecoder if one was created for this service
 
       if (service.textDecoder_ && !isExtended) {
-        if (isMultiByte) {
-          charCodeArray = [currentByte, nextByte];
-          i++;
-        } else {
-          charCodeArray = [currentByte];
-        }
         char = service.textDecoder_.decode(new Uint8Array(charCodeArray));
       } else {
-        char = get708CharFromCode(extended | currentByte);
+        // We assume any multi-byte char without a decoder is unicode.
+        if (isMultiByte) {
+          const unicode = toHexString(charCodeArray); // Takes a unicode hex string and creates a single character.
+
+          char = String.fromCharCode(parseInt(unicode, 16));
+        } else {
+          char = get708CharFromCode(extended | currentByte);
+        }
       }
       if (win.pendingNewLine && !win.isEmpty()) {
         win.newLine(this.getPts(i));
@@ -41297,7 +48286,6 @@
       // └
       0x033f: 0x2518 // ┘
     };
-
     var getCharFromCode = function (code) {
       if (code === null) {
         return '';
@@ -41311,12 +48299,18 @@
 
     var ROWS = [0x1100, 0x1120, 0x1200, 0x1220, 0x1500, 0x1520, 0x1600, 0x1620, 0x1700, 0x1720, 0x1000, 0x1300, 0x1320, 0x1400, 0x1420]; // CEA-608 captions are rendered onto a 34x15 matrix of character
     // cells. The "bottom" row is the last element in the outer array.
+    // We keep track of positioning information as we go by storing the
+    // number of indentations and the tab offset in this buffer.
 
     var createDisplayBuffer = function () {
       var result = [],
         i = BOTTOM_ROW + 1;
       while (i--) {
-        result.push('');
+        result.push({
+          text: '',
+          indent: 0,
+          offset: 0
+        });
       }
       return result;
     };
@@ -41379,9 +48373,9 @@
           this.startPts_ = packet.pts;
         } else if (data === this.BACKSPACE_) {
           if (this.mode_ === 'popOn') {
-            this.nonDisplayed_[this.row_] = this.nonDisplayed_[this.row_].slice(0, -1);
+            this.nonDisplayed_[this.row_].text = this.nonDisplayed_[this.row_].text.slice(0, -1);
           } else {
-            this.displayed_[this.row_] = this.displayed_[this.row_].slice(0, -1);
+            this.displayed_[this.row_].text = this.displayed_[this.row_].text.slice(0, -1);
           }
         } else if (data === this.ERASE_DISPLAYED_MEMORY_) {
           this.flushDisplayed(packet.pts);
@@ -41413,9 +48407,9 @@
           // backspace the "e" and insert "è".
           // Delete the previous character
           if (this.mode_ === 'popOn') {
-            this.nonDisplayed_[this.row_] = this.nonDisplayed_[this.row_].slice(0, -1);
+            this.nonDisplayed_[this.row_].text = this.nonDisplayed_[this.row_].text.slice(0, -1);
           } else {
-            this.displayed_[this.row_] = this.displayed_[this.row_].slice(0, -1);
+            this.displayed_[this.row_].text = this.displayed_[this.row_].text.slice(0, -1);
           } // Bitmask char0 so that we can apply character transformations
           // regardless of field and data channel.
           // Then byte-shift to the left and OR with char1 so we can pass the
@@ -41443,7 +48437,11 @@
           // increments, with an additional offset code of 1-3 to reach any
           // of the 32 columns specified by CEA-608. So all we need to do
           // here is increment the column cursor by the given offset.
-          this.column_ += char1 & 0x03; // Detect PACs (Preamble Address Codes)
+          const offset = char1 & 0x03; // For an offest value 1-3, set the offset for that caption
+          // in the non-displayed array.
+
+          this.nonDisplayed_[this.row_].offset = offset;
+          this.column_ += offset; // Detect PACs (Preamble Address Codes)
         } else if (this.isPAC(char0, char1)) {
           // There's no logic for PAC -> row mapping, so we have to just
           // find the row code in an array and use its index :(
@@ -41457,8 +48455,10 @@
               row = this.rollUpRows_ - 1;
             }
             this.setRollUp(packet.pts, row);
-          }
-          if (row !== this.row_) {
+          } // Ensure the row is between 0 and 14, otherwise use the most
+          // recent or default row.
+
+          if (row !== this.row_ && row >= 0 && row <= 14) {
             // formatting is only persistent for current row
             this.clearFormatting(packet.pts);
             this.row_ = row;
@@ -41473,7 +48473,10 @@
             // increments the column cursor by 4, so we can get the desired
             // column position by bit-shifting to the right (to get n/2)
             // and multiplying by 4.
-            this.column_ = ((data & 0xe) >> 1) * 4;
+            const indentations = (data & 0xe) >> 1;
+            this.column_ = indentations * 4; // add to the number of indentations for positioning
+
+            this.nonDisplayed_[this.row_].indent += indentations;
           }
           if (this.isColorPAC(char1)) {
             // it's a color code, though we only support white, which
@@ -41495,33 +48498,51 @@
         } // finish data processing
       };
     };
-
     Cea608Stream.prototype = new Stream$7(); // Trigger a cue point that captures the current state of the
     // display buffer
 
     Cea608Stream.prototype.flushDisplayed = function (pts) {
-      var content = this.displayed_ // remove spaces from the start and end of the string
-      .map(function (row, index) {
-        try {
-          return row.trim();
-        } catch (e) {
-          // Ordinarily, this shouldn't happen. However, caption
-          // parsing errors should not throw exceptions and
-          // break playback.
-          this.trigger('log', {
-            level: 'warn',
-            message: 'Skipping a malformed 608 caption at index ' + index + '.'
-          });
-          return '';
+      const logWarning = index => {
+        this.trigger('log', {
+          level: 'warn',
+          message: 'Skipping a malformed 608 caption at index ' + index + '.'
+        });
+      };
+      const content = [];
+      this.displayed_.forEach((row, i) => {
+        if (row && row.text && row.text.length) {
+          try {
+            // remove spaces from the start and end of the string
+            row.text = row.text.trim();
+          } catch (e) {
+            // Ordinarily, this shouldn't happen. However, caption
+            // parsing errors should not throw exceptions and
+            // break playback.
+            logWarning(i);
+          } // See the below link for more details on the following fields:
+          // https://dvcs.w3.org/hg/text-tracks/raw-file/default/608toVTT/608toVTT.html#positioning-in-cea-608
+
+          if (row.text.length) {
+            content.push({
+              // The text to be displayed in the caption from this specific row, with whitespace removed.
+              text: row.text,
+              // Value between 1 and 15 representing the PAC row used to calculate line height.
+              line: i + 1,
+              // A number representing the indent position by percentage (CEA-608 PAC indent code).
+              // The value will be a number between 10 and 80. Offset is used to add an aditional
+              // value to the position if necessary.
+              position: 10 + Math.min(70, row.indent * 10) + row.offset * 2.5
+            });
+          }
+        } else if (row === undefined || row === null) {
+          logWarning(i);
         }
-      }, this) // combine all text rows to display in one cue
-      .join('\n') // and remove blank rows from the start and end, but not the middle
-      .replace(/^\n+|\n+$/g, '');
+      });
       if (content.length) {
         this.trigger('data', {
           startPts: this.startPts_,
           endPts: pts,
-          text: content,
+          content,
           stream: this.name_
         });
       }
@@ -41718,7 +48739,11 @@
         // move currently displayed captions (up or down) to the new base row
         for (var i = 0; i < this.rollUpRows_; i++) {
           this.displayed_[newBaseRow - i] = this.displayed_[this.row_ - i];
-          this.displayed_[this.row_ - i] = '';
+          this.displayed_[this.row_ - i] = {
+            text: '',
+            indent: 0,
+            offset: 0
+          };
         }
       }
       if (newBaseRow === undefined) {
@@ -41749,36 +48774,48 @@
     }; // Mode Implementations
 
     Cea608Stream.prototype.popOn = function (pts, text) {
-      var baseRow = this.nonDisplayed_[this.row_]; // buffer characters
+      var baseRow = this.nonDisplayed_[this.row_].text; // buffer characters
 
       baseRow += text;
-      this.nonDisplayed_[this.row_] = baseRow;
+      this.nonDisplayed_[this.row_].text = baseRow;
     };
     Cea608Stream.prototype.rollUp = function (pts, text) {
-      var baseRow = this.displayed_[this.row_];
+      var baseRow = this.displayed_[this.row_].text;
       baseRow += text;
-      this.displayed_[this.row_] = baseRow;
+      this.displayed_[this.row_].text = baseRow;
     };
     Cea608Stream.prototype.shiftRowsUp_ = function () {
       var i; // clear out inactive rows
 
       for (i = 0; i < this.topRow_; i++) {
-        this.displayed_[i] = '';
+        this.displayed_[i] = {
+          text: '',
+          indent: 0,
+          offset: 0
+        };
       }
       for (i = this.row_ + 1; i < BOTTOM_ROW + 1; i++) {
-        this.displayed_[i] = '';
+        this.displayed_[i] = {
+          text: '',
+          indent: 0,
+          offset: 0
+        };
       } // shift displayed rows up
 
       for (i = this.topRow_; i < this.row_; i++) {
         this.displayed_[i] = this.displayed_[i + 1];
       } // clear out the bottom row
 
-      this.displayed_[this.row_] = '';
+      this.displayed_[this.row_] = {
+        text: '',
+        indent: 0,
+        offset: 0
+      };
     };
     Cea608Stream.prototype.paintOn = function (pts, text) {
-      var baseRow = this.displayed_[this.row_];
+      var baseRow = this.displayed_[this.row_].text;
       baseRow += text;
-      this.displayed_[this.row_] = baseRow;
+      this.displayed_[this.row_].text = baseRow;
     }; // exports
 
     var captionStream = {
@@ -41840,8 +48877,22 @@
 
       this.type_ = type || TYPE_SHARED;
       this.push = function (data) {
-        // Any "shared" rollover streams will accept _all_ data. Otherwise,
+        /**
+         * Rollover stream expects data from elementary stream.
+         * Elementary stream can push forward 2 types of data
+         * - Parsed Video/Audio/Timed-metadata PES (packetized elementary stream) packets
+         * - Tracks metadata from PMT (Program Map Table)
+         * Rollover stream expects pts/dts info to be available, since it stores lastDTS
+         * We should ignore non-PES packets since they may override lastDTS to undefined.
+         * lastDTS is important to signal the next segments
+         * about rollover from the previous segments.
+         */
+        if (data.type === 'metadata') {
+          this.trigger('data', data);
+          return;
+        } // Any "shared" rollover streams will accept _all_ data. Otherwise,
         // streams will only accept data that matches their type.
+
         if (this.type_ !== TYPE_SHARED && data.type !== this.type_) {
           return;
         }
@@ -43025,7 +50076,6 @@
           // the number is odd if the low order bit is set
           return 1 + valu >>> 1; // add 1 to make it even, and divide by 2
         }
-
         return -1 * (valu >>> 1); // divide by two then make it negative
       }; // Some convenience functions
       // :Boolean
@@ -43394,7 +50444,6 @@
           if (chromaFormatIdc === 3) {
             expGolombDecoder.skipBits(1); // separate_colour_plane_flag
           }
-
           expGolombDecoder.skipUnsignedExpGolomb(); // bit_depth_luma_minus8
 
           expGolombDecoder.skipUnsignedExpGolomb(); // bit_depth_chroma_minus8
@@ -43433,7 +50482,6 @@
             expGolombDecoder.skipExpGolomb(); // offset_for_ref_frame[ i ]
           }
         }
-
         expGolombDecoder.skipUnsignedExpGolomb(); // max_num_ref_frames
 
         expGolombDecoder.skipBits(1); // gaps_in_frame_num_value_allowed_flag
@@ -43444,7 +50492,6 @@
         if (frameMbsOnlyFlag === 0) {
           expGolombDecoder.skipBits(1); // mb_adaptive_frame_field_flag
         }
-
         expGolombDecoder.skipBits(1); // direct_8x8_inference_flag
 
         if (expGolombDecoder.readBoolean()) {
@@ -43589,14 +50636,13 @@
     var parseIso88591 = function (bytes, start, end) {
       return unescape(percentEncode(bytes, start, end)); // jshint ignore:line
     };
-
     var parseAdtsSize = function (header, byteIndex) {
       var lowThree = (header[byteIndex + 5] & 0xE0) >> 5,
         middle = header[byteIndex + 4] << 3,
         highTwo = header[byteIndex + 3] & 0x3 << 11;
       return highTwo | middle | lowThree;
     };
-    var parseType$4 = function (header, byteIndex) {
+    var parseType$5 = function (header, byteIndex) {
       if (header[byteIndex] === 'I'.charCodeAt(0) && header[byteIndex + 1] === 'D'.charCodeAt(0) && header[byteIndex + 2] === '3'.charCodeAt(0)) {
         return 'timed-metadata';
       } else if (header[byteIndex] & 0xff === 0xff && (header[byteIndex + 1] & 0xf0) === 0xf0) {
@@ -43662,7 +50708,7 @@
       isLikelyAacData: isLikelyAacData$1,
       parseId3TagSize: parseId3TagSize,
       parseAdtsSize: parseAdtsSize,
-      parseType: parseType$4,
+      parseType: parseType$5,
       parseSampleRate: parseSampleRate,
       parseAacTimestamp: parseAacTimestamp
     };
@@ -44351,7 +51397,7 @@
       this.push = function (output) {
         // buffer incoming captions until the associated video segment
         // finishes
-        if (output.text) {
+        if (output.content || output.text) {
           return this.pendingCaptions.push(output);
         } // buffer incoming id3 tags until the final flush
 
@@ -44776,7 +51822,7 @@
       toUnsigned: toUnsigned$3,
       toHexString: toHexString$1
     };
-    var parseType$3 = function (buffer) {
+    var parseType$4 = function (buffer) {
       var result = '';
       result += String.fromCharCode(buffer[0]);
       result += String.fromCharCode(buffer[1]);
@@ -44784,10 +51830,10 @@
       result += String.fromCharCode(buffer[3]);
       return result;
     };
-    var parseType_1 = parseType$3;
+    var parseType_1 = parseType$4;
     var toUnsigned$2 = bin.toUnsigned;
-    var parseType$2 = parseType_1;
-    var findBox$2 = function (data, path) {
+    var parseType$3 = parseType_1;
+    var findBox$5 = function (data, path) {
       var results = [],
         i,
         size,
@@ -44800,7 +51846,7 @@
       }
       for (i = 0; i < data.byteLength;) {
         size = toUnsigned$2(data[i] << 24 | data[i + 1] << 16 | data[i + 2] << 8 | data[i + 3]);
-        type = parseType$2(data.subarray(i + 4, i + 8));
+        type = parseType$3(data.subarray(i + 4, i + 8));
         end = size > 1 ? i + size : data.byteLength;
         if (type === path[0]) {
           if (path.length === 1) {
@@ -44809,7 +51855,7 @@
             results.push(data.subarray(i + 8, end));
           } else {
             // recursively search for the next box along the path
-            subresults = findBox$2(data.subarray(i + 8, end), path.slice(1));
+            subresults = findBox$5(data.subarray(i + 8, end), path.slice(1));
             if (subresults.length) {
               results = results.concat(subresults);
             }
@@ -44820,22 +51866,108 @@
 
       return results;
     };
-    var findBox_1 = findBox$2;
+    var findBox_1 = findBox$5;
     var toUnsigned$1 = bin.toUnsigned;
-    var getUint64$2 = numbers.getUint64;
+    var getUint64$4 = numbers.getUint64;
     var tfdt = function (data) {
       var result = {
         version: data[0],
         flags: new Uint8Array(data.subarray(1, 4))
       };
       if (result.version === 1) {
-        result.baseMediaDecodeTime = getUint64$2(data.subarray(4));
+        result.baseMediaDecodeTime = getUint64$4(data.subarray(4));
       } else {
         result.baseMediaDecodeTime = toUnsigned$1(data[4] << 24 | data[5] << 16 | data[6] << 8 | data[7]);
       }
       return result;
     };
-    var parseTfdt$2 = tfdt;
+    var parseTfdt$3 = tfdt;
+    var tfhd = function (data) {
+      var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+        result = {
+          version: data[0],
+          flags: new Uint8Array(data.subarray(1, 4)),
+          trackId: view.getUint32(4)
+        },
+        baseDataOffsetPresent = result.flags[2] & 0x01,
+        sampleDescriptionIndexPresent = result.flags[2] & 0x02,
+        defaultSampleDurationPresent = result.flags[2] & 0x08,
+        defaultSampleSizePresent = result.flags[2] & 0x10,
+        defaultSampleFlagsPresent = result.flags[2] & 0x20,
+        durationIsEmpty = result.flags[0] & 0x010000,
+        defaultBaseIsMoof = result.flags[0] & 0x020000,
+        i;
+      i = 8;
+      if (baseDataOffsetPresent) {
+        i += 4; // truncate top 4 bytes
+        // FIXME: should we read the full 64 bits?
+
+        result.baseDataOffset = view.getUint32(12);
+        i += 4;
+      }
+      if (sampleDescriptionIndexPresent) {
+        result.sampleDescriptionIndex = view.getUint32(i);
+        i += 4;
+      }
+      if (defaultSampleDurationPresent) {
+        result.defaultSampleDuration = view.getUint32(i);
+        i += 4;
+      }
+      if (defaultSampleSizePresent) {
+        result.defaultSampleSize = view.getUint32(i);
+        i += 4;
+      }
+      if (defaultSampleFlagsPresent) {
+        result.defaultSampleFlags = view.getUint32(i);
+      }
+      if (durationIsEmpty) {
+        result.durationIsEmpty = true;
+      }
+      if (!baseDataOffsetPresent && defaultBaseIsMoof) {
+        result.baseDataOffsetIsMoof = true;
+      }
+      return result;
+    };
+    var parseTfhd$2 = tfhd;
+    var getUint64$3 = numbers.getUint64;
+    var parseSidx = function (data) {
+      var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+        result = {
+          version: data[0],
+          flags: new Uint8Array(data.subarray(1, 4)),
+          references: [],
+          referenceId: view.getUint32(4),
+          timescale: view.getUint32(8)
+        },
+        i = 12;
+      if (result.version === 0) {
+        result.earliestPresentationTime = view.getUint32(i);
+        result.firstOffset = view.getUint32(i + 4);
+        i += 8;
+      } else {
+        // read 64 bits
+        result.earliestPresentationTime = getUint64$3(data.subarray(i));
+        result.firstOffset = getUint64$3(data.subarray(i + 8));
+        i += 16;
+      }
+      i += 2; // reserved
+
+      var referenceCount = view.getUint16(i);
+      i += 2; // start of references
+
+      for (; referenceCount > 0; i += 12, referenceCount--) {
+        result.references.push({
+          referenceType: (data[i] & 0x80) >>> 7,
+          referencedSize: view.getUint32(i) & 0x7FFFFFFF,
+          subsegmentDuration: view.getUint32(i + 4),
+          startsWithSap: !!(data[i + 8] & 0x80),
+          sapType: (data[i + 8] & 0x70) >>> 4,
+          sapDeltaTime: view.getUint32(i + 8) & 0x0FFFFFFF
+        });
+      }
+      return result;
+    };
+    var parseSidx_1 = parseSidx;
     var parseSampleFlags$1 = function (flags) {
       return {
         isLeading: (flags[0] & 0x0c) >>> 2,
@@ -44930,53 +52062,824 @@
       return result;
     };
     var parseTrun$2 = trun;
-    var tfhd = function (data) {
-      var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
-        result = {
-          version: data[0],
-          flags: new Uint8Array(data.subarray(1, 4)),
-          trackId: view.getUint32(4)
-        },
-        baseDataOffsetPresent = result.flags[2] & 0x01,
-        sampleDescriptionIndexPresent = result.flags[2] & 0x02,
-        defaultSampleDurationPresent = result.flags[2] & 0x08,
-        defaultSampleSizePresent = result.flags[2] & 0x10,
-        defaultSampleFlagsPresent = result.flags[2] & 0x20,
-        durationIsEmpty = result.flags[0] & 0x010000,
-        defaultBaseIsMoof = result.flags[0] & 0x020000,
-        i;
-      i = 8;
-      if (baseDataOffsetPresent) {
-        i += 4; // truncate top 4 bytes
-        // FIXME: should we read the full 64 bits?
+    /**
+     * mux.js
+     *
+     * Copyright (c) Brightcove
+     * Licensed Apache-2.0 https://github.com/videojs/mux.js/blob/master/LICENSE
+     *
+     * Parse the internal MP4 structure into an equivalent javascript
+     * object.
+     */
 
-        result.baseDataOffset = view.getUint32(12);
-        i += 4;
+    var numberHelpers = numbers;
+    var getUint64$2 = numberHelpers.getUint64;
+    var inspectMp4,
+      textifyMp4,
+      parseMp4Date = function (seconds) {
+        return new Date(seconds * 1000 - 2082844800000);
+      },
+      parseType$2 = parseType_1,
+      findBox$4 = findBox_1,
+      nalParse = function (avcStream) {
+        var avcView = new DataView(avcStream.buffer, avcStream.byteOffset, avcStream.byteLength),
+          result = [],
+          i,
+          length;
+        for (i = 0; i + 4 < avcStream.length; i += length) {
+          length = avcView.getUint32(i);
+          i += 4; // bail if this doesn't appear to be an H264 stream
+
+          if (length <= 0) {
+            result.push('<span style=\'color:red;\'>MALFORMED DATA</span>');
+            continue;
+          }
+          switch (avcStream[i] & 0x1F) {
+            case 0x01:
+              result.push('slice_layer_without_partitioning_rbsp');
+              break;
+            case 0x05:
+              result.push('slice_layer_without_partitioning_rbsp_idr');
+              break;
+            case 0x06:
+              result.push('sei_rbsp');
+              break;
+            case 0x07:
+              result.push('seq_parameter_set_rbsp');
+              break;
+            case 0x08:
+              result.push('pic_parameter_set_rbsp');
+              break;
+            case 0x09:
+              result.push('access_unit_delimiter_rbsp');
+              break;
+            default:
+              result.push('UNKNOWN NAL - ' + avcStream[i] & 0x1F);
+              break;
+          }
+        }
+        return result;
+      },
+      // registry of handlers for individual mp4 box types
+      parse = {
+        // codingname, not a first-class box type. stsd entries share the
+        // same format as real boxes so the parsing infrastructure can be
+        // shared
+        avc1: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+          return {
+            dataReferenceIndex: view.getUint16(6),
+            width: view.getUint16(24),
+            height: view.getUint16(26),
+            horizresolution: view.getUint16(28) + view.getUint16(30) / 16,
+            vertresolution: view.getUint16(32) + view.getUint16(34) / 16,
+            frameCount: view.getUint16(40),
+            depth: view.getUint16(74),
+            config: inspectMp4(data.subarray(78, data.byteLength))
+          };
+        },
+        avcC: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              configurationVersion: data[0],
+              avcProfileIndication: data[1],
+              profileCompatibility: data[2],
+              avcLevelIndication: data[3],
+              lengthSizeMinusOne: data[4] & 0x03,
+              sps: [],
+              pps: []
+            },
+            numOfSequenceParameterSets = data[5] & 0x1f,
+            numOfPictureParameterSets,
+            nalSize,
+            offset,
+            i; // iterate past any SPSs
+
+          offset = 6;
+          for (i = 0; i < numOfSequenceParameterSets; i++) {
+            nalSize = view.getUint16(offset);
+            offset += 2;
+            result.sps.push(new Uint8Array(data.subarray(offset, offset + nalSize)));
+            offset += nalSize;
+          } // iterate past any PPSs
+
+          numOfPictureParameterSets = data[offset];
+          offset++;
+          for (i = 0; i < numOfPictureParameterSets; i++) {
+            nalSize = view.getUint16(offset);
+            offset += 2;
+            result.pps.push(new Uint8Array(data.subarray(offset, offset + nalSize)));
+            offset += nalSize;
+          }
+          return result;
+        },
+        btrt: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+          return {
+            bufferSizeDB: view.getUint32(0),
+            maxBitrate: view.getUint32(4),
+            avgBitrate: view.getUint32(8)
+          };
+        },
+        edts: function edts(data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        elst: function elst(data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              version: view.getUint8(0),
+              flags: new Uint8Array(data.subarray(1, 4)),
+              edits: []
+            },
+            entryCount = view.getUint32(4),
+            i;
+          for (i = 8; entryCount; entryCount--) {
+            if (result.version === 0) {
+              result.edits.push({
+                segmentDuration: view.getUint32(i),
+                mediaTime: view.getInt32(i + 4),
+                mediaRate: view.getUint16(i + 8) + view.getUint16(i + 10) / (256 * 256)
+              });
+              i += 12;
+            } else {
+              result.edits.push({
+                segmentDuration: getUint64$2(data.subarray(i)),
+                mediaTime: getUint64$2(data.subarray(i + 8)),
+                mediaRate: view.getUint16(i + 16) + view.getUint16(i + 18) / (256 * 256)
+              });
+              i += 20;
+            }
+          }
+          return result;
+        },
+        esds: function (data) {
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4)),
+            esId: data[6] << 8 | data[7],
+            streamPriority: data[8] & 0x1f,
+            decoderConfig: {
+              objectProfileIndication: data[11],
+              streamType: data[12] >>> 2 & 0x3f,
+              bufferSize: data[13] << 16 | data[14] << 8 | data[15],
+              maxBitrate: data[16] << 24 | data[17] << 16 | data[18] << 8 | data[19],
+              avgBitrate: data[20] << 24 | data[21] << 16 | data[22] << 8 | data[23],
+              decoderConfigDescriptor: {
+                tag: data[24],
+                length: data[25],
+                audioObjectType: data[26] >>> 3 & 0x1f,
+                samplingFrequencyIndex: (data[26] & 0x07) << 1 | data[27] >>> 7 & 0x01,
+                channelConfiguration: data[27] >>> 3 & 0x0f
+              }
+            }
+          };
+        },
+        ftyp: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              majorBrand: parseType$2(data.subarray(0, 4)),
+              minorVersion: view.getUint32(4),
+              compatibleBrands: []
+            },
+            i = 8;
+          while (i < data.byteLength) {
+            result.compatibleBrands.push(parseType$2(data.subarray(i, i + 4)));
+            i += 4;
+          }
+          return result;
+        },
+        dinf: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        dref: function (data) {
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4)),
+            dataReferences: inspectMp4(data.subarray(8))
+          };
+        },
+        hdlr: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              version: view.getUint8(0),
+              flags: new Uint8Array(data.subarray(1, 4)),
+              handlerType: parseType$2(data.subarray(8, 12)),
+              name: ''
+            },
+            i = 8; // parse out the name field
+
+          for (i = 24; i < data.byteLength; i++) {
+            if (data[i] === 0x00) {
+              // the name field is null-terminated
+              i++;
+              break;
+            }
+            result.name += String.fromCharCode(data[i]);
+          } // decode UTF-8 to javascript's internal representation
+          // see http://ecmanaut.blogspot.com/2006/07/encoding-decoding-utf8-in-javascript.html
+
+          result.name = decodeURIComponent(escape(result.name));
+          return result;
+        },
+        mdat: function (data) {
+          return {
+            byteLength: data.byteLength,
+            nals: nalParse(data)
+          };
+        },
+        mdhd: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            i = 4,
+            language,
+            result = {
+              version: view.getUint8(0),
+              flags: new Uint8Array(data.subarray(1, 4)),
+              language: ''
+            };
+          if (result.version === 1) {
+            i += 4;
+            result.creationTime = parseMp4Date(view.getUint32(i)); // truncating top 4 bytes
+
+            i += 8;
+            result.modificationTime = parseMp4Date(view.getUint32(i)); // truncating top 4 bytes
+
+            i += 4;
+            result.timescale = view.getUint32(i);
+            i += 8;
+            result.duration = view.getUint32(i); // truncating top 4 bytes
+          } else {
+            result.creationTime = parseMp4Date(view.getUint32(i));
+            i += 4;
+            result.modificationTime = parseMp4Date(view.getUint32(i));
+            i += 4;
+            result.timescale = view.getUint32(i);
+            i += 4;
+            result.duration = view.getUint32(i);
+          }
+          i += 4; // language is stored as an ISO-639-2/T code in an array of three 5-bit fields
+          // each field is the packed difference between its ASCII value and 0x60
+
+          language = view.getUint16(i);
+          result.language += String.fromCharCode((language >> 10) + 0x60);
+          result.language += String.fromCharCode(((language & 0x03e0) >> 5) + 0x60);
+          result.language += String.fromCharCode((language & 0x1f) + 0x60);
+          return result;
+        },
+        mdia: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        mfhd: function (data) {
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4)),
+            sequenceNumber: data[4] << 24 | data[5] << 16 | data[6] << 8 | data[7]
+          };
+        },
+        minf: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        // codingname, not a first-class box type. stsd entries share the
+        // same format as real boxes so the parsing infrastructure can be
+        // shared
+        mp4a: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              // 6 bytes reserved
+              dataReferenceIndex: view.getUint16(6),
+              // 4 + 4 bytes reserved
+              channelcount: view.getUint16(16),
+              samplesize: view.getUint16(18),
+              // 2 bytes pre_defined
+              // 2 bytes reserved
+              samplerate: view.getUint16(24) + view.getUint16(26) / 65536
+            }; // if there are more bytes to process, assume this is an ISO/IEC
+          // 14496-14 MP4AudioSampleEntry and parse the ESDBox
+
+          if (data.byteLength > 28) {
+            result.streamDescriptor = inspectMp4(data.subarray(28))[0];
+          }
+          return result;
+        },
+        moof: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        moov: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        mvex: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        mvhd: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            i = 4,
+            result = {
+              version: view.getUint8(0),
+              flags: new Uint8Array(data.subarray(1, 4))
+            };
+          if (result.version === 1) {
+            i += 4;
+            result.creationTime = parseMp4Date(view.getUint32(i)); // truncating top 4 bytes
+
+            i += 8;
+            result.modificationTime = parseMp4Date(view.getUint32(i)); // truncating top 4 bytes
+
+            i += 4;
+            result.timescale = view.getUint32(i);
+            i += 8;
+            result.duration = view.getUint32(i); // truncating top 4 bytes
+          } else {
+            result.creationTime = parseMp4Date(view.getUint32(i));
+            i += 4;
+            result.modificationTime = parseMp4Date(view.getUint32(i));
+            i += 4;
+            result.timescale = view.getUint32(i);
+            i += 4;
+            result.duration = view.getUint32(i);
+          }
+          i += 4; // convert fixed-point, base 16 back to a number
+
+          result.rate = view.getUint16(i) + view.getUint16(i + 2) / 16;
+          i += 4;
+          result.volume = view.getUint8(i) + view.getUint8(i + 1) / 8;
+          i += 2;
+          i += 2;
+          i += 2 * 4;
+          result.matrix = new Uint32Array(data.subarray(i, i + 9 * 4));
+          i += 9 * 4;
+          i += 6 * 4;
+          result.nextTrackId = view.getUint32(i);
+          return result;
+        },
+        pdin: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+          return {
+            version: view.getUint8(0),
+            flags: new Uint8Array(data.subarray(1, 4)),
+            rate: view.getUint32(4),
+            initialDelay: view.getUint32(8)
+          };
+        },
+        sdtp: function (data) {
+          var result = {
+              version: data[0],
+              flags: new Uint8Array(data.subarray(1, 4)),
+              samples: []
+            },
+            i;
+          for (i = 4; i < data.byteLength; i++) {
+            result.samples.push({
+              dependsOn: (data[i] & 0x30) >> 4,
+              isDependedOn: (data[i] & 0x0c) >> 2,
+              hasRedundancy: data[i] & 0x03
+            });
+          }
+          return result;
+        },
+        sidx: parseSidx_1,
+        smhd: function (data) {
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4)),
+            balance: data[4] + data[5] / 256
+          };
+        },
+        stbl: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        ctts: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              version: view.getUint8(0),
+              flags: new Uint8Array(data.subarray(1, 4)),
+              compositionOffsets: []
+            },
+            entryCount = view.getUint32(4),
+            i;
+          for (i = 8; entryCount; i += 8, entryCount--) {
+            result.compositionOffsets.push({
+              sampleCount: view.getUint32(i),
+              sampleOffset: view[result.version === 0 ? 'getUint32' : 'getInt32'](i + 4)
+            });
+          }
+          return result;
+        },
+        stss: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              version: view.getUint8(0),
+              flags: new Uint8Array(data.subarray(1, 4)),
+              syncSamples: []
+            },
+            entryCount = view.getUint32(4),
+            i;
+          for (i = 8; entryCount; i += 4, entryCount--) {
+            result.syncSamples.push(view.getUint32(i));
+          }
+          return result;
+        },
+        stco: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              version: data[0],
+              flags: new Uint8Array(data.subarray(1, 4)),
+              chunkOffsets: []
+            },
+            entryCount = view.getUint32(4),
+            i;
+          for (i = 8; entryCount; i += 4, entryCount--) {
+            result.chunkOffsets.push(view.getUint32(i));
+          }
+          return result;
+        },
+        stsc: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            entryCount = view.getUint32(4),
+            result = {
+              version: data[0],
+              flags: new Uint8Array(data.subarray(1, 4)),
+              sampleToChunks: []
+            },
+            i;
+          for (i = 8; entryCount; i += 12, entryCount--) {
+            result.sampleToChunks.push({
+              firstChunk: view.getUint32(i),
+              samplesPerChunk: view.getUint32(i + 4),
+              sampleDescriptionIndex: view.getUint32(i + 8)
+            });
+          }
+          return result;
+        },
+        stsd: function (data) {
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4)),
+            sampleDescriptions: inspectMp4(data.subarray(8))
+          };
+        },
+        stsz: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              version: data[0],
+              flags: new Uint8Array(data.subarray(1, 4)),
+              sampleSize: view.getUint32(4),
+              entries: []
+            },
+            i;
+          for (i = 12; i < data.byteLength; i += 4) {
+            result.entries.push(view.getUint32(i));
+          }
+          return result;
+        },
+        stts: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            result = {
+              version: data[0],
+              flags: new Uint8Array(data.subarray(1, 4)),
+              timeToSamples: []
+            },
+            entryCount = view.getUint32(4),
+            i;
+          for (i = 8; entryCount; i += 8, entryCount--) {
+            result.timeToSamples.push({
+              sampleCount: view.getUint32(i),
+              sampleDelta: view.getUint32(i + 4)
+            });
+          }
+          return result;
+        },
+        styp: function (data) {
+          return parse.ftyp(data);
+        },
+        tfdt: parseTfdt$3,
+        tfhd: parseTfhd$2,
+        tkhd: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength),
+            i = 4,
+            result = {
+              version: view.getUint8(0),
+              flags: new Uint8Array(data.subarray(1, 4))
+            };
+          if (result.version === 1) {
+            i += 4;
+            result.creationTime = parseMp4Date(view.getUint32(i)); // truncating top 4 bytes
+
+            i += 8;
+            result.modificationTime = parseMp4Date(view.getUint32(i)); // truncating top 4 bytes
+
+            i += 4;
+            result.trackId = view.getUint32(i);
+            i += 4;
+            i += 8;
+            result.duration = view.getUint32(i); // truncating top 4 bytes
+          } else {
+            result.creationTime = parseMp4Date(view.getUint32(i));
+            i += 4;
+            result.modificationTime = parseMp4Date(view.getUint32(i));
+            i += 4;
+            result.trackId = view.getUint32(i);
+            i += 4;
+            i += 4;
+            result.duration = view.getUint32(i);
+          }
+          i += 4;
+          i += 2 * 4;
+          result.layer = view.getUint16(i);
+          i += 2;
+          result.alternateGroup = view.getUint16(i);
+          i += 2; // convert fixed-point, base 16 back to a number
+
+          result.volume = view.getUint8(i) + view.getUint8(i + 1) / 8;
+          i += 2;
+          i += 2;
+          result.matrix = new Uint32Array(data.subarray(i, i + 9 * 4));
+          i += 9 * 4;
+          result.width = view.getUint16(i) + view.getUint16(i + 2) / 65536;
+          i += 4;
+          result.height = view.getUint16(i) + view.getUint16(i + 2) / 65536;
+          return result;
+        },
+        traf: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        trak: function (data) {
+          return {
+            boxes: inspectMp4(data)
+          };
+        },
+        trex: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4)),
+            trackId: view.getUint32(4),
+            defaultSampleDescriptionIndex: view.getUint32(8),
+            defaultSampleDuration: view.getUint32(12),
+            defaultSampleSize: view.getUint32(16),
+            sampleDependsOn: data[20] & 0x03,
+            sampleIsDependedOn: (data[21] & 0xc0) >> 6,
+            sampleHasRedundancy: (data[21] & 0x30) >> 4,
+            samplePaddingValue: (data[21] & 0x0e) >> 1,
+            sampleIsDifferenceSample: !!(data[21] & 0x01),
+            sampleDegradationPriority: view.getUint16(22)
+          };
+        },
+        trun: parseTrun$2,
+        'url ': function (data) {
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4))
+          };
+        },
+        vmhd: function (data) {
+          var view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+          return {
+            version: data[0],
+            flags: new Uint8Array(data.subarray(1, 4)),
+            graphicsmode: view.getUint16(4),
+            opcolor: new Uint16Array([view.getUint16(6), view.getUint16(8), view.getUint16(10)])
+          };
+        }
+      };
+    /**
+     * Return a javascript array of box objects parsed from an ISO base
+     * media file.
+     * @param data {Uint8Array} the binary data of the media to be inspected
+     * @return {array} a javascript array of potentially nested box objects
+     */
+
+    inspectMp4 = function (data) {
+      var i = 0,
+        result = [],
+        view,
+        size,
+        type,
+        end,
+        box; // Convert data from Uint8Array to ArrayBuffer, to follow Dataview API
+
+      var ab = new ArrayBuffer(data.length);
+      var v = new Uint8Array(ab);
+      for (var z = 0; z < data.length; ++z) {
+        v[z] = data[z];
       }
-      if (sampleDescriptionIndexPresent) {
-        result.sampleDescriptionIndex = view.getUint32(i);
-        i += 4;
-      }
-      if (defaultSampleDurationPresent) {
-        result.defaultSampleDuration = view.getUint32(i);
-        i += 4;
-      }
-      if (defaultSampleSizePresent) {
-        result.defaultSampleSize = view.getUint32(i);
-        i += 4;
-      }
-      if (defaultSampleFlagsPresent) {
-        result.defaultSampleFlags = view.getUint32(i);
-      }
-      if (durationIsEmpty) {
-        result.durationIsEmpty = true;
-      }
-      if (!baseDataOffsetPresent && defaultBaseIsMoof) {
-        result.baseDataOffsetIsMoof = true;
+      view = new DataView(ab);
+      while (i < data.byteLength) {
+        // parse box data
+        size = view.getUint32(i);
+        type = parseType$2(data.subarray(i + 4, i + 8));
+        end = size > 1 ? i + size : data.byteLength; // parse type-specific data
+
+        box = (parse[type] || function (data) {
+          return {
+            data: data
+          };
+        })(data.subarray(i + 8, end));
+        box.size = size;
+        box.type = type; // store this box and move to the next
+
+        result.push(box);
+        i = end;
       }
       return result;
     };
-    var parseTfhd$2 = tfhd;
+    /**
+     * Returns a textual representation of the javascript represtentation
+     * of an MP4 file. You can use it as an alternative to
+     * JSON.stringify() to compare inspected MP4s.
+     * @param inspectedMp4 {array} the parsed array of boxes in an MP4
+     * file
+     * @param depth {number} (optional) the number of ancestor boxes of
+     * the elements of inspectedMp4. Assumed to be zero if unspecified.
+     * @return {string} a text representation of the parsed MP4
+     */
+
+    textifyMp4 = function (inspectedMp4, depth) {
+      var indent;
+      depth = depth || 0;
+      indent = new Array(depth * 2 + 1).join(' '); // iterate over all the boxes
+
+      return inspectedMp4.map(function (box, index) {
+        // list the box type first at the current indentation level
+        return indent + box.type + '\n' +
+        // the type is already included and handle child boxes separately
+        Object.keys(box).filter(function (key) {
+          return key !== 'type' && key !== 'boxes'; // output all the box properties
+        }).map(function (key) {
+          var prefix = indent + '  ' + key + ': ',
+            value = box[key]; // print out raw bytes as hexademical
+
+          if (value instanceof Uint8Array || value instanceof Uint32Array) {
+            var bytes = Array.prototype.slice.call(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)).map(function (byte) {
+              return ' ' + ('00' + byte.toString(16)).slice(-2);
+            }).join('').match(/.{1,24}/g);
+            if (!bytes) {
+              return prefix + '<>';
+            }
+            if (bytes.length === 1) {
+              return prefix + '<' + bytes.join('').slice(1) + '>';
+            }
+            return prefix + '<\n' + bytes.map(function (line) {
+              return indent + '  ' + line;
+            }).join('\n') + '\n' + indent + '  >';
+          } // stringify generic objects
+
+          return prefix + JSON.stringify(value, null, 2).split('\n').map(function (line, index) {
+            if (index === 0) {
+              return line;
+            }
+            return indent + '  ' + line;
+          }).join('\n');
+        }).join('\n') + (
+        // recursively textify the child boxes
+        box.boxes ? '\n' + textifyMp4(box.boxes, depth + 1) : '');
+      }).join('\n');
+    };
+    var mp4Inspector = {
+      inspect: inspectMp4,
+      textify: textifyMp4,
+      parseType: parseType$2,
+      findBox: findBox$4,
+      parseTraf: parse.traf,
+      parseTfdt: parse.tfdt,
+      parseHdlr: parse.hdlr,
+      parseTfhd: parse.tfhd,
+      parseTrun: parse.trun,
+      parseSidx: parse.sidx
+    };
+    /**
+     * Returns the first string in the data array ending with a null char '\0'
+     * @param {UInt8} data 
+     * @returns the string with the null char
+     */
+
+    var uint8ToCString$1 = function (data) {
+      var index = 0;
+      var curChar = String.fromCharCode(data[index]);
+      var retString = '';
+      while (curChar !== '\0') {
+        retString += curChar;
+        index++;
+        curChar = String.fromCharCode(data[index]);
+      } // Add nullChar
+
+      retString += curChar;
+      return retString;
+    };
+    var string = {
+      uint8ToCString: uint8ToCString$1
+    };
+    var uint8ToCString = string.uint8ToCString;
+    var getUint64$1 = numbers.getUint64;
+    /**
+     * Based on: ISO/IEC 23009 Section: 5.10.3.3
+     * References:
+     * https://dashif-documents.azurewebsites.net/Events/master/event.html#emsg-format
+     * https://aomediacodec.github.io/id3-emsg/
+     * 
+     * Takes emsg box data as a uint8 array and returns a emsg box object
+     * @param {UInt8Array} boxData data from emsg box
+     * @returns A parsed emsg box object
+     */
+
+    var parseEmsgBox = function (boxData) {
+      // version + flags
+      var offset = 4;
+      var version = boxData[0];
+      var scheme_id_uri, value, timescale, presentation_time, presentation_time_delta, event_duration, id, message_data;
+      if (version === 0) {
+        scheme_id_uri = uint8ToCString(boxData.subarray(offset));
+        offset += scheme_id_uri.length;
+        value = uint8ToCString(boxData.subarray(offset));
+        offset += value.length;
+        var dv = new DataView(boxData.buffer);
+        timescale = dv.getUint32(offset);
+        offset += 4;
+        presentation_time_delta = dv.getUint32(offset);
+        offset += 4;
+        event_duration = dv.getUint32(offset);
+        offset += 4;
+        id = dv.getUint32(offset);
+        offset += 4;
+      } else if (version === 1) {
+        var dv = new DataView(boxData.buffer);
+        timescale = dv.getUint32(offset);
+        offset += 4;
+        presentation_time = getUint64$1(boxData.subarray(offset));
+        offset += 8;
+        event_duration = dv.getUint32(offset);
+        offset += 4;
+        id = dv.getUint32(offset);
+        offset += 4;
+        scheme_id_uri = uint8ToCString(boxData.subarray(offset));
+        offset += scheme_id_uri.length;
+        value = uint8ToCString(boxData.subarray(offset));
+        offset += value.length;
+      }
+      message_data = new Uint8Array(boxData.subarray(offset, boxData.byteLength));
+      var emsgBox = {
+        scheme_id_uri,
+        value,
+        // if timescale is undefined or 0 set to 1 
+        timescale: timescale ? timescale : 1,
+        presentation_time,
+        presentation_time_delta,
+        event_duration,
+        id,
+        message_data
+      };
+      return isValidEmsgBox(version, emsgBox) ? emsgBox : undefined;
+    };
+    /**
+     * Scales a presentation time or time delta with an offset with a provided timescale
+     * @param {number} presentationTime 
+     * @param {number} timescale 
+     * @param {number} timeDelta 
+     * @param {number} offset 
+     * @returns the scaled time as a number
+     */
+
+    var scaleTime = function (presentationTime, timescale, timeDelta, offset) {
+      return presentationTime || presentationTime === 0 ? presentationTime / timescale : offset + timeDelta / timescale;
+    };
+    /**
+     * Checks the emsg box data for validity based on the version
+     * @param {number} version of the emsg box to validate
+     * @param {Object} emsg the emsg data to validate
+     * @returns if the box is valid as a boolean
+     */
+
+    var isValidEmsgBox = function (version, emsg) {
+      var hasScheme = emsg.scheme_id_uri !== '\0';
+      var isValidV0Box = version === 0 && isDefined(emsg.presentation_time_delta) && hasScheme;
+      var isValidV1Box = version === 1 && isDefined(emsg.presentation_time) && hasScheme; // Only valid versions of emsg are 0 and 1
+
+      return !(version > 1) && isValidV0Box || isValidV1Box;
+    }; // Utility function to check if an object is defined
+
+    var isDefined = function (data) {
+      return data !== undefined || data !== null;
+    };
+    var emsg$1 = {
+      parseEmsgBox: parseEmsgBox,
+      scaleTime: scaleTime
+    };
     var win;
     if (typeof window !== "undefined") {
       win = window;
@@ -44994,6 +52897,427 @@
      * Copyright (c) Brightcove
      * Licensed Apache-2.0 https://github.com/videojs/mux.js/blob/master/LICENSE
      *
+     * Utilities to detect basic properties and metadata about MP4s.
+     */
+
+    var toUnsigned = bin.toUnsigned;
+    var toHexString = bin.toHexString;
+    var findBox$3 = findBox_1;
+    var parseType$1 = parseType_1;
+    var emsg = emsg$1;
+    var parseTfhd$1 = parseTfhd$2;
+    var parseTrun$1 = parseTrun$2;
+    var parseTfdt$2 = parseTfdt$3;
+    var getUint64 = numbers.getUint64;
+    var timescale, startTime, compositionStartTime, getVideoTrackIds, getTracks, getTimescaleFromMediaHeader$1, getEmsgID3;
+    var window$2 = window_1;
+    var parseId3Frames = parseId3.parseId3Frames;
+    /**
+     * Parses an MP4 initialization segment and extracts the timescale
+     * values for any declared tracks. Timescale values indicate the
+     * number of clock ticks per second to assume for time-based values
+     * elsewhere in the MP4.
+     *
+     * To determine the start time of an MP4, you need two pieces of
+     * information: the timescale unit and the earliest base media decode
+     * time. Multiple timescales can be specified within an MP4 but the
+     * base media decode time is always expressed in the timescale from
+     * the media header box for the track:
+     * ```
+     * moov > trak > mdia > mdhd.timescale
+     * ```
+     * @param init {Uint8Array} the bytes of the init segment
+     * @return {object} a hash of track ids to timescale values or null if
+     * the init segment is malformed.
+     */
+
+    timescale = function (init) {
+      var result = {},
+        traks = findBox$3(init, ['moov', 'trak']); // mdhd timescale
+
+      return traks.reduce(function (result, trak) {
+        var tkhd, version, index, id, mdhd;
+        tkhd = findBox$3(trak, ['tkhd'])[0];
+        if (!tkhd) {
+          return null;
+        }
+        version = tkhd[0];
+        index = version === 0 ? 12 : 20;
+        id = toUnsigned(tkhd[index] << 24 | tkhd[index + 1] << 16 | tkhd[index + 2] << 8 | tkhd[index + 3]);
+        mdhd = findBox$3(trak, ['mdia', 'mdhd'])[0];
+        if (!mdhd) {
+          return null;
+        }
+        version = mdhd[0];
+        index = version === 0 ? 12 : 20;
+        result[id] = toUnsigned(mdhd[index] << 24 | mdhd[index + 1] << 16 | mdhd[index + 2] << 8 | mdhd[index + 3]);
+        return result;
+      }, result);
+    };
+    /**
+     * Determine the base media decode start time, in seconds, for an MP4
+     * fragment. If multiple fragments are specified, the earliest time is
+     * returned.
+     *
+     * The base media decode time can be parsed from track fragment
+     * metadata:
+     * ```
+     * moof > traf > tfdt.baseMediaDecodeTime
+     * ```
+     * It requires the timescale value from the mdhd to interpret.
+     *
+     * @param timescale {object} a hash of track ids to timescale values.
+     * @return {number} the earliest base media decode start time for the
+     * fragment, in seconds
+     */
+
+    startTime = function (timescale, fragment) {
+      var trafs; // we need info from two childrend of each track fragment box
+
+      trafs = findBox$3(fragment, ['moof', 'traf']); // determine the start times for each track
+
+      var lowestTime = trafs.reduce(function (acc, traf) {
+        var tfhd = findBox$3(traf, ['tfhd'])[0]; // get the track id from the tfhd
+
+        var id = toUnsigned(tfhd[4] << 24 | tfhd[5] << 16 | tfhd[6] << 8 | tfhd[7]); // assume a 90kHz clock if no timescale was specified
+
+        var scale = timescale[id] || 90e3; // get the base media decode time from the tfdt
+
+        var tfdt = findBox$3(traf, ['tfdt'])[0];
+        var dv = new DataView(tfdt.buffer, tfdt.byteOffset, tfdt.byteLength);
+        var baseTime; // version 1 is 64 bit
+
+        if (tfdt[0] === 1) {
+          baseTime = getUint64(tfdt.subarray(4, 12));
+        } else {
+          baseTime = dv.getUint32(4);
+        } // convert base time to seconds if it is a valid number.
+
+        let seconds;
+        if (typeof baseTime === 'bigint') {
+          seconds = baseTime / window$2.BigInt(scale);
+        } else if (typeof baseTime === 'number' && !isNaN(baseTime)) {
+          seconds = baseTime / scale;
+        }
+        if (seconds < Number.MAX_SAFE_INTEGER) {
+          seconds = Number(seconds);
+        }
+        if (seconds < acc) {
+          acc = seconds;
+        }
+        return acc;
+      }, Infinity);
+      return typeof lowestTime === 'bigint' || isFinite(lowestTime) ? lowestTime : 0;
+    };
+    /**
+     * Determine the composition start, in seconds, for an MP4
+     * fragment.
+     *
+     * The composition start time of a fragment can be calculated using the base
+     * media decode time, composition time offset, and timescale, as follows:
+     *
+     * compositionStartTime = (baseMediaDecodeTime + compositionTimeOffset) / timescale
+     *
+     * All of the aforementioned information is contained within a media fragment's
+     * `traf` box, except for timescale info, which comes from the initialization
+     * segment, so a track id (also contained within a `traf`) is also necessary to
+     * associate it with a timescale
+     *
+     *
+     * @param timescales {object} - a hash of track ids to timescale values.
+     * @param fragment {Unit8Array} - the bytes of a media segment
+     * @return {number} the composition start time for the fragment, in seconds
+     **/
+
+    compositionStartTime = function (timescales, fragment) {
+      var trafBoxes = findBox$3(fragment, ['moof', 'traf']);
+      var baseMediaDecodeTime = 0;
+      var compositionTimeOffset = 0;
+      var trackId;
+      if (trafBoxes && trafBoxes.length) {
+        // The spec states that track run samples contained within a `traf` box are contiguous, but
+        // it does not explicitly state whether the `traf` boxes themselves are contiguous.
+        // We will assume that they are, so we only need the first to calculate start time.
+        var tfhd = findBox$3(trafBoxes[0], ['tfhd'])[0];
+        var trun = findBox$3(trafBoxes[0], ['trun'])[0];
+        var tfdt = findBox$3(trafBoxes[0], ['tfdt'])[0];
+        if (tfhd) {
+          var parsedTfhd = parseTfhd$1(tfhd);
+          trackId = parsedTfhd.trackId;
+        }
+        if (tfdt) {
+          var parsedTfdt = parseTfdt$2(tfdt);
+          baseMediaDecodeTime = parsedTfdt.baseMediaDecodeTime;
+        }
+        if (trun) {
+          var parsedTrun = parseTrun$1(trun);
+          if (parsedTrun.samples && parsedTrun.samples.length) {
+            compositionTimeOffset = parsedTrun.samples[0].compositionTimeOffset || 0;
+          }
+        }
+      } // Get timescale for this specific track. Assume a 90kHz clock if no timescale was
+      // specified.
+
+      var timescale = timescales[trackId] || 90e3; // return the composition start time, in seconds
+
+      if (typeof baseMediaDecodeTime === 'bigint') {
+        compositionTimeOffset = window$2.BigInt(compositionTimeOffset);
+        timescale = window$2.BigInt(timescale);
+      }
+      var result = (baseMediaDecodeTime + compositionTimeOffset) / timescale;
+      if (typeof result === 'bigint' && result < Number.MAX_SAFE_INTEGER) {
+        result = Number(result);
+      }
+      return result;
+    };
+    /**
+      * Find the trackIds of the video tracks in this source.
+      * Found by parsing the Handler Reference and Track Header Boxes:
+      *   moov > trak > mdia > hdlr
+      *   moov > trak > tkhd
+      *
+      * @param {Uint8Array} init - The bytes of the init segment for this source
+      * @return {Number[]} A list of trackIds
+      *
+      * @see ISO-BMFF-12/2015, Section 8.4.3
+     **/
+
+    getVideoTrackIds = function (init) {
+      var traks = findBox$3(init, ['moov', 'trak']);
+      var videoTrackIds = [];
+      traks.forEach(function (trak) {
+        var hdlrs = findBox$3(trak, ['mdia', 'hdlr']);
+        var tkhds = findBox$3(trak, ['tkhd']);
+        hdlrs.forEach(function (hdlr, index) {
+          var handlerType = parseType$1(hdlr.subarray(8, 12));
+          var tkhd = tkhds[index];
+          var view;
+          var version;
+          var trackId;
+          if (handlerType === 'vide') {
+            view = new DataView(tkhd.buffer, tkhd.byteOffset, tkhd.byteLength);
+            version = view.getUint8(0);
+            trackId = version === 0 ? view.getUint32(12) : view.getUint32(20);
+            videoTrackIds.push(trackId);
+          }
+        });
+      });
+      return videoTrackIds;
+    };
+    getTimescaleFromMediaHeader$1 = function (mdhd) {
+      // mdhd is a FullBox, meaning it will have its own version as the first byte
+      var version = mdhd[0];
+      var index = version === 0 ? 12 : 20;
+      return toUnsigned(mdhd[index] << 24 | mdhd[index + 1] << 16 | mdhd[index + 2] << 8 | mdhd[index + 3]);
+    };
+    /**
+     * Get all the video, audio, and hint tracks from a non fragmented
+     * mp4 segment
+     */
+
+    getTracks = function (init) {
+      var traks = findBox$3(init, ['moov', 'trak']);
+      var tracks = [];
+      traks.forEach(function (trak) {
+        var track = {};
+        var tkhd = findBox$3(trak, ['tkhd'])[0];
+        var view, tkhdVersion; // id
+
+        if (tkhd) {
+          view = new DataView(tkhd.buffer, tkhd.byteOffset, tkhd.byteLength);
+          tkhdVersion = view.getUint8(0);
+          track.id = tkhdVersion === 0 ? view.getUint32(12) : view.getUint32(20);
+        }
+        var hdlr = findBox$3(trak, ['mdia', 'hdlr'])[0]; // type
+
+        if (hdlr) {
+          var type = parseType$1(hdlr.subarray(8, 12));
+          if (type === 'vide') {
+            track.type = 'video';
+          } else if (type === 'soun') {
+            track.type = 'audio';
+          } else {
+            track.type = type;
+          }
+        } // codec
+
+        var stsd = findBox$3(trak, ['mdia', 'minf', 'stbl', 'stsd'])[0];
+        if (stsd) {
+          var sampleDescriptions = stsd.subarray(8); // gives the codec type string
+
+          track.codec = parseType$1(sampleDescriptions.subarray(4, 8));
+          var codecBox = findBox$3(sampleDescriptions, [track.codec])[0];
+          var codecConfig, codecConfigType;
+          if (codecBox) {
+            // https://tools.ietf.org/html/rfc6381#section-3.3
+            if (/^[asm]vc[1-9]$/i.test(track.codec)) {
+              // we don't need anything but the "config" parameter of the
+              // avc1 codecBox
+              codecConfig = codecBox.subarray(78);
+              codecConfigType = parseType$1(codecConfig.subarray(4, 8));
+              if (codecConfigType === 'avcC' && codecConfig.length > 11) {
+                track.codec += '.'; // left padded with zeroes for single digit hex
+                // profile idc
+
+                track.codec += toHexString(codecConfig[9]); // the byte containing the constraint_set flags
+
+                track.codec += toHexString(codecConfig[10]); // level idc
+
+                track.codec += toHexString(codecConfig[11]);
+              } else {
+                // TODO: show a warning that we couldn't parse the codec
+                // and are using the default
+                track.codec = 'avc1.4d400d';
+              }
+            } else if (/^mp4[a,v]$/i.test(track.codec)) {
+              // we do not need anything but the streamDescriptor of the mp4a codecBox
+              codecConfig = codecBox.subarray(28);
+              codecConfigType = parseType$1(codecConfig.subarray(4, 8));
+              if (codecConfigType === 'esds' && codecConfig.length > 20 && codecConfig[19] !== 0) {
+                track.codec += '.' + toHexString(codecConfig[19]); // this value is only a single digit
+
+                track.codec += '.' + toHexString(codecConfig[20] >>> 2 & 0x3f).replace(/^0/, '');
+              } else {
+                // TODO: show a warning that we couldn't parse the codec
+                // and are using the default
+                track.codec = 'mp4a.40.2';
+              }
+            } else {
+              // flac, opus, etc
+              track.codec = track.codec.toLowerCase();
+            }
+          }
+        }
+        var mdhd = findBox$3(trak, ['mdia', 'mdhd'])[0];
+        if (mdhd) {
+          track.timescale = getTimescaleFromMediaHeader$1(mdhd);
+        }
+        tracks.push(track);
+      });
+      return tracks;
+    };
+    /**
+     * Returns an array of emsg ID3 data from the provided segmentData.
+     * An offset can also be provided as the Latest Arrival Time to calculate 
+     * the Event Start Time of v0 EMSG boxes. 
+     * See: https://dashif-documents.azurewebsites.net/Events/master/event.html#Inband-event-timing
+     * 
+     * @param {Uint8Array} segmentData the segment byte array.
+     * @param {number} offset the segment start time or Latest Arrival Time, 
+     * @return {Object[]} an array of ID3 parsed from EMSG boxes
+     */
+
+    getEmsgID3 = function (segmentData, offset = 0) {
+      var emsgBoxes = findBox$3(segmentData, ['emsg']);
+      return emsgBoxes.map(data => {
+        var parsedBox = emsg.parseEmsgBox(new Uint8Array(data));
+        var parsedId3Frames = parseId3Frames(parsedBox.message_data);
+        return {
+          cueTime: emsg.scaleTime(parsedBox.presentation_time, parsedBox.timescale, parsedBox.presentation_time_delta, offset),
+          duration: emsg.scaleTime(parsedBox.event_duration, parsedBox.timescale),
+          frames: parsedId3Frames
+        };
+      });
+    };
+    var probe$2 = {
+      // export mp4 inspector's findBox and parseType for backwards compatibility
+      findBox: findBox$3,
+      parseType: parseType$1,
+      timescale: timescale,
+      startTime: startTime,
+      compositionStartTime: compositionStartTime,
+      videoTrackIds: getVideoTrackIds,
+      tracks: getTracks,
+      getTimescaleFromMediaHeader: getTimescaleFromMediaHeader$1,
+      getEmsgID3: getEmsgID3
+    };
+    const {
+      parseTrun
+    } = mp4Inspector;
+    const {
+      findBox: findBox$2
+    } = probe$2;
+    var window$1 = window_1;
+    /**
+     * Utility function for parsing data from mdat boxes.
+     * @param {Array<Uint8Array>} segment the segment data to create mdat/traf pairs from.
+     * @returns mdat and traf boxes paired up for easier parsing.
+     */
+
+    var getMdatTrafPairs$2 = function (segment) {
+      var trafs = findBox$2(segment, ['moof', 'traf']);
+      var mdats = findBox$2(segment, ['mdat']);
+      var mdatTrafPairs = []; // Pair up each traf with a mdat as moofs and mdats are in pairs
+
+      mdats.forEach(function (mdat, index) {
+        var matchingTraf = trafs[index];
+        mdatTrafPairs.push({
+          mdat: mdat,
+          traf: matchingTraf
+        });
+      });
+      return mdatTrafPairs;
+    };
+    /**
+      * Parses sample information out of Track Run Boxes and calculates
+      * the absolute presentation and decode timestamps of each sample.
+      *
+      * @param {Array<Uint8Array>} truns - The Trun Run boxes to be parsed
+      * @param {Number|BigInt} baseMediaDecodeTime - base media decode time from tfdt
+          @see ISO-BMFF-12/2015, Section 8.8.12
+      * @param {Object} tfhd - The parsed Track Fragment Header
+      *   @see inspect.parseTfhd
+      * @return {Object[]} the parsed samples
+      *
+      * @see ISO-BMFF-12/2015, Section 8.8.8
+     **/
+
+    var parseSamples$2 = function (truns, baseMediaDecodeTime, tfhd) {
+      var currentDts = baseMediaDecodeTime;
+      var defaultSampleDuration = tfhd.defaultSampleDuration || 0;
+      var defaultSampleSize = tfhd.defaultSampleSize || 0;
+      var trackId = tfhd.trackId;
+      var allSamples = [];
+      truns.forEach(function (trun) {
+        // Note: We currently do not parse the sample table as well
+        // as the trun. It's possible some sources will require this.
+        // moov > trak > mdia > minf > stbl
+        var trackRun = parseTrun(trun);
+        var samples = trackRun.samples;
+        samples.forEach(function (sample) {
+          if (sample.duration === undefined) {
+            sample.duration = defaultSampleDuration;
+          }
+          if (sample.size === undefined) {
+            sample.size = defaultSampleSize;
+          }
+          sample.trackId = trackId;
+          sample.dts = currentDts;
+          if (sample.compositionTimeOffset === undefined) {
+            sample.compositionTimeOffset = 0;
+          }
+          if (typeof currentDts === 'bigint') {
+            sample.pts = currentDts + window$1.BigInt(sample.compositionTimeOffset);
+            currentDts += window$1.BigInt(sample.duration);
+          } else {
+            sample.pts = currentDts + sample.compositionTimeOffset;
+            currentDts += sample.duration;
+          }
+        });
+        allSamples = allSamples.concat(samples);
+      });
+      return allSamples;
+    };
+    var samples = {
+      getMdatTrafPairs: getMdatTrafPairs$2,
+      parseSamples: parseSamples$2
+    };
+    /**
+     * mux.js
+     *
+     * Copyright (c) Brightcove
+     * Licensed Apache-2.0 https://github.com/videojs/mux.js/blob/master/LICENSE
+     *
      * Reads in-band CEA-708 captions out of FMP4 segments.
      * @see https://en.wikipedia.org/wiki/CEA-708
      */
@@ -45001,10 +53325,12 @@
     var discardEmulationPreventionBytes = captionPacketParser.discardEmulationPreventionBytes;
     var CaptionStream = captionStream.CaptionStream;
     var findBox$1 = findBox_1;
-    var parseTfdt$1 = parseTfdt$2;
-    var parseTrun$1 = parseTrun$2;
-    var parseTfhd$1 = parseTfhd$2;
-    var window$2 = window_1;
+    var parseTfdt$1 = parseTfdt$3;
+    var parseTfhd = parseTfhd$2;
+    var {
+      getMdatTrafPairs: getMdatTrafPairs$1,
+      parseSamples: parseSamples$1
+    } = samples;
     /**
       * Maps an offset in the mdat to a sample based on the the size of the samples.
       * Assumes that `parseSamples` has been called first.
@@ -45093,56 +53419,6 @@
       return result;
     };
     /**
-      * Parses sample information out of Track Run Boxes and calculates
-      * the absolute presentation and decode timestamps of each sample.
-      *
-      * @param {Array<Uint8Array>} truns - The Trun Run boxes to be parsed
-      * @param {Number|BigInt} baseMediaDecodeTime - base media decode time from tfdt
-          @see ISO-BMFF-12/2015, Section 8.8.12
-      * @param {Object} tfhd - The parsed Track Fragment Header
-      *   @see inspect.parseTfhd
-      * @return {Object[]} the parsed samples
-      *
-      * @see ISO-BMFF-12/2015, Section 8.8.8
-     **/
-
-    var parseSamples = function (truns, baseMediaDecodeTime, tfhd) {
-      var currentDts = baseMediaDecodeTime;
-      var defaultSampleDuration = tfhd.defaultSampleDuration || 0;
-      var defaultSampleSize = tfhd.defaultSampleSize || 0;
-      var trackId = tfhd.trackId;
-      var allSamples = [];
-      truns.forEach(function (trun) {
-        // Note: We currently do not parse the sample table as well
-        // as the trun. It's possible some sources will require this.
-        // moov > trak > mdia > minf > stbl
-        var trackRun = parseTrun$1(trun);
-        var samples = trackRun.samples;
-        samples.forEach(function (sample) {
-          if (sample.duration === undefined) {
-            sample.duration = defaultSampleDuration;
-          }
-          if (sample.size === undefined) {
-            sample.size = defaultSampleSize;
-          }
-          sample.trackId = trackId;
-          sample.dts = currentDts;
-          if (sample.compositionTimeOffset === undefined) {
-            sample.compositionTimeOffset = 0;
-          }
-          if (typeof currentDts === 'bigint') {
-            sample.pts = currentDts + window$2.BigInt(sample.compositionTimeOffset);
-            currentDts += window$2.BigInt(sample.duration);
-          } else {
-            sample.pts = currentDts + sample.compositionTimeOffset;
-            currentDts += sample.duration;
-          }
-        });
-        allSamples = allSamples.concat(samples);
-      });
-      return allSamples;
-    };
-    /**
       * Parses out caption nals from an FMP4 segment's video tracks.
       *
       * @param {Uint8Array} segment - The bytes of a single segment
@@ -45152,26 +53428,14 @@
      **/
 
     var parseCaptionNals = function (segment, videoTrackId) {
-      // To get the samples
-      var trafs = findBox$1(segment, ['moof', 'traf']); // To get SEI NAL units
-
-      var mdats = findBox$1(segment, ['mdat']);
       var captionNals = {};
-      var mdatTrafPairs = []; // Pair up each traf with a mdat as moofs and mdats are in pairs
-
-      mdats.forEach(function (mdat, index) {
-        var matchingTraf = trafs[index];
-        mdatTrafPairs.push({
-          mdat: mdat,
-          traf: matchingTraf
-        });
-      });
+      var mdatTrafPairs = getMdatTrafPairs$1(segment);
       mdatTrafPairs.forEach(function (pair) {
         var mdat = pair.mdat;
         var traf = pair.traf;
         var tfhd = findBox$1(traf, ['tfhd']); // Exactly 1 tfhd per traf
 
-        var headerInfo = parseTfhd$1(tfhd[0]);
+        var headerInfo = parseTfhd(tfhd[0]);
         var trackId = headerInfo.trackId;
         var tfdt = findBox$1(traf, ['tfdt']); // Either 0 or 1 tfdt per traf
 
@@ -45181,7 +53445,7 @@
         var result; // Only parse video data for the chosen video track
 
         if (videoTrackId === trackId && truns.length > 0) {
-          samples = parseSamples(truns, baseMediaDecodeTime, headerInfo);
+          samples = parseSamples$1(truns, baseMediaDecodeTime, headerInfo);
           result = findSeiNals(mdat, samples, trackId);
           if (!captionNals[trackId]) {
             captionNals[trackId] = {
@@ -45209,7 +53473,10 @@
       * @return {?Object[]} parsedCaptions - A list of captions or null if no video tracks
       * @return {Number} parsedCaptions[].startTime - The time to show the caption in seconds
       * @return {Number} parsedCaptions[].endTime - The time to stop showing the caption in seconds
-      * @return {String} parsedCaptions[].text - The visible content of the caption
+      * @return {Object[]} parsedCaptions[].content - A list of individual caption segments
+      * @return {String} parsedCaptions[].content.text - The visible content of the caption segment
+      * @return {Number} parsedCaptions[].content.line - The line height from 1-15 for positioning of the caption segment
+      * @return {Number} parsedCaptions[].content.position - The column indent percentage for cue positioning from 10-80
      **/
 
     var parseEmbeddedCaptions = function (segment, trackId, timescale) {
@@ -45419,463 +53686,123 @@
       this.reset();
     };
     var captionParser = CaptionParser;
+    const {
+      parseTfdt
+    } = mp4Inspector;
+    const findBox = findBox_1;
+    const {
+      getTimescaleFromMediaHeader
+    } = probe$2;
+    const {
+      parseSamples,
+      getMdatTrafPairs
+    } = samples;
     /**
-     * Returns the first string in the data array ending with a null char '\0'
-     * @param {UInt8} data 
-     * @returns the string with the null char
+     * Module for parsing WebVTT text and styles from FMP4 segments.
+     * Based on the ISO/IEC 14496-30.
      */
 
-    var uint8ToCString$1 = function (data) {
-      var index = 0;
-      var curChar = String.fromCharCode(data[index]);
-      var retString = '';
-      while (curChar !== '\0') {
-        retString += curChar;
-        index++;
-        curChar = String.fromCharCode(data[index]);
-      } // Add nullChar
+    const WebVttParser = function () {
+      // default timescale to 90k
+      let timescale = 90e3;
+      /**
+       * Parses the timescale from the init segment.
+       * @param {Array<Uint8Array>} segment The initialization segment to parse the timescale from.
+       */
 
-      retString += curChar;
-      return retString;
-    };
-    var string = {
-      uint8ToCString: uint8ToCString$1
-    };
-    var uint8ToCString = string.uint8ToCString;
-    var getUint64$1 = numbers.getUint64;
-    /**
-     * Based on: ISO/IEC 23009 Section: 5.10.3.3
-     * References:
-     * https://dashif-documents.azurewebsites.net/Events/master/event.html#emsg-format
-     * https://aomediacodec.github.io/id3-emsg/
-     * 
-     * Takes emsg box data as a uint8 array and returns a emsg box object
-     * @param {UInt8Array} boxData data from emsg box
-     * @returns A parsed emsg box object
-     */
-
-    var parseEmsgBox = function (boxData) {
-      // version + flags
-      var offset = 4;
-      var version = boxData[0];
-      var scheme_id_uri, value, timescale, presentation_time, presentation_time_delta, event_duration, id, message_data;
-      if (version === 0) {
-        scheme_id_uri = uint8ToCString(boxData.subarray(offset));
-        offset += scheme_id_uri.length;
-        value = uint8ToCString(boxData.subarray(offset));
-        offset += value.length;
-        var dv = new DataView(boxData.buffer);
-        timescale = dv.getUint32(offset);
-        offset += 4;
-        presentation_time_delta = dv.getUint32(offset);
-        offset += 4;
-        event_duration = dv.getUint32(offset);
-        offset += 4;
-        id = dv.getUint32(offset);
-        offset += 4;
-      } else if (version === 1) {
-        var dv = new DataView(boxData.buffer);
-        timescale = dv.getUint32(offset);
-        offset += 4;
-        presentation_time = getUint64$1(boxData.subarray(offset));
-        offset += 8;
-        event_duration = dv.getUint32(offset);
-        offset += 4;
-        id = dv.getUint32(offset);
-        offset += 4;
-        scheme_id_uri = uint8ToCString(boxData.subarray(offset));
-        offset += scheme_id_uri.length;
-        value = uint8ToCString(boxData.subarray(offset));
-        offset += value.length;
-      }
-      message_data = new Uint8Array(boxData.subarray(offset, boxData.byteLength));
-      var emsgBox = {
-        scheme_id_uri,
-        value,
-        // if timescale is undefined or 0 set to 1 
-        timescale: timescale ? timescale : 1,
-        presentation_time,
-        presentation_time_delta,
-        event_duration,
-        id,
-        message_data
+      this.init = function (segment) {
+        // We just need the timescale from the init segment.
+        const mdhd = findBox(segment, ['moov', 'trak', 'mdia', 'mdhd'])[0];
+        if (mdhd) {
+          timescale = getTimescaleFromMediaHeader(mdhd);
+        }
       };
-      return isValidEmsgBox(version, emsgBox) ? emsgBox : undefined;
-    };
-    /**
-     * Scales a presentation time or time delta with an offset with a provided timescale
-     * @param {number} presentationTime 
-     * @param {number} timescale 
-     * @param {number} timeDelta 
-     * @param {number} offset 
-     * @returns the scaled time as a number
-     */
+      /**
+       * Parses a WebVTT FMP4 segment.
+       * @param {Array<Uint8Array>} segment The content segment to parse the WebVTT cues from.
+       * @returns The WebVTT cue text, styling, and timing info as an array of cue objects.
+       */
 
-    var scaleTime = function (presentationTime, timescale, timeDelta, offset) {
-      return presentationTime || presentationTime === 0 ? presentationTime / timescale : offset + timeDelta / timescale;
-    };
-    /**
-     * Checks the emsg box data for validity based on the version
-     * @param {number} version of the emsg box to validate
-     * @param {Object} emsg the emsg data to validate
-     * @returns if the box is valid as a boolean
-     */
+      this.parseSegment = function (segment) {
+        const vttCues = [];
+        const mdatTrafPairs = getMdatTrafPairs(segment);
+        let baseMediaDecodeTime = 0;
+        mdatTrafPairs.forEach(function (pair) {
+          const mdatBox = pair.mdat;
+          const trafBox = pair.traf; // zero or one.
 
-    var isValidEmsgBox = function (version, emsg) {
-      var hasScheme = emsg.scheme_id_uri !== '\0';
-      var isValidV0Box = version === 0 && isDefined(emsg.presentation_time_delta) && hasScheme;
-      var isValidV1Box = version === 1 && isDefined(emsg.presentation_time) && hasScheme; // Only valid versions of emsg are 0 and 1
+          const tfdtBox = findBox(trafBox, ['tfdt'])[0]; // zero or one.
 
-      return !(version > 1) && isValidV0Box || isValidV1Box;
-    }; // Utility function to check if an object is defined
+          const tfhdBox = findBox(trafBox, ['tfhd'])[0]; // zero or more.
 
-    var isDefined = function (data) {
-      return data !== undefined || data !== null;
-    };
-    var emsg$1 = {
-      parseEmsgBox: parseEmsgBox,
-      scaleTime: scaleTime
-    };
-    /**
-     * mux.js
-     *
-     * Copyright (c) Brightcove
-     * Licensed Apache-2.0 https://github.com/videojs/mux.js/blob/master/LICENSE
-     *
-     * Utilities to detect basic properties and metadata about MP4s.
-     */
-
-    var toUnsigned = bin.toUnsigned;
-    var toHexString = bin.toHexString;
-    var findBox = findBox_1;
-    var parseType$1 = parseType_1;
-    var emsg = emsg$1;
-    var parseTfhd = parseTfhd$2;
-    var parseTrun = parseTrun$2;
-    var parseTfdt = parseTfdt$2;
-    var getUint64 = numbers.getUint64;
-    var timescale, startTime, compositionStartTime, getVideoTrackIds, getTracks, getTimescaleFromMediaHeader, getEmsgID3;
-    var window$1 = window_1;
-    var parseId3Frames = parseId3.parseId3Frames;
-    /**
-     * Parses an MP4 initialization segment and extracts the timescale
-     * values for any declared tracks. Timescale values indicate the
-     * number of clock ticks per second to assume for time-based values
-     * elsewhere in the MP4.
-     *
-     * To determine the start time of an MP4, you need two pieces of
-     * information: the timescale unit and the earliest base media decode
-     * time. Multiple timescales can be specified within an MP4 but the
-     * base media decode time is always expressed in the timescale from
-     * the media header box for the track:
-     * ```
-     * moov > trak > mdia > mdhd.timescale
-     * ```
-     * @param init {Uint8Array} the bytes of the init segment
-     * @return {object} a hash of track ids to timescale values or null if
-     * the init segment is malformed.
-     */
-
-    timescale = function (init) {
-      var result = {},
-        traks = findBox(init, ['moov', 'trak']); // mdhd timescale
-
-      return traks.reduce(function (result, trak) {
-        var tkhd, version, index, id, mdhd;
-        tkhd = findBox(trak, ['tkhd'])[0];
-        if (!tkhd) {
-          return null;
-        }
-        version = tkhd[0];
-        index = version === 0 ? 12 : 20;
-        id = toUnsigned(tkhd[index] << 24 | tkhd[index + 1] << 16 | tkhd[index + 2] << 8 | tkhd[index + 3]);
-        mdhd = findBox(trak, ['mdia', 'mdhd'])[0];
-        if (!mdhd) {
-          return null;
-        }
-        version = mdhd[0];
-        index = version === 0 ? 12 : 20;
-        result[id] = toUnsigned(mdhd[index] << 24 | mdhd[index + 1] << 16 | mdhd[index + 2] << 8 | mdhd[index + 3]);
-        return result;
-      }, result);
-    };
-    /**
-     * Determine the base media decode start time, in seconds, for an MP4
-     * fragment. If multiple fragments are specified, the earliest time is
-     * returned.
-     *
-     * The base media decode time can be parsed from track fragment
-     * metadata:
-     * ```
-     * moof > traf > tfdt.baseMediaDecodeTime
-     * ```
-     * It requires the timescale value from the mdhd to interpret.
-     *
-     * @param timescale {object} a hash of track ids to timescale values.
-     * @return {number} the earliest base media decode start time for the
-     * fragment, in seconds
-     */
-
-    startTime = function (timescale, fragment) {
-      var trafs; // we need info from two childrend of each track fragment box
-
-      trafs = findBox(fragment, ['moof', 'traf']); // determine the start times for each track
-
-      var lowestTime = trafs.reduce(function (acc, traf) {
-        var tfhd = findBox(traf, ['tfhd'])[0]; // get the track id from the tfhd
-
-        var id = toUnsigned(tfhd[4] << 24 | tfhd[5] << 16 | tfhd[6] << 8 | tfhd[7]); // assume a 90kHz clock if no timescale was specified
-
-        var scale = timescale[id] || 90e3; // get the base media decode time from the tfdt
-
-        var tfdt = findBox(traf, ['tfdt'])[0];
-        var dv = new DataView(tfdt.buffer, tfdt.byteOffset, tfdt.byteLength);
-        var baseTime; // version 1 is 64 bit
-
-        if (tfdt[0] === 1) {
-          baseTime = getUint64(tfdt.subarray(4, 12));
-        } else {
-          baseTime = dv.getUint32(4);
-        } // convert base time to seconds if it is a valid number.
-
-        let seconds;
-        if (typeof baseTime === 'bigint') {
-          seconds = baseTime / window$1.BigInt(scale);
-        } else if (typeof baseTime === 'number' && !isNaN(baseTime)) {
-          seconds = baseTime / scale;
-        }
-        if (seconds < Number.MAX_SAFE_INTEGER) {
-          seconds = Number(seconds);
-        }
-        if (seconds < acc) {
-          acc = seconds;
-        }
-        return acc;
-      }, Infinity);
-      return typeof lowestTime === 'bigint' || isFinite(lowestTime) ? lowestTime : 0;
-    };
-    /**
-     * Determine the composition start, in seconds, for an MP4
-     * fragment.
-     *
-     * The composition start time of a fragment can be calculated using the base
-     * media decode time, composition time offset, and timescale, as follows:
-     *
-     * compositionStartTime = (baseMediaDecodeTime + compositionTimeOffset) / timescale
-     *
-     * All of the aforementioned information is contained within a media fragment's
-     * `traf` box, except for timescale info, which comes from the initialization
-     * segment, so a track id (also contained within a `traf`) is also necessary to
-     * associate it with a timescale
-     *
-     *
-     * @param timescales {object} - a hash of track ids to timescale values.
-     * @param fragment {Unit8Array} - the bytes of a media segment
-     * @return {number} the composition start time for the fragment, in seconds
-     **/
-
-    compositionStartTime = function (timescales, fragment) {
-      var trafBoxes = findBox(fragment, ['moof', 'traf']);
-      var baseMediaDecodeTime = 0;
-      var compositionTimeOffset = 0;
-      var trackId;
-      if (trafBoxes && trafBoxes.length) {
-        // The spec states that track run samples contained within a `traf` box are contiguous, but
-        // it does not explicitly state whether the `traf` boxes themselves are contiguous.
-        // We will assume that they are, so we only need the first to calculate start time.
-        var tfhd = findBox(trafBoxes[0], ['tfhd'])[0];
-        var trun = findBox(trafBoxes[0], ['trun'])[0];
-        var tfdt = findBox(trafBoxes[0], ['tfdt'])[0];
-        if (tfhd) {
-          var parsedTfhd = parseTfhd(tfhd);
-          trackId = parsedTfhd.trackId;
-        }
-        if (tfdt) {
-          var parsedTfdt = parseTfdt(tfdt);
-          baseMediaDecodeTime = parsedTfdt.baseMediaDecodeTime;
-        }
-        if (trun) {
-          var parsedTrun = parseTrun(trun);
-          if (parsedTrun.samples && parsedTrun.samples.length) {
-            compositionTimeOffset = parsedTrun.samples[0].compositionTimeOffset || 0;
+          const trunBoxes = findBox(trafBox, ['trun']);
+          if (tfdtBox) {
+            const tfdt = parseTfdt(tfdtBox);
+            baseMediaDecodeTime = tfdt.baseMediaDecodeTime;
           }
-        }
-      } // Get timescale for this specific track. Assume a 90kHz clock if no timescale was
-      // specified.
+          if (trunBoxes.length && tfhdBox) {
+            const samples = parseSamples(trunBoxes, baseMediaDecodeTime, tfhdBox);
+            let mdatOffset = 0;
+            samples.forEach(function (sample) {
+              // decode utf8 payload
+              const UTF_8 = 'utf-8';
+              const textDecoder = new TextDecoder(UTF_8); // extract sample data from the mdat box.
+              // WebVTT Sample format:
+              // Exactly one VTTEmptyCueBox box
+              // OR one or more VTTCueBox boxes.
 
-      var timescale = timescales[trackId] || 90e3; // return the composition start time, in seconds
+              const sampleData = mdatBox.slice(mdatOffset, mdatOffset + sample.size); // single vtte box.
 
-      if (typeof baseMediaDecodeTime === 'bigint') {
-        compositionTimeOffset = window$1.BigInt(compositionTimeOffset);
-        timescale = window$1.BigInt(timescale);
-      }
-      var result = (baseMediaDecodeTime + compositionTimeOffset) / timescale;
-      if (typeof result === 'bigint' && result < Number.MAX_SAFE_INTEGER) {
-        result = Number(result);
-      }
-      return result;
-    };
-    /**
-      * Find the trackIds of the video tracks in this source.
-      * Found by parsing the Handler Reference and Track Header Boxes:
-      *   moov > trak > mdia > hdlr
-      *   moov > trak > tkhd
-      *
-      * @param {Uint8Array} init - The bytes of the init segment for this source
-      * @return {Number[]} A list of trackIds
-      *
-      * @see ISO-BMFF-12/2015, Section 8.4.3
-     **/
+              const vtteBox = findBox(sampleData, ['vtte'])[0]; // empty box
 
-    getVideoTrackIds = function (init) {
-      var traks = findBox(init, ['moov', 'trak']);
-      var videoTrackIds = [];
-      traks.forEach(function (trak) {
-        var hdlrs = findBox(trak, ['mdia', 'hdlr']);
-        var tkhds = findBox(trak, ['tkhd']);
-        hdlrs.forEach(function (hdlr, index) {
-          var handlerType = parseType$1(hdlr.subarray(8, 12));
-          var tkhd = tkhds[index];
-          var view;
-          var version;
-          var trackId;
-          if (handlerType === 'vide') {
-            view = new DataView(tkhd.buffer, tkhd.byteOffset, tkhd.byteLength);
-            version = view.getUint8(0);
-            trackId = version === 0 ? view.getUint32(12) : view.getUint32(20);
-            videoTrackIds.push(trackId);
+              if (vtteBox) {
+                mdatOffset += sample.size;
+                return;
+              } // TODO: Support 'vtta' boxes.
+              // VTTAdditionalTextBoxes can be interleaved between VTTCueBoxes.
+
+              const vttcBoxes = findBox(sampleData, ['vttc']);
+              vttcBoxes.forEach(function (vttcBox) {
+                // mandatory payload box.
+                const paylBox = findBox(vttcBox, ['payl'])[0]; // optional settings box
+
+                const sttgBox = findBox(vttcBox, ['sttg'])[0];
+                const start = sample.pts / timescale;
+                const end = (sample.pts + sample.duration) / timescale;
+                let cueText, settings; // contains cue text.
+
+                if (paylBox) {
+                  try {
+                    cueText = textDecoder.decode(paylBox);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                } // settings box contains styling.
+
+                if (sttgBox) {
+                  try {
+                    settings = textDecoder.decode(sttgBox);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }
+                if (sample.duration && cueText) {
+                  vttCues.push({
+                    cueText,
+                    start,
+                    end,
+                    settings
+                  });
+                }
+              });
+              mdatOffset += sample.size;
+            });
           }
         });
-      });
-      return videoTrackIds;
+        return vttCues;
+      };
     };
-    getTimescaleFromMediaHeader = function (mdhd) {
-      // mdhd is a FullBox, meaning it will have its own version as the first byte
-      var version = mdhd[0];
-      var index = version === 0 ? 12 : 20;
-      return toUnsigned(mdhd[index] << 24 | mdhd[index + 1] << 16 | mdhd[index + 2] << 8 | mdhd[index + 3]);
-    };
-    /**
-     * Get all the video, audio, and hint tracks from a non fragmented
-     * mp4 segment
-     */
-
-    getTracks = function (init) {
-      var traks = findBox(init, ['moov', 'trak']);
-      var tracks = [];
-      traks.forEach(function (trak) {
-        var track = {};
-        var tkhd = findBox(trak, ['tkhd'])[0];
-        var view, tkhdVersion; // id
-
-        if (tkhd) {
-          view = new DataView(tkhd.buffer, tkhd.byteOffset, tkhd.byteLength);
-          tkhdVersion = view.getUint8(0);
-          track.id = tkhdVersion === 0 ? view.getUint32(12) : view.getUint32(20);
-        }
-        var hdlr = findBox(trak, ['mdia', 'hdlr'])[0]; // type
-
-        if (hdlr) {
-          var type = parseType$1(hdlr.subarray(8, 12));
-          if (type === 'vide') {
-            track.type = 'video';
-          } else if (type === 'soun') {
-            track.type = 'audio';
-          } else {
-            track.type = type;
-          }
-        } // codec
-
-        var stsd = findBox(trak, ['mdia', 'minf', 'stbl', 'stsd'])[0];
-        if (stsd) {
-          var sampleDescriptions = stsd.subarray(8); // gives the codec type string
-
-          track.codec = parseType$1(sampleDescriptions.subarray(4, 8));
-          var codecBox = findBox(sampleDescriptions, [track.codec])[0];
-          var codecConfig, codecConfigType;
-          if (codecBox) {
-            // https://tools.ietf.org/html/rfc6381#section-3.3
-            if (/^[asm]vc[1-9]$/i.test(track.codec)) {
-              // we don't need anything but the "config" parameter of the
-              // avc1 codecBox
-              codecConfig = codecBox.subarray(78);
-              codecConfigType = parseType$1(codecConfig.subarray(4, 8));
-              if (codecConfigType === 'avcC' && codecConfig.length > 11) {
-                track.codec += '.'; // left padded with zeroes for single digit hex
-                // profile idc
-
-                track.codec += toHexString(codecConfig[9]); // the byte containing the constraint_set flags
-
-                track.codec += toHexString(codecConfig[10]); // level idc
-
-                track.codec += toHexString(codecConfig[11]);
-              } else {
-                // TODO: show a warning that we couldn't parse the codec
-                // and are using the default
-                track.codec = 'avc1.4d400d';
-              }
-            } else if (/^mp4[a,v]$/i.test(track.codec)) {
-              // we do not need anything but the streamDescriptor of the mp4a codecBox
-              codecConfig = codecBox.subarray(28);
-              codecConfigType = parseType$1(codecConfig.subarray(4, 8));
-              if (codecConfigType === 'esds' && codecConfig.length > 20 && codecConfig[19] !== 0) {
-                track.codec += '.' + toHexString(codecConfig[19]); // this value is only a single digit
-
-                track.codec += '.' + toHexString(codecConfig[20] >>> 2 & 0x3f).replace(/^0/, '');
-              } else {
-                // TODO: show a warning that we couldn't parse the codec
-                // and are using the default
-                track.codec = 'mp4a.40.2';
-              }
-            } else {
-              // flac, opus, etc
-              track.codec = track.codec.toLowerCase();
-            }
-          }
-        }
-        var mdhd = findBox(trak, ['mdia', 'mdhd'])[0];
-        if (mdhd) {
-          track.timescale = getTimescaleFromMediaHeader(mdhd);
-        }
-        tracks.push(track);
-      });
-      return tracks;
-    };
-    /**
-     * Returns an array of emsg ID3 data from the provided segmentData.
-     * An offset can also be provided as the Latest Arrival Time to calculate 
-     * the Event Start Time of v0 EMSG boxes. 
-     * See: https://dashif-documents.azurewebsites.net/Events/master/event.html#Inband-event-timing
-     * 
-     * @param {Uint8Array} segmentData the segment byte array.
-     * @param {number} offset the segment start time or Latest Arrival Time, 
-     * @return {Object[]} an array of ID3 parsed from EMSG boxes
-     */
-
-    getEmsgID3 = function (segmentData, offset = 0) {
-      var emsgBoxes = findBox(segmentData, ['emsg']);
-      return emsgBoxes.map(data => {
-        var parsedBox = emsg.parseEmsgBox(new Uint8Array(data));
-        var parsedId3Frames = parseId3Frames(parsedBox.message_data);
-        return {
-          cueTime: emsg.scaleTime(parsedBox.presentation_time, parsedBox.timescale, parsedBox.presentation_time_delta, offset),
-          duration: emsg.scaleTime(parsedBox.event_duration, parsedBox.timescale),
-          frames: parsedId3Frames
-        };
-      });
-    };
-    var probe$2 = {
-      // export mp4 inspector's findBox and parseType for backwards compatibility
-      findBox: findBox,
-      parseType: parseType$1,
-      timescale: timescale,
-      startTime: startTime,
-      compositionStartTime: compositionStartTime,
-      videoTrackIds: getVideoTrackIds,
-      tracks: getTracks,
-      getTimescaleFromMediaHeader: getTimescaleFromMediaHeader,
-      getEmsgID3: getEmsgID3
-    };
+    var webvttParser = WebVttParser;
     /**
      * mux.js
      *
@@ -46025,7 +53952,6 @@
           pes.dts += (packet[offset + 18] & 0x06) >>> 1; // OR by the two LSBs
         }
       }
-
       return pes;
     };
     var parseNalUnitType = function (type) {
@@ -46745,6 +54671,42 @@
           data: segment.buffer
         }, [segment.buffer]);
       }
+      /**
+       * Initializes the WebVttParser and passes the init segment.
+       *
+       * @param {Uint8Array} data mp4 boxed WebVTT init segment data
+       */
+
+      initMp4WebVttParser(data) {
+        if (!this.webVttParser) {
+          this.webVttParser = new webvttParser();
+        }
+        const segment = new Uint8Array(data.data, data.byteOffset, data.byteLength); // Set the timescale for the parser.
+        // This can be called repeatedly in order to set and re-set the timescale.
+
+        this.webVttParser.init(segment);
+      }
+      /**
+       * Parse an mp4 encapsulated WebVTT segment and return an array of cues.
+       *
+       * @param {Uint8Array} data a text/webvtt segment
+       * @return {Object[]} an array of parsed cue objects
+       */
+
+      getMp4WebVttText(data) {
+        if (!this.webVttParser) {
+          // timescale might not be set yet if the parser is created before an init segment is passed.
+          // default timescale is 90k.
+          this.webVttParser = new webvttParser();
+        }
+        const segment = new Uint8Array(data.data, data.byteOffset, data.byteLength);
+        const parsed = this.webVttParser.parseSegment(segment);
+        this.self.postMessage({
+          action: 'getMp4WebVttText',
+          mp4VttCues: parsed || [],
+          data: segment.buffer
+        }, [segment.buffer]);
+      }
       probeMp4StartTime({
         timescales,
         data
@@ -46764,6 +54726,26 @@
           action: 'probeMp4Tracks',
           tracks,
           data
+        }, [data.buffer]);
+      }
+      /**
+       * Probes an mp4 segment for EMSG boxes containing ID3 data.
+       * https://aomediacodec.github.io/id3-emsg/
+       *
+       * @param {Uint8Array} data segment data
+       * @param {number} offset segment start time
+       * @return {Object[]} an array of ID3 frames
+       */
+
+      probeEmsgID3({
+        data,
+        offset
+      }) {
+        const id3Frames = probe$2.getEmsgID3(data, offset);
+        this.self.postMessage({
+          action: 'probeEmsgID3',
+          id3Frames,
+          emsgData: data
         }, [data.buffer]);
       }
       /**
@@ -46906,7 +54888,7 @@
     };
   }));
   var TransmuxWorker = factory(workerCode$1);
-  /* rollup-plugin-worker-factory end for worker!/Users/ddashkevich/projects/http-streaming/src/transmuxer-worker.js */
+  /* rollup-plugin-worker-factory end for worker!/home/runner/work/http-streaming/http-streaming/src/transmuxer-worker.js */
 
   const handleData_ = (event, transmuxedData, callback) => {
     const {
@@ -46972,7 +54954,9 @@
       onDone,
       onEndedTimeline,
       onTransmuxerLog,
-      isEndOfTimeline
+      isEndOfTimeline,
+      segment,
+      triggerSegmentEventFn
     } = options;
     const transmuxedData = {
       buffer: []
@@ -47038,8 +55022,20 @@
       dequeue(transmuxer);
       /* eslint-enable */
     };
-
+    const handleError = () => {
+      const error = {
+        message: 'Received an error message from the transmuxer worker',
+        metadata: {
+          errorType: videojs.Error.StreamingFailedToTransmuxSegment,
+          segmentInfo: segmentInfoPayload({
+            segment
+          })
+        }
+      };
+      onDone(null, error);
+    };
     transmuxer.onmessage = handleMessage;
+    transmuxer.onerror = handleError;
     if (audioAppendStart) {
       transmuxer.postMessage({
         action: 'setAudioAppendStart',
@@ -47062,6 +55058,10 @@
     if (bytes.byteLength) {
       const buffer = bytes instanceof ArrayBuffer ? bytes : bytes.buffer;
       const byteOffset = bytes instanceof ArrayBuffer ? 0 : bytes.byteOffset;
+      triggerSegmentEventFn({
+        type: 'segmenttransmuxingstart',
+        segment
+      });
       transmuxer.postMessage({
         action: 'push',
         // Send the typed-array of data as an ArrayBuffer so that
@@ -47185,6 +55185,7 @@
     TIMEOUT: -101,
     ABORTED: -102
   };
+  const WEB_VTT_CODEC = 'wvtt';
   /**
    * Abort all requests
    *
@@ -47240,12 +55241,21 @@
    */
 
   const handleErrors = (error, request) => {
+    const {
+      requestType
+    } = request;
+    const metadata = getStreamingNetworkErrorMetadata({
+      requestType,
+      request,
+      error
+    });
     if (request.timedout) {
       return {
         status: request.status,
         message: 'HLS request timed-out at URL: ' + request.uri,
         code: REQUEST_ERRORS.TIMEOUT,
-        xhr: request
+        xhr: request,
+        metadata
       };
     }
     if (request.aborted) {
@@ -47253,7 +55263,8 @@
         status: request.status,
         message: 'HLS request aborted at URL: ' + request.uri,
         code: REQUEST_ERRORS.ABORTED,
-        xhr: request
+        xhr: request,
+        metadata
       };
     }
     if (error) {
@@ -47261,7 +55272,8 @@
         status: request.status,
         message: 'HLS request errored at URL: ' + request.uri,
         code: REQUEST_ERRORS.FAILURE,
-        xhr: request
+        xhr: request,
+        metadata
       };
     }
     if (request.responseType === 'arraybuffer' && request.response.byteLength === 0) {
@@ -47269,7 +55281,8 @@
         status: request.status,
         message: 'Empty HLS response at URL: ' + request.uri,
         code: REQUEST_ERRORS.FAILURE,
-        xhr: request
+        xhr: request,
+        metadata
       };
     }
     return null;
@@ -47285,7 +55298,7 @@
    *                                        this request
    */
 
-  const handleKeyResponse = (segment, objects, finishProcessingFn) => (error, request) => {
+  const handleKeyResponse = (segment, objects, finishProcessingFn, triggerSegmentEventFn) => (error, request) => {
     const response = request.response;
     const errorObj = handleErrors(error, request);
     if (errorObj) {
@@ -47304,7 +55317,57 @@
     for (let i = 0; i < objects.length; i++) {
       objects[i].bytes = bytes;
     }
+    const keyInfo = {
+      uri: request.uri
+    };
+    triggerSegmentEventFn({
+      type: 'segmentkeyloadcomplete',
+      segment,
+      keyInfo
+    });
     return finishProcessingFn(null, segment);
+  };
+  /**
+   * Processes an mp4 init segment depending on the codec through the transmuxer.
+   *
+   * @param {Object} segment init segment to process
+   * @param {string} codec the codec of the text segments
+   */
+
+  const initMp4Text = (segment, codec) => {
+    if (codec === WEB_VTT_CODEC) {
+      segment.transmuxer.postMessage({
+        action: 'initMp4WebVttParser',
+        data: segment.map.bytes
+      });
+    }
+  };
+  /**
+   * Parses an mp4 text segment with the transmuxer and calls the doneFn from
+   * the segment loader.
+   *
+   * @param {Object} segment the text segment to parse
+   * @param {string} codec the codec of the text segment
+   * @param {Function} doneFn the doneFn passed from the segment loader
+   */
+
+  const parseMp4TextSegment = (segment, codec, doneFn) => {
+    if (codec === WEB_VTT_CODEC) {
+      workerCallback({
+        action: 'getMp4WebVttText',
+        data: segment.bytes,
+        transmuxer: segment.transmuxer,
+        callback: ({
+          data,
+          mp4VttCues
+        }) => {
+          segment.bytes = data;
+          doneFn(null, segment, {
+            mp4VttCues
+          });
+        }
+      });
+    }
   };
   const parseInitSegment = (segment, callback) => {
     const type = detectContainerForBytes(segment.map.bytes); // TODO: We should also handle ts init segments here, but we
@@ -47312,10 +55375,14 @@
 
     if (type !== 'mp4') {
       const uri = segment.map.resolvedUri || segment.map.uri;
+      const mediaType = type || 'unknown';
       return callback({
         internal: true,
-        message: `Found unsupported ${type || 'unknown'} container for initialization segment at URL: ${uri}`,
-        code: REQUEST_ERRORS.FAILURE
+        message: `Found unsupported ${mediaType} container for initialization segment at URL: ${uri}`,
+        code: REQUEST_ERRORS.FAILURE,
+        metadata: {
+          mediaType
+        }
       });
     }
     workerCallback({
@@ -47339,6 +55406,9 @@
             segment.map.timescales = segment.map.timescales || {};
             segment.map.timescales[track.id] = track.timescale;
           }
+          if (track.type === 'text') {
+            initMp4Text(segment, track.codec);
+          }
         });
         return callback(null);
       }
@@ -47355,13 +55425,18 @@
 
   const handleInitSegmentResponse = ({
     segment,
-    finishProcessingFn
+    finishProcessingFn,
+    triggerSegmentEventFn
   }) => (error, request) => {
     const errorObj = handleErrors(error, request);
     if (errorObj) {
       return finishProcessingFn(errorObj, segment);
     }
-    const bytes = new Uint8Array(request.response); // init segment is encypted, we will have to wait
+    const bytes = new Uint8Array(request.response);
+    triggerSegmentEventFn({
+      type: 'segmentloaded',
+      segment
+    }); // init segment is encypted, we will have to wait
     // until the key request is done to decrypt.
 
     if (segment.map.key) {
@@ -47392,12 +55467,17 @@
   const handleSegmentResponse = ({
     segment,
     finishProcessingFn,
-    responseType
+    responseType,
+    triggerSegmentEventFn
   }) => (error, request) => {
     const errorObj = handleErrors(error, request);
     if (errorObj) {
       return finishProcessingFn(errorObj, segment);
     }
+    triggerSegmentEventFn({
+      type: 'segmentloaded',
+      segment
+    });
     const newBytes =
     // although responseText "should" exist, this guard serves to prevent an error being
     // thrown for two primary cases:
@@ -47426,7 +55506,8 @@
     endedTimelineFn,
     dataFn,
     doneFn,
-    onTransmuxerLog
+    onTransmuxerLog,
+    triggerSegmentEventFn
   }) => {
     const fmp4Tracks = segment.map && segment.map.tracks || {};
     const isMuxed = Boolean(fmp4Tracks.audio && fmp4Tracks.video); // Keep references to each function so we can null them out after we're done with them.
@@ -47478,9 +55559,39 @@
         }
       },
       onVideoSegmentTimingInfo: videoSegmentTimingInfo => {
+        const timingInfo = {
+          pts: {
+            start: videoSegmentTimingInfo.start.presentation,
+            end: videoSegmentTimingInfo.end.presentation
+          },
+          dts: {
+            start: videoSegmentTimingInfo.start.decode,
+            end: videoSegmentTimingInfo.end.decode
+          }
+        };
+        triggerSegmentEventFn({
+          type: 'segmenttransmuxingtiminginfoavailable',
+          segment,
+          timingInfo
+        });
         videoSegmentTimingInfoFn(videoSegmentTimingInfo);
       },
       onAudioSegmentTimingInfo: audioSegmentTimingInfo => {
+        const timingInfo = {
+          pts: {
+            start: audioSegmentTimingInfo.start.pts,
+            end: audioSegmentTimingInfo.end.pts
+          },
+          dts: {
+            start: audioSegmentTimingInfo.start.dts,
+            end: audioSegmentTimingInfo.end.dts
+          }
+        };
+        triggerSegmentEventFn({
+          type: 'segmenttransmuxingtiminginfoavailable',
+          segment,
+          timingInfo
+        });
         audioSegmentTimingInfoFn(audioSegmentTimingInfo);
       },
       onId3: (id3Frames, dispatchType) => {
@@ -47494,13 +55605,19 @@
         endedTimelineFn();
       },
       onTransmuxerLog,
-      onDone: result => {
+      onDone: (result, error) => {
         if (!doneFn) {
           return;
         }
         result.type = result.type === 'combined' ? 'video' : result.type;
-        doneFn(null, segment, result);
-      }
+        triggerSegmentEventFn({
+          type: 'segmenttransmuxingcomplete',
+          segment
+        });
+        doneFn(error, segment, result);
+      },
+      segment,
+      triggerSegmentEventFn
     }); // In the transmuxer, we don't yet have the ability to extract a "proper" start time.
     // Meaning cached frame data may corrupt our notion of where this segment
     // really starts. To get around this, probe for the info needed.
@@ -47520,14 +55637,6 @@
             isMuxed
           });
           trackInfoFn = null;
-          if (probeResult.hasAudio && !isMuxed) {
-            audioStartFn(probeResult.audioStart);
-          }
-          if (probeResult.hasVideo) {
-            videoStartFn(probeResult.videoStart);
-          }
-          audioStartFn = null;
-          videoStartFn = null;
         }
         finish();
       }
@@ -47546,7 +55655,8 @@
     endedTimelineFn,
     dataFn,
     doneFn,
-    onTransmuxerLog
+    onTransmuxerLog,
+    triggerSegmentEventFn
   }) => {
     let bytesAsUint8Array = new Uint8Array(bytes); // TODO:
     // We should have a handler that fetches the number of bytes required
@@ -47559,6 +55669,15 @@
       const {
         tracks
       } = segment.map;
+      const isMp4TextSegment = tracks.text && (!tracks.audio || !tracks.video);
+      if (isMp4TextSegment) {
+        dataFn(segment, {
+          data: bytesAsUint8Array,
+          type: 'text'
+        });
+        parseMp4TextSegment(segment, tracks.text.codec, doneFn);
+        return;
+      }
       const trackInfo = {
         isFmp4: true,
         hasVideo: !!tracks.video,
@@ -47586,7 +55705,7 @@
       // that is the true start of the segment (where the playback engine should begin
       // decoding).
 
-      const finishLoading = captions => {
+      const finishLoading = (captions, id3Frames) => {
         // if the track still has audio at this point it is only possible
         // for it to be audio only. See `tracks.video && tracks.audio` if statement
         // above.
@@ -47595,6 +55714,9 @@
           data: bytesAsUint8Array,
           type: trackInfo.hasAudio && !trackInfo.isMuxed ? 'audio' : 'video'
         });
+        if (id3Frames && id3Frames.length) {
+          id3Fn(segment, id3Frames);
+        }
         if (captions && captions.length) {
           captionsFn(segment, captions);
         }
@@ -47617,30 +55739,44 @@
           }
           if (trackInfo.hasVideo) {
             timingInfoFn(segment, 'video', 'start', startTime);
-          } // Run through the CaptionParser in case there are captions.
-          // Initialize CaptionParser if it hasn't been yet
-
-          if (!tracks.video || !data.byteLength || !segment.transmuxer) {
-            finishLoading();
-            return;
           }
           workerCallback({
-            action: 'pushMp4Captions',
-            endAction: 'mp4Captions',
-            transmuxer: segment.transmuxer,
+            action: 'probeEmsgID3',
             data: bytesAsUint8Array,
-            timescales: segment.map.timescales,
-            trackIds: [tracks.video.id],
-            callback: message => {
+            transmuxer: segment.transmuxer,
+            offset: startTime,
+            callback: ({
+              emsgData,
+              id3Frames
+            }) => {
               // transfer bytes back to us
-              bytes = message.data.buffer;
-              segment.bytes = bytesAsUint8Array = message.data;
-              message.logs.forEach(function (log) {
-                onTransmuxerLog(merge(log, {
-                  stream: 'mp4CaptionParser'
-                }));
+              bytes = emsgData.buffer;
+              segment.bytes = bytesAsUint8Array = emsgData; // Run through the CaptionParser in case there are captions.
+              // Initialize CaptionParser if it hasn't been yet
+
+              if (!tracks.video || !emsgData.byteLength || !segment.transmuxer) {
+                finishLoading(undefined, id3Frames);
+                return;
+              }
+              workerCallback({
+                action: 'pushMp4Captions',
+                endAction: 'mp4Captions',
+                transmuxer: segment.transmuxer,
+                data: bytesAsUint8Array,
+                timescales: segment.map.timescales,
+                trackIds: [tracks.video.id],
+                callback: message => {
+                  // transfer bytes back to us
+                  bytes = message.data.buffer;
+                  segment.bytes = bytesAsUint8Array = message.data;
+                  message.logs.forEach(function (log) {
+                    onTransmuxerLog(merge(log, {
+                      stream: 'mp4CaptionParser'
+                    }));
+                  });
+                  finishLoading(message.captions, id3Frames);
+                }
               });
-              finishLoading(message.captions);
             }
           });
         }
@@ -47677,14 +55813,17 @@
       endedTimelineFn,
       dataFn,
       doneFn,
-      onTransmuxerLog
+      onTransmuxerLog,
+      triggerSegmentEventFn
     });
   };
   const decrypt = function ({
     id,
     key,
     encryptedBytes,
-    decryptionWorker
+    decryptionWorker,
+    segment,
+    doneFn
   }, callback) {
     const decryptionHandler = event => {
       if (event.data.source === id) {
@@ -47692,6 +55831,24 @@
         const decrypted = event.data.decrypted;
         callback(new Uint8Array(decrypted.bytes, decrypted.byteOffset, decrypted.byteLength));
       }
+    };
+    decryptionWorker.onerror = () => {
+      const message = 'An error occurred in the decryption worker';
+      const segmentInfo = segmentInfoPayload({
+        segment
+      });
+      const decryptError = {
+        message,
+        metadata: {
+          error: new Error(message),
+          errorType: videojs.Error.StreamingFailedToDecryptSegment,
+          segmentInfo,
+          keyInfo: {
+            uri: segment.key.resolvedUri || segment.map.key.resolvedUri
+          }
+        }
+      };
+      doneFn(decryptError, segment);
     };
     decryptionWorker.addEventListener('message', decryptionHandler);
     let keyBytes;
@@ -47746,15 +55903,25 @@
     endedTimelineFn,
     dataFn,
     doneFn,
-    onTransmuxerLog
+    onTransmuxerLog,
+    triggerSegmentEventFn
   }) => {
+    triggerSegmentEventFn({
+      type: 'segmentdecryptionstart'
+    });
     decrypt({
       id: segment.requestId,
       key: segment.key,
       encryptedBytes: segment.encryptedBytes,
-      decryptionWorker
+      decryptionWorker,
+      segment,
+      doneFn
     }, decryptedBytes => {
       segment.bytes = decryptedBytes;
+      triggerSegmentEventFn({
+        type: 'segmentdecryptioncomplete',
+        segment
+      });
       handleSegmentBytes({
         segment,
         bytes: segment.bytes,
@@ -47768,7 +55935,8 @@
         endedTimelineFn,
         dataFn,
         doneFn,
-        onTransmuxerLog
+        onTransmuxerLog,
+        triggerSegmentEventFn
       });
     });
   };
@@ -47815,7 +55983,8 @@
     endedTimelineFn,
     dataFn,
     doneFn,
-    onTransmuxerLog
+    onTransmuxerLog,
+    triggerSegmentEventFn
   }) => {
     let count = 0;
     let didError = false;
@@ -47857,7 +56026,8 @@
               endedTimelineFn,
               dataFn,
               doneFn,
-              onTransmuxerLog
+              onTransmuxerLog,
+              triggerSegmentEventFn
             });
           } // Otherwise, everything is ready just continue
 
@@ -47874,12 +56044,17 @@
             endedTimelineFn,
             dataFn,
             doneFn,
-            onTransmuxerLog
+            onTransmuxerLog,
+            triggerSegmentEventFn
           });
         }; // Keep track of when *all* of the requests have completed
 
         segment.endOfAllRequests = Date.now();
         if (segment.map && segment.map.encryptedBytes && !segment.map.bytes) {
+          triggerSegmentEventFn({
+            type: 'segmentdecryptionstart',
+            segment
+          });
           return decrypt({
             decryptionWorker,
             // add -init to the "id" to differentiate between segment
@@ -47887,9 +56062,15 @@
             // at the same time at some point in the future.
             id: segment.requestId + '-init',
             encryptedBytes: segment.map.encryptedBytes,
-            key: segment.map.key
+            key: segment.map.key,
+            segment,
+            doneFn
           }, decryptedBytes => {
             segment.map.bytes = decryptedBytes;
+            triggerSegmentEventFn({
+              type: 'segmentdecryptioncomplete',
+              segment
+            });
             parseInitSegment(segment, parseError => {
               if (parseError) {
                 abortAll(activeXhrs);
@@ -48057,7 +56238,8 @@
     endedTimelineFn,
     dataFn,
     doneFn,
-    onTransmuxerLog
+    onTransmuxerLog,
+    triggerSegmentEventFn
   }) => {
     const activeXhrs = [];
     const finishProcessingFn = waitForCompletion({
@@ -48073,7 +56255,8 @@
       endedTimelineFn,
       dataFn,
       doneFn,
-      onTransmuxerLog
+      onTransmuxerLog,
+      triggerSegmentEventFn
     }); // optionally, request the decryption key
 
     if (segment.key && !segment.key.bytes) {
@@ -48083,9 +56266,18 @@
       }
       const keyRequestOptions = merge(xhrOptions, {
         uri: segment.key.resolvedUri,
-        responseType: 'arraybuffer'
+        responseType: 'arraybuffer',
+        requestType: 'segment-key'
       });
-      const keyRequestCallback = handleKeyResponse(segment, objects, finishProcessingFn);
+      const keyRequestCallback = handleKeyResponse(segment, objects, finishProcessingFn, triggerSegmentEventFn);
+      const keyInfo = {
+        uri: segment.key.resolvedUri
+      };
+      triggerSegmentEventFn({
+        type: 'segmentkeyloadstart',
+        segment,
+        keyInfo
+      });
       const keyXhr = xhr(keyRequestOptions, keyRequestCallback);
       activeXhrs.push(keyXhr);
     } // optionally, request the associated media init segment
@@ -48095,20 +56287,35 @@
       if (differentMapKey) {
         const mapKeyRequestOptions = merge(xhrOptions, {
           uri: segment.map.key.resolvedUri,
-          responseType: 'arraybuffer'
+          responseType: 'arraybuffer',
+          requestType: 'segment-key'
         });
-        const mapKeyRequestCallback = handleKeyResponse(segment, [segment.map.key], finishProcessingFn);
+        const mapKeyRequestCallback = handleKeyResponse(segment, [segment.map.key], finishProcessingFn, triggerSegmentEventFn);
+        const keyInfo = {
+          uri: segment.map.key.resolvedUri
+        };
+        triggerSegmentEventFn({
+          type: 'segmentkeyloadstart',
+          segment,
+          keyInfo
+        });
         const mapKeyXhr = xhr(mapKeyRequestOptions, mapKeyRequestCallback);
         activeXhrs.push(mapKeyXhr);
       }
       const initSegmentOptions = merge(xhrOptions, {
         uri: segment.map.resolvedUri,
         responseType: 'arraybuffer',
-        headers: segmentXhrHeaders(segment.map)
+        headers: segmentXhrHeaders(segment.map),
+        requestType: 'segment-media-initialization'
       });
       const initSegmentRequestCallback = handleInitSegmentResponse({
         segment,
-        finishProcessingFn
+        finishProcessingFn,
+        triggerSegmentEventFn
+      });
+      triggerSegmentEventFn({
+        type: 'segmentloadstart',
+        segment
       });
       const initSegmentXhr = xhr(initSegmentOptions, initSegmentRequestCallback);
       activeXhrs.push(initSegmentXhr);
@@ -48116,12 +56323,18 @@
     const segmentRequestOptions = merge(xhrOptions, {
       uri: segment.part && segment.part.resolvedUri || segment.resolvedUri,
       responseType: 'arraybuffer',
-      headers: segmentXhrHeaders(segment)
+      headers: segmentXhrHeaders(segment),
+      requestType: 'segment'
     });
     const segmentRequestCallback = handleSegmentResponse({
       segment,
       finishProcessingFn,
-      responseType: segmentRequestOptions.responseType
+      responseType: segmentRequestOptions.responseType,
+      triggerSegmentEventFn
+    });
+    triggerSegmentEventFn({
+      type: 'segmentloadstart',
+      segment
     });
     const segmentXhr = xhr(segmentRequestOptions, segmentRequestCallback);
     segmentXhr.addEventListener('progress', handleProgress({
@@ -48148,110 +56361,6 @@
       }));
     });
     return () => abortAll(activeXhrs);
-  };
-
-  /**
-   * @file - codecs.js - Handles tasks regarding codec strings such as translating them to
-   * codec strings, or translating codec strings into objects that can be examined.
-   */
-  const logFn$1 = logger('CodecUtils');
-  /**
-   * Returns a set of codec strings parsed from the playlist or the default
-   * codec strings if no codecs were specified in the playlist
-   *
-   * @param {Playlist} media the current media playlist
-   * @return {Object} an object with the video and audio codecs
-   */
-
-  const getCodecs = function (media) {
-    // if the codecs were explicitly specified, use them instead of the
-    // defaults
-    const mediaAttributes = media.attributes || {};
-    if (mediaAttributes.CODECS) {
-      return parseCodecs(mediaAttributes.CODECS);
-    }
-  };
-  const isMaat = (main, media) => {
-    const mediaAttributes = media.attributes || {};
-    return main && main.mediaGroups && main.mediaGroups.AUDIO && mediaAttributes.AUDIO && main.mediaGroups.AUDIO[mediaAttributes.AUDIO];
-  };
-  const isMuxed = (main, media) => {
-    if (!isMaat(main, media)) {
-      return true;
-    }
-    const mediaAttributes = media.attributes || {};
-    const audioGroup = main.mediaGroups.AUDIO[mediaAttributes.AUDIO];
-    for (const groupId in audioGroup) {
-      // If an audio group has a URI (the case for HLS, as HLS will use external playlists),
-      // or there are listed playlists (the case for DASH, as the manifest will have already
-      // provided all of the details necessary to generate the audio playlist, as opposed to
-      // HLS' externally requested playlists), then the content is demuxed.
-      if (!audioGroup[groupId].uri && !audioGroup[groupId].playlists) {
-        return true;
-      }
-    }
-    return false;
-  };
-  const unwrapCodecList = function (codecList) {
-    const codecs = {};
-    codecList.forEach(({
-      mediaType,
-      type,
-      details
-    }) => {
-      codecs[mediaType] = codecs[mediaType] || [];
-      codecs[mediaType].push(translateLegacyCodec(`${type}${details}`));
-    });
-    Object.keys(codecs).forEach(function (mediaType) {
-      if (codecs[mediaType].length > 1) {
-        logFn$1(`multiple ${mediaType} codecs found as attributes: ${codecs[mediaType].join(', ')}. Setting playlist codecs to null so that we wait for mux.js to probe segments for real codecs.`);
-        codecs[mediaType] = null;
-        return;
-      }
-      codecs[mediaType] = codecs[mediaType][0];
-    });
-    return codecs;
-  };
-  const codecCount = function (codecObj) {
-    let count = 0;
-    if (codecObj.audio) {
-      count++;
-    }
-    if (codecObj.video) {
-      count++;
-    }
-    return count;
-  };
-  /**
-   * Calculates the codec strings for a working configuration of
-   * SourceBuffers to play variant streams in a main playlist. If
-   * there is no possible working configuration, an empty object will be
-   * returned.
-   *
-   * @param main {Object} the m3u8 object for the main playlist
-   * @param media {Object} the m3u8 object for the variant playlist
-   * @return {Object} the codec strings.
-   *
-   * @private
-   */
-
-  const codecsForPlaylist = function (main, media) {
-    const mediaAttributes = media.attributes || {};
-    const codecInfo = unwrapCodecList(getCodecs(media) || []); // HLS with multiple-audio tracks must always get an audio codec.
-    // Put another way, there is no way to have a video-only multiple-audio HLS!
-
-    if (isMaat(main, media) && !codecInfo.audio) {
-      if (!isMuxed(main, media)) {
-        // It is possible for codecs to be specified on the audio media group playlist but
-        // not on the rendition playlist. This is mostly the case for DASH, where audio and
-        // video are always separate (and separately specified).
-        const defaultCodecs = unwrapCodecList(codecsFromDefault(main, mediaAttributes.AUDIO) || []);
-        if (defaultCodecs.audio) {
-          codecInfo.audio = defaultCodecs.audio;
-        }
-      }
-    }
-    return codecInfo;
   };
   const logFn = logger('PlaylistSelector');
   const representationToString = function (representation) {
@@ -48363,25 +56472,40 @@
   /**
    * Chooses the appropriate media playlist based on bandwidth and player size
    *
-   * @param {Object} main
+   * @param {Object} settings
+   *        Object of information required to use this selector
+   * @param {Object} settings.main
    *        Object representation of the main manifest
-   * @param {number} playerBandwidth
+   * @param {number} settings.bandwidth
    *        Current calculated bandwidth of the player
-   * @param {number} playerWidth
+   * @param {number} settings.playerWidth
    *        Current width of the player element (should account for the device pixel ratio)
-   * @param {number} playerHeight
+   * @param {number} settings.playerHeight
    *        Current height of the player element (should account for the device pixel ratio)
-   * @param {boolean} limitRenditionByPlayerDimensions
+   * @param {number} settings.playerObjectFit
+   *        Current value of the video element's object-fit CSS property. Allows taking into
+   *        account that the video might be scaled up to cover the media element when selecting
+   *        media playlists based on player size.
+   * @param {boolean} settings.limitRenditionByPlayerDimensions
    *        True if the player width and height should be used during the selection, false otherwise
-   * @param {Object} playlistController
+   * @param {Object} settings.playlistController
    *        the current playlistController object
    * @return {Playlist} the highest bitrate playlist less than the
    * currently detected bandwidth, accounting for some amount of
    * bandwidth variance
    */
 
-  let simpleSelector = function (main, playerBandwidth, playerWidth, playerHeight, limitRenditionByPlayerDimensions, playlistController) {
-    // If we end up getting called before `main` is available, exit early
+  let simpleSelector = function (settings) {
+    const {
+      main,
+      bandwidth: playerBandwidth,
+      playerWidth,
+      playerHeight,
+      playerObjectFit,
+      limitRenditionByPlayerDimensions,
+      playlistController
+    } = settings; // If we end up getting called before `main` is available, exit early
+
     if (!main) {
       return;
     }
@@ -48465,7 +56589,17 @@
     // if there is no match of exact resolution
 
     if (!resolutionBestRep) {
-      resolutionPlusOneList = haveResolution.filter(rep => rep.width > playerWidth || rep.height > playerHeight); // find all the variants have the same smallest resolution
+      resolutionPlusOneList = haveResolution.filter(rep => {
+        if (playerObjectFit === 'cover') {
+          // video will be scaled up to cover the player. We need to
+          // make sure rendition is at least as wide and as high as the
+          // player.
+          return rep.width > playerWidth && rep.height > playerHeight;
+        } // video will be scaled down to fit inside the player soon as
+        // its resolution exceeds player size in at least one dimension.
+
+        return rep.width > playerWidth || rep.height > playerHeight;
+      }); // find all the variants have the same smallest resolution
 
       resolutionPlusOneSmallest = resolutionPlusOneList.filter(rep => rep.width === resolutionPlusOneList[0].width && rep.height === resolutionPlusOneList[0].height); // ensure that we also pick the highest bandwidth variant that
       // is just-larger-than the video player
@@ -48527,8 +56661,19 @@
    */
 
   const lastBandwidthSelector = function () {
-    const pixelRatio = this.useDevicePixelRatio ? window.devicePixelRatio || 1 : 1;
-    return simpleSelector(this.playlists.main, this.systemBandwidth, parseInt(safeGetComputedStyle(this.tech_.el(), 'width'), 10) * pixelRatio, parseInt(safeGetComputedStyle(this.tech_.el(), 'height'), 10) * pixelRatio, this.limitRenditionByPlayerDimensions, this.playlistController_);
+    let pixelRatio = this.useDevicePixelRatio ? window.devicePixelRatio || 1 : 1;
+    if (!isNaN(this.customPixelRatio)) {
+      pixelRatio = this.customPixelRatio;
+    }
+    return simpleSelector({
+      main: this.playlists.main,
+      bandwidth: this.systemBandwidth,
+      playerWidth: parseInt(safeGetComputedStyle(this.tech_.el(), 'width'), 10) * pixelRatio,
+      playerHeight: parseInt(safeGetComputedStyle(this.tech_.el(), 'height'), 10) * pixelRatio,
+      playerObjectFit: this.usePlayerObjectFit ? safeGetComputedStyle(this.tech_.el(), 'objectFit') : '',
+      limitRenditionByPlayerDimensions: this.limitRenditionByPlayerDimensions,
+      playlistController: this.playlistController_
+    });
   };
   /**
    * Chooses the appropriate media playlist based on an
@@ -48552,7 +56697,10 @@
       throw new Error('Moving average bandwidth decay must be between 0 and 1.');
     }
     return function () {
-      const pixelRatio = this.useDevicePixelRatio ? window.devicePixelRatio || 1 : 1;
+      let pixelRatio = this.useDevicePixelRatio ? window.devicePixelRatio || 1 : 1;
+      if (!isNaN(this.customPixelRatio)) {
+        pixelRatio = this.customPixelRatio;
+      }
       if (average < 0) {
         average = this.systemBandwidth;
         lastSystemBandwidth = this.systemBandwidth;
@@ -48566,7 +56714,15 @@
         average = decay * this.systemBandwidth + (1 - decay) * average;
         lastSystemBandwidth = this.systemBandwidth;
       }
-      return simpleSelector(this.playlists.main, average, parseInt(safeGetComputedStyle(this.tech_.el(), 'width'), 10) * pixelRatio, parseInt(safeGetComputedStyle(this.tech_.el(), 'height'), 10) * pixelRatio, this.limitRenditionByPlayerDimensions, this.playlistController_);
+      return simpleSelector({
+        main: this.playlists.main,
+        bandwidth: average,
+        playerWidth: parseInt(safeGetComputedStyle(this.tech_.el(), 'width'), 10) * pixelRatio,
+        playerHeight: parseInt(safeGetComputedStyle(this.tech_.el(), 'height'), 10) * pixelRatio,
+        playerObjectFit: this.usePlayerObjectFit ? safeGetComputedStyle(this.tech_.el(), 'objectFit') : '',
+        limitRenditionByPlayerDimensions: this.limitRenditionByPlayerDimensions,
+        playlistController: this.playlistController_
+      });
     };
   };
   /**
@@ -48690,6 +56846,23 @@
     }
     return tempBuffer;
   };
+  /**
+   * Example:
+   * https://host.com/path1/path2/path3/segment.ts?arg1=val1
+   * -->
+   * path3/segment.ts
+   *
+   * @param resolvedUri
+   * @return {string}
+   */
+
+  function compactSegmentUrlDescription(resolvedUri) {
+    try {
+      return new URL(resolvedUri).pathname.split('/').slice(-2).join('/');
+    } catch (e) {
+      return '';
+    }
+  }
 
   /**
    * @file text-tracks.js
@@ -48766,8 +56939,22 @@
     }
     const Cue = window.WebKitDataCue || window.VTTCue;
     captionArray.forEach(caption => {
-      const track = caption.stream;
-      inbandTextTracks[track].addCue(new Cue(caption.startTime + timestampOffset, caption.endTime + timestampOffset, caption.text));
+      const track = caption.stream; // in CEA 608 captions, video.js/mux.js sends a content array
+      // with positioning data
+
+      if (caption.content) {
+        caption.content.forEach(value => {
+          const cue = new Cue(caption.startTime + timestampOffset, caption.endTime + timestampOffset, value.text);
+          cue.line = value.line;
+          cue.align = 'left';
+          cue.position = value.position;
+          cue.positionAlign = 'line-left';
+          inbandTextTracks[track].addCue(cue);
+        });
+      } else {
+        // otherwise, a text value with combined captions is sent
+        inbandTextTracks[track].addCue(new Cue(caption.startTime + timestampOffset, caption.endTime + timestampOffset, caption.text));
+      }
     });
   };
   /**
@@ -48834,6 +57021,10 @@
 
       if (typeof time !== 'number' || window.isNaN(time) || time < 0 || !(time < Infinity)) {
         return;
+      } // If we have no frames, we can't create a cue.
+
+      if (!metadata.frames || !metadata.frames.length) {
+        return;
       }
       metadata.frames.forEach(frame => {
         const cue = new Cue(time, time, frame.value || frame.url || frame.data || '');
@@ -48870,11 +57061,64 @@
 
     sortedStartTimes.forEach((startTime, idx) => {
       const cueGroup = cuesGroupedByStartTime[startTime];
-      const nextTime = Number(sortedStartTimes[idx + 1]) || videoDuration; // Map each cue's endTime the next group's startTime
+      const finiteDuration = isFinite(videoDuration) ? videoDuration : startTime;
+      const nextTime = Number(sortedStartTimes[idx + 1]) || finiteDuration; // Map each cue's endTime the next group's startTime
 
       cueGroup.forEach(cue => {
         cue.endTime = nextTime;
       });
+    });
+  }; // object for mapping daterange attributes
+
+  const dateRangeAttr = {
+    id: 'ID',
+    class: 'CLASS',
+    startDate: 'START-DATE',
+    duration: 'DURATION',
+    endDate: 'END-DATE',
+    endOnNext: 'END-ON-NEXT',
+    plannedDuration: 'PLANNED-DURATION',
+    scte35Out: 'SCTE35-OUT',
+    scte35In: 'SCTE35-IN'
+  };
+  const dateRangeKeysToOmit = new Set(['id', 'class', 'startDate', 'duration', 'endDate', 'endOnNext', 'startTime', 'endTime', 'processDateRange']);
+  /**
+   * Add DateRange metadata text track to a source handler given an array of metadata
+   *
+   * @param {Object}
+   *   @param {Object} inbandTextTracks the inband text tracks
+   *   @param {Array} dateRanges parsed media playlist
+   * @private
+   */
+
+  const addDateRangeMetadata = ({
+    inbandTextTracks,
+    dateRanges
+  }) => {
+    const metadataTrack = inbandTextTracks.metadataTrack_;
+    if (!metadataTrack) {
+      return;
+    }
+    const Cue = window.WebKitDataCue || window.VTTCue;
+    dateRanges.forEach(dateRange => {
+      // we generate multiple cues for each date range with different attributes
+      for (const key of Object.keys(dateRange)) {
+        if (dateRangeKeysToOmit.has(key)) {
+          continue;
+        }
+        const cue = new Cue(dateRange.startTime, dateRange.endTime, '');
+        cue.id = dateRange.id;
+        cue.type = 'com.apple.quicktime.HLS';
+        cue.value = {
+          key: dateRangeAttr[key],
+          data: dateRange[key]
+        };
+        if (key === 'scte35Out' || key === 'scte35In') {
+          cue.value.data = new Uint8Array(cue.value.data.match(/[\da-f]{2}/gi)).buffer;
+        }
+        metadataTrack.addCue(cue);
+      }
+      dateRange.processDateRange();
     });
   };
   /**
@@ -48894,7 +57138,9 @@
       kind: 'metadata',
       label: 'Timed Metadata'
     }, false).track;
-    inbandTextTracks.metadataTrack_.inBandMetadataTrackDispatchType = dispatchType;
+    if (!videojs.browser.IS_ANY_SAFARI) {
+      inbandTextTracks.metadataTrack_.inBandMetadataTrackDispatchType = dispatchType;
+    }
   };
   /**
    * Remove cues from a track on video.js.
@@ -48936,19 +57182,14 @@
     if (!cues) {
       return;
     }
-    for (let i = 0; i < cues.length; i++) {
-      const duplicates = [];
-      let occurrences = 0;
-      for (let j = 0; j < cues.length; j++) {
-        if (cues[i].startTime === cues[j].startTime && cues[i].endTime === cues[j].endTime && cues[i].text === cues[j].text) {
-          occurrences++;
-          if (occurrences > 1) {
-            duplicates.push(cues[j]);
-          }
-        }
-      }
-      if (duplicates.length) {
-        duplicates.forEach(dupe => track.removeCue(dupe));
+    const uniqueCues = {};
+    for (let i = cues.length - 1; i >= 0; i--) {
+      const cue = cues[i];
+      const cueKey = `${cue.startTime}-${cue.endTime}-${cue.text}`;
+      if (uniqueCues[cueKey]) {
+        track.removeCue(cue);
+      } else {
+        uniqueCues[cueKey] = cue;
       }
     }
   };
@@ -49086,9 +57327,6 @@
     }
     return true;
   };
-
-  // https://www.w3.org/TR/WebIDL-1/#quotaexceedederror
-  const QUOTA_EXCEEDED_ERR = 22;
 
   /**
    * The segment loader has no recourse except to fetch a segment in the
@@ -49432,6 +57670,69 @@
     }
     return false;
   };
+  const shouldFixBadTimelineChanges = timelineChangeController => {
+    if (!timelineChangeController) {
+      return false;
+    }
+    const pendingAudioTimelineChange = timelineChangeController.pendingTimelineChange({
+      type: 'audio'
+    });
+    const pendingMainTimelineChange = timelineChangeController.pendingTimelineChange({
+      type: 'main'
+    });
+    const hasPendingTimelineChanges = pendingAudioTimelineChange && pendingMainTimelineChange;
+    const differentPendingChanges = hasPendingTimelineChanges && pendingAudioTimelineChange.to !== pendingMainTimelineChange.to;
+    const isNotInitialPendingTimelineChange = hasPendingTimelineChanges && pendingAudioTimelineChange.from !== -1 && pendingMainTimelineChange.from !== -1;
+    if (isNotInitialPendingTimelineChange && differentPendingChanges) {
+      return true;
+    }
+    return false;
+  };
+  /**
+   * Check if the pending audio timeline change is behind the
+   * pending main timeline change.
+   *
+   * @param {SegmentLoader} segmentLoader
+   * @return {boolean}
+   */
+
+  const isAudioTimelineBehind = segmentLoader => {
+    const pendingAudioTimelineChange = segmentLoader.timelineChangeController_.pendingTimelineChange({
+      type: 'audio'
+    });
+    const pendingMainTimelineChange = segmentLoader.timelineChangeController_.pendingTimelineChange({
+      type: 'main'
+    });
+    const hasPendingTimelineChanges = pendingAudioTimelineChange && pendingMainTimelineChange;
+    return hasPendingTimelineChanges && pendingAudioTimelineChange.to < pendingMainTimelineChange.to;
+  };
+  /**
+   * A method to check if the player is waiting for a timeline change, and fixes
+   * certain scenarios where the timelines need to be updated.
+   *
+   * @param {SegmentLoader} segmentLoader
+   */
+
+  const checkAndFixTimelines = segmentLoader => {
+    const segmentInfo = segmentLoader.pendingSegment_;
+    if (!segmentInfo) {
+      return;
+    }
+    const waitingForTimelineChange = shouldWaitForTimelineChange({
+      timelineChangeController: segmentLoader.timelineChangeController_,
+      currentTimeline: segmentLoader.currentTimeline_,
+      segmentTimeline: segmentInfo.timeline,
+      loaderType: segmentLoader.loaderType_,
+      audioDisabled: segmentLoader.audioDisabled_
+    });
+    if (waitingForTimelineChange && shouldFixBadTimelineChanges(segmentLoader.timelineChangeController_)) {
+      if (isAudioTimelineBehind(segmentLoader)) {
+        segmentLoader.timelineChangeController_.trigger('audioTimelineBehind');
+        return;
+      }
+      segmentLoader.timelineChangeController_.trigger('fixBadTimelineChange');
+    }
+  };
   const mediaDuration = timingInfos => {
     let maxDuration = 0;
     ['video', 'audio'].forEach(function (type) {
@@ -49518,6 +57819,31 @@
     return null;
   };
   /**
+   *
+   * @param {Object} options type of segment loader and segment either segmentInfo or simple segment
+   * @return a segmentInfo payload for events or errors.
+   */
+
+  const segmentInfoPayload = ({
+    type,
+    segment
+  }) => {
+    if (!segment) {
+      return;
+    }
+    const isEncrypted = Boolean(segment.key || segment.map && segment.map.ke);
+    const isMediaInitialization = Boolean(segment.map && !segment.map.bytes);
+    const start = segment.startOfSegment === undefined ? segment.start : segment.startOfSegment;
+    return {
+      type: type || segment.type,
+      uri: segment.resolvedUri || segment.uri,
+      start,
+      duration: segment.duration,
+      isEncrypted,
+      isMediaInitialization
+    };
+  };
+  /**
    * An object that manages segment loading and appending.
    *
    * @class SegmentLoader
@@ -49570,11 +57896,13 @@
       this.parse708captions_ = settings.parse708captions;
       this.useDtsForTimestampOffset_ = settings.useDtsForTimestampOffset;
       this.captionServices_ = settings.captionServices;
-      this.exactManifestTimings = settings.exactManifestTimings; // private instance variables
+      this.exactManifestTimings = settings.exactManifestTimings;
+      this.addMetadataToTextTrack = settings.addMetadataToTextTrack; // private instance variables
 
       this.checkBufferTimeout_ = null;
       this.error_ = void 0;
       this.currentTimeline_ = -1;
+      this.shouldForceTimestampOffsetAfterResync_ = false;
       this.pendingSegment_ = null;
       this.xhrOptions_ = null;
       this.pendingSegments_ = [];
@@ -49583,7 +57911,7 @@
 
       this.gopBuffer_ = [];
       this.timeMapping_ = 0;
-      this.safeAppend_ = videojs.browser.IE_VERSION >= 11;
+      this.safeAppend_ = false;
       this.appendInitSegment_ = {
         audio: true,
         video: true
@@ -49646,7 +57974,14 @@
       this.sourceUpdater_.on('ready', () => {
         if (this.hasEnoughInfoToAppend_()) {
           this.processCallQueue_();
+        } else {
+          checkAndFixTimelines(this);
         }
+      });
+      this.sourceUpdater_.on('codecschange', metadata => {
+        this.trigger(_extends$1({
+          type: 'codecschange'
+        }, metadata));
       }); // Only the main loader needs to listen for pending timeline changes, as the main
       // loader should wait for audio to be ready to change its timeline so that both main
       // and audio timelines change together. For more details, see the
@@ -49656,6 +57991,8 @@
         this.timelineChangeController_.on('pendingtimelinechange', () => {
           if (this.hasEnoughInfoToAppend_()) {
             this.processCallQueue_();
+          } else {
+            checkAndFixTimelines(this);
           }
         });
       } // The main loader only listens on pending timeline changes, but the audio loader,
@@ -49663,15 +58000,34 @@
       // see the shouldWaitForTimelineChange function.
 
       if (this.loaderType_ === 'audio') {
-        this.timelineChangeController_.on('timelinechange', () => {
+        this.timelineChangeController_.on('timelinechange', metadata => {
+          this.trigger(_extends$1({
+            type: 'timelinechange'
+          }, metadata));
           if (this.hasEnoughInfoToLoad_()) {
             this.processLoadQueue_();
+          } else {
+            checkAndFixTimelines(this);
           }
           if (this.hasEnoughInfoToAppend_()) {
             this.processCallQueue_();
+          } else {
+            checkAndFixTimelines(this);
           }
         });
       }
+    }
+    /**
+     * TODO: Current sync controller consists of many hls-specific strategies
+     * media sequence sync is also hls-specific, and we would like to be protocol-agnostic on this level
+     * this should be a part of the sync-controller and sync controller should expect different strategy list based on the protocol.
+     *
+     * @return {MediaSequenceSync|null}
+     * @private
+     */
+
+    get mediaSequenceSync_() {
+      return this.syncController_.getMediaSequenceSync(this.loaderType_);
     }
     createTransmuxer_() {
       return segmentTransmuxer.createTransmuxer({
@@ -49738,6 +58094,7 @@
         if (this.pendingSegment_) {
           this.pendingSegment_ = null;
         }
+        this.timelineChangeController_.clearPendingTimelineChange(this.loaderType_);
         return;
       }
       this.abort_(); // We aborted the requests we were waiting on, so reset the loader's state to READY
@@ -49958,6 +58315,10 @@
       if (!newPlaylist) {
         return;
       }
+      if (this.playlist_ && this.playlist_.endList && newPlaylist.endList && this.playlist_.uri === newPlaylist.uri) {
+        // skip update if both prev and new are vod and have the same URI
+        return;
+      }
       const oldPlaylist = this.playlist_;
       const segmentInfo = this.pendingSegment_;
       this.playlist_ = newPlaylist;
@@ -49994,7 +58355,14 @@
           oldId = oldPlaylist.uri;
         }
       }
-      this.logger_(`playlist update [${oldId} => ${newPlaylist.id || newPlaylist.uri}]`); // in VOD, this is always a rendition switch (or we updated our syncInfo above)
+      this.logger_(`playlist update [${oldId} => ${newPlaylist.id || newPlaylist.uri}]`);
+      if (this.mediaSequenceSync_) {
+        this.mediaSequenceSync_.update(newPlaylist, this.currentTime_());
+        this.logger_(`Playlist update:
+currentTime: ${this.currentTime_()}
+bufferedEnd: ${lastBufferedEnd(this.buffered_())}
+`, this.mediaSequenceSync_.diagnostics);
+      } // in VOD, this is always a rendition switch (or we updated our syncInfo above)
       // in LIVE, we always want to update with new playlists (including refreshes)
 
       this.trigger('syncinfoupdate'); // if we were unpaused but waiting for a playlist, start
@@ -50007,13 +58375,14 @@
         if (this.mediaIndex !== null) {
           // we must reset/resync the segment loader when we switch renditions and
           // the segment loader is already synced to the previous rendition
-          // on playlist changes we want it to be possible to fetch
-          // at the buffer for vod but not for live. So we use resetLoader
-          // for live and resyncLoader for vod. We want this because
-          // if a playlist uses independent and non-independent segments/parts the
-          // buffer may not accurately reflect the next segment that we should try
-          // downloading.
-          if (!newPlaylist.endList) {
+          // We only want to reset the loader here for LLHLS playback, as resetLoader sets fetchAtBuffer_
+          // to false, resulting in fetching segments at currentTime and causing repeated
+          // same-segment requests on playlist change. This erroneously drives up the playback watcher
+          // stalled segment count, as re-requesting segments at the currentTime or browser cached segments
+          // will not change the buffer.
+          // Reference for LLHLS fixes: https://github.com/videojs/http-streaming/pull/1201
+          const isLLHLS = !newPlaylist.endList && typeof newPlaylist.partTargetDuration === 'number';
+          if (isLLHLS) {
             this.resetLoader();
           } else {
             this.resyncLoader();
@@ -50138,6 +58507,9 @@
 
     resetLoader() {
       this.fetchAtBuffer_ = false;
+      if (this.mediaSequenceSync_) {
+        this.mediaSequenceSync_.resetAppendedStatus();
+      }
       this.resyncLoader();
     }
     /**
@@ -50153,7 +58525,14 @@
       this.mediaIndex = null;
       this.partIndex = null;
       this.syncPoint_ = null;
-      this.isPendingTimestampOffset_ = false;
+      this.isPendingTimestampOffset_ = false; // this is mainly to sync timing-info when switching between renditions with and without timestamp-rollover,
+      // so we don't want it for DASH or fragmented mp4 segments.
+
+      const isFmp4 = this.currentMediaInfo_ && this.currentMediaInfo_.isFmp4;
+      const isHlsTs = this.sourceType_ === 'hls' && !isFmp4;
+      if (isHlsTs) {
+        this.shouldForceTimestampOffsetAfterResync_ = true;
+      }
       this.callQueue_ = [];
       this.loadQueue_ = [];
       this.metadataQueue_.id3 = [];
@@ -50276,6 +58655,16 @@
       if (!segmentInfo) {
         return;
       }
+      const metadata = {
+        segmentInfo: segmentInfoPayload({
+          type: this.loaderType_,
+          segment: segmentInfo
+        })
+      };
+      this.trigger({
+        type: 'segmentselected',
+        metadata
+      });
       if (typeof segmentInfo.timestampOffset === 'number') {
         this.isPendingTimestampOffset_ = false;
         this.timelineChangeController_.pendingTimelineChange({
@@ -50330,7 +58719,7 @@
       if (!segments.length || preloaded || haveEnoughBuffer) {
         return null;
       }
-      this.syncPoint_ = this.syncPoint_ || this.syncController_.getSyncPoint(this.playlist_, this.duration_(), this.currentTimeline_, this.currentTime_());
+      this.syncPoint_ = this.syncPoint_ || this.syncController_.getSyncPoint(this.playlist_, this.duration_(), this.currentTimeline_, this.currentTime_(), this.loaderType_);
       const next = {
         partIndex: null,
         mediaIndex: null,
@@ -50340,6 +58729,7 @@
       };
       if (next.isSyncRequest) {
         next.mediaIndex = getSyncSegmentCandidate(this.currentTimeline_, segments, bufferedEnd);
+        this.logger_(`choose next request. Can not find sync point. Fallback to media Index: ${next.mediaIndex}`);
       } else if (this.mediaIndex !== null) {
         const segment = segments[this.mediaIndex];
         const partIndex = typeof this.partIndex === 'number' ? this.partIndex : -1;
@@ -50351,23 +58741,57 @@
           next.mediaIndex = this.mediaIndex + 1;
         }
       } else {
-        // Find the segment containing the end of the buffer or current time.
-        const {
-          segmentIndex,
-          startTime,
-          partIndex
-        } = Playlist.getMediaInfoForTime({
-          exactManifestTimings: this.exactManifestTimings,
-          playlist: this.playlist_,
-          currentTime: this.fetchAtBuffer_ ? bufferedEnd : this.currentTime_(),
-          startingPartIndex: this.syncPoint_.partIndex,
-          startingSegmentIndex: this.syncPoint_.segmentIndex,
-          startTime: this.syncPoint_.time
-        });
-        next.getMediaInfoForTime = this.fetchAtBuffer_ ? `bufferedEnd ${bufferedEnd}` : `currentTime ${this.currentTime_()}`;
+        let segmentIndex;
+        let partIndex;
+        let startTime;
+        const targetTime = this.fetchAtBuffer_ ? bufferedEnd : this.currentTime_();
+        if (this.mediaSequenceSync_) {
+          this.logger_(`chooseNextRequest_ request after Quality Switch:
+For TargetTime: ${targetTime}.
+CurrentTime: ${this.currentTime_()}
+BufferedEnd: ${bufferedEnd}
+Fetch At Buffer: ${this.fetchAtBuffer_}
+`, this.mediaSequenceSync_.diagnostics);
+        }
+        if (this.mediaSequenceSync_ && this.mediaSequenceSync_.isReliable) {
+          const syncInfo = this.getSyncInfoFromMediaSequenceSync_(targetTime);
+          if (!syncInfo) {
+            const message = 'No sync info found while using media sequence sync';
+            this.error({
+              message,
+              metadata: {
+                errorType: videojs.Error.StreamingFailedToSelectNextSegment,
+                error: new Error(message)
+              }
+            });
+            this.logger_('chooseNextRequest_ - no sync info found using media sequence sync'); // no match
+
+            return null;
+          }
+          this.logger_(`chooseNextRequest_ mediaSequence syncInfo (${syncInfo.start} --> ${syncInfo.end})`);
+          segmentIndex = syncInfo.segmentIndex;
+          partIndex = syncInfo.partIndex;
+          startTime = syncInfo.start;
+        } else {
+          this.logger_('chooseNextRequest_ - fallback to a regular segment selection algorithm, based on a syncPoint.'); // fallback
+
+          const mediaInfoForTime = Playlist.getMediaInfoForTime({
+            exactManifestTimings: this.exactManifestTimings,
+            playlist: this.playlist_,
+            currentTime: targetTime,
+            startingPartIndex: this.syncPoint_.partIndex,
+            startingSegmentIndex: this.syncPoint_.segmentIndex,
+            startTime: this.syncPoint_.time
+          });
+          segmentIndex = mediaInfoForTime.segmentIndex;
+          partIndex = mediaInfoForTime.partIndex;
+          startTime = mediaInfoForTime.startTime;
+        }
+        next.getMediaInfoForTime = this.fetchAtBuffer_ ? `bufferedEnd ${targetTime}` : `currentTime ${targetTime}`;
         next.mediaIndex = segmentIndex;
         next.startOfSegment = startTime;
         next.partIndex = partIndex;
+        this.logger_(`choose next request. Playlist switched and we have a sync point. Media Index: ${next.mediaIndex} `);
       }
       const nextSegment = segments[next.mediaIndex];
       let nextPart = nextSegment && typeof next.partIndex === 'number' && nextSegment.parts && nextSegment.parts[next.partIndex]; // if the next segment index is invalid or
@@ -50381,12 +58805,16 @@
       if (typeof next.partIndex !== 'number' && nextSegment.parts) {
         next.partIndex = 0;
         nextPart = nextSegment.parts[0];
-      } // if we have no buffered data then we need to make sure
+      } // independentSegments applies to every segment in a playlist. If independentSegments appears in a main playlist,
+      // it applies to each segment in each media playlist.
+      // https://datatracker.ietf.org/doc/html/draft-pantos-http-live-streaming-23#section-4.3.5.1
+
+      const hasIndependentSegments = this.vhs_.playlists && this.vhs_.playlists.main && this.vhs_.playlists.main.independentSegments || this.playlist_.independentSegments; // if we have no buffered data then we need to make sure
       // that the next part we append is "independent" if possible.
       // So we check if the previous part is independent, and request
       // it if it is.
 
-      if (!bufferedTime && nextPart && !nextPart.independent) {
+      if (!bufferedTime && nextPart && !hasIndependentSegments && !nextPart.independent) {
         if (next.partIndex === 0) {
           const lastSegment = segments[next.mediaIndex - 1];
           const lastSegmentLastPart = lastSegment.parts && lastSegment.parts.length && lastSegment.parts[lastSegment.parts.length - 1];
@@ -50408,7 +58836,43 @@
       if (next.mediaIndex >= segments.length - 1 && ended && !this.seeking_()) {
         return null;
       }
+      if (this.shouldForceTimestampOffsetAfterResync_) {
+        this.shouldForceTimestampOffsetAfterResync_ = false;
+        next.forceTimestampOffset = true;
+        this.logger_('choose next request. Force timestamp offset after loader resync');
+      }
       return this.generateSegmentInfo_(next);
+    }
+    getSyncInfoFromMediaSequenceSync_(targetTime) {
+      if (!this.mediaSequenceSync_) {
+        return null;
+      } // we should pull the target time to the least available time if we drop out of sync for any reason
+
+      const finalTargetTime = Math.max(targetTime, this.mediaSequenceSync_.start);
+      if (targetTime !== finalTargetTime) {
+        this.logger_(`getSyncInfoFromMediaSequenceSync_. Pulled target time from ${targetTime} to ${finalTargetTime}`);
+      }
+      const mediaSequenceSyncInfo = this.mediaSequenceSync_.getSyncInfoForTime(finalTargetTime);
+      if (!mediaSequenceSyncInfo) {
+        // no match at all
+        return null;
+      }
+      if (!mediaSequenceSyncInfo.isAppended) {
+        // has a perfect match
+        return mediaSequenceSyncInfo;
+      } // has match, but segment was already appended.
+      // attempt to auto-advance to the nearest next segment:
+
+      const nextMediaSequenceSyncInfo = this.mediaSequenceSync_.getSyncInfoForTime(mediaSequenceSyncInfo.end);
+      if (!nextMediaSequenceSyncInfo) {
+        // no match at all
+        return null;
+      }
+      if (nextMediaSequenceSyncInfo.isAppended) {
+        this.logger_('getSyncInfoFromMediaSequenceSync_: We encounter unexpected scenario where next media sequence sync info is also appended!');
+      } // got match with the nearest next segment
+
+      return nextMediaSequenceSyncInfo;
     }
     generateSegmentInfo_(options) {
       const {
@@ -50576,6 +59040,24 @@
       this.trigger('progress');
     }
     handleTrackInfo_(simpleSegment, trackInfo) {
+      const {
+        hasAudio,
+        hasVideo
+      } = trackInfo;
+      const metadata = {
+        segmentInfo: segmentInfoPayload({
+          type: this.loaderType_,
+          segment: simpleSegment
+        }),
+        trackInfo: {
+          hasAudio,
+          hasVideo
+        }
+      };
+      this.trigger({
+        type: 'segmenttransmuxingtrackinfoavailable',
+        metadata
+      });
       this.earlyAbortWhenNeeded_(simpleSegment.stats);
       if (this.checkForAbort_(simpleSegment.requestId)) {
         return;
@@ -50608,6 +59090,8 @@
 
       if (this.hasEnoughInfoToAppend_()) {
         this.processCallQueue_();
+      } else {
+        checkAndFixTimelines(this);
       }
     }
     handleTimingInfo_(simpleSegment, mediaType, timeType, time) {
@@ -50623,6 +59107,8 @@
 
       if (this.hasEnoughInfoToAppend_()) {
         this.processCallQueue_();
+      } else {
+        checkAndFixTimelines(this);
       }
     }
     handleCaptions_(simpleSegment, captionData) {
@@ -50700,17 +59186,7 @@
         this.metadataQueue_.id3.push(this.handleId3_.bind(this, simpleSegment, id3Frames, dispatchType));
         return;
       }
-      const timestampOffset = this.sourceUpdater_.videoTimestampOffset() === null ? this.sourceUpdater_.audioTimestampOffset() : this.sourceUpdater_.videoTimestampOffset(); // There's potentially an issue where we could double add metadata if there's a muxed
-      // audio/video source with a metadata track, and an alt audio with a metadata track.
-      // However, this probably won't happen, and if it does it can be handled then.
-
-      createMetadataTrackIfNotExists(this.inbandTextTracks_, dispatchType, this.vhs_.tech_);
-      addMetadata({
-        inbandTextTracks: this.inbandTextTracks_,
-        metadataArray: id3Frames,
-        timestampOffset,
-        videoDuration: this.duration_()
-      });
+      this.addMetadataToTextTrack(dispatchType, id3Frames, this.duration_());
     }
     processMetadataQueue_() {
       this.metadataQueue_.id3.forEach(fn => fn());
@@ -50824,7 +59300,8 @@
 
       if (hasAudio && !this.audioDisabled_ && !isMuxed && !segmentInfo.audioTimingInfo) {
         return false;
-      }
+      } // we need to allow an append here even if we're moving to different timelines.
+
       if (shouldWaitForTimelineChange({
         timelineChangeController: this.timelineChangeController_,
         currentTimeline: this.currentTimeline_,
@@ -50844,6 +59321,7 @@
       // executed after the calls currently queued.
 
       if (this.callQueue_.length || !this.hasEnoughInfoToAppend_()) {
+        checkAndFixTimelines(this);
         this.callQueue_.push(this.handleData_.bind(this, simpleSegment, result));
         return;
       }
@@ -51084,13 +59562,18 @@
 
         return;
       }
-      this.logger_('Received non QUOTA_EXCEEDED_ERR on append', error);
-      this.error(`${type} append of ${bytes.length}b failed for segment ` + `#${segmentInfo.mediaIndex} in playlist ${segmentInfo.playlist.id}`); // If an append errors, we often can't recover.
+      this.logger_('Received non QUOTA_EXCEEDED_ERR on append', error); // If an append errors, we often can't recover.
       // (see https://w3c.github.io/media-source/#sourcebuffer-append-error).
       //
       // Trigger a special error so that it can be handled separately from normal,
       // recoverable errors.
 
+      this.error({
+        message: `${type} append of ${bytes.length}b failed for segment ` + `#${segmentInfo.mediaIndex} in playlist ${segmentInfo.playlist.id}`,
+        metadata: {
+          errorType: videojs.Error.StreamingFailedToAppendSegment
+        }
+      });
       this.trigger('appenderror');
     }
     appendToSourceBuffer_({
@@ -51117,6 +59600,16 @@
           segments
         });
       }
+      const metadata = {
+        segmentInfo: segmentInfoPayload({
+          type: this.loaderType_,
+          segment: segmentInfo
+        })
+      };
+      this.trigger({
+        type: 'segmentappendstart',
+        metadata
+      });
       this.sourceUpdater_.appendBuffer({
         segmentInfo,
         type,
@@ -51186,6 +59679,7 @@
         }
       }
       if (!this.hasEnoughInfoToLoad_()) {
+        checkAndFixTimelines(this);
         this.loadQueue_.push(() => {
           // regenerate the audioAppendStart, timestampOffset, etc as they
           // may have changed since this function was added to the queue.
@@ -51228,7 +59722,9 @@
       // the first timeline
       segmentInfo.timeline > 0;
       const isEndOfTimeline = isEndOfStream || isWalkingForward && isDiscontinuity;
-      this.logger_(`Requesting ${segmentInfoString(segmentInfo)}`); // If there's an init segment associated with this segment, but it is not cached (identified by a lack of bytes),
+      this.logger_(`Requesting
+${compactSegmentUrlDescription(segmentInfo.uri)}
+${segmentInfoString(segmentInfo)}`); // If there's an init segment associated with this segment, but it is not cached (identified by a lack of bytes),
       // then this init segment has never been seen before and should be appended.
       //
       // At this point the content type (audio/video or both) is not yet known, but it should be safe to set
@@ -51266,6 +59762,34 @@
           stream
         }) => {
           this.logger_(`${segmentInfoString(segmentInfo)} logged from transmuxer stream ${stream} as a ${level}: ${message}`);
+        },
+        triggerSegmentEventFn: ({
+          type,
+          segment,
+          keyInfo,
+          trackInfo,
+          timingInfo
+        }) => {
+          const segInfo = segmentInfoPayload({
+            segment
+          });
+          const metadata = {
+            segmentInfo: segInfo
+          }; // add other properties if necessary.
+
+          if (keyInfo) {
+            metadata.keyInfo = keyInfo;
+          }
+          if (trackInfo) {
+            metadata.trackInfo = trackInfo;
+          }
+          if (timingInfo) {
+            metadata.timingInfo = timingInfo;
+          }
+          this.trigger({
+            type,
+            metadata
+          });
         }
       });
     }
@@ -51302,6 +59826,8 @@
     createSimplifiedSegmentObj_(segmentInfo) {
       const segment = segmentInfo.segment;
       const part = segmentInfo.part;
+      const isEncrypted = segmentInfo.segment.key || segmentInfo.segment.map && segmentInfo.segment.map.key;
+      const isMediaInitialization = segmentInfo.segment.map && !segmentInfo.segment.map.bytes;
       const simpleSegment = {
         resolvedUri: part ? part.resolvedUri : segment.resolvedUri,
         byterange: part ? part.byterange : segment.byterange,
@@ -51309,7 +59835,12 @@
         transmuxer: segmentInfo.transmuxer,
         audioAppendStart: segmentInfo.audioAppendStart,
         gopsToAlignWith: segmentInfo.gopsToAlignWith,
-        part: segmentInfo.part
+        part: segmentInfo.part,
+        type: this.loaderType_,
+        start: segmentInfo.startOfSegment,
+        duration: segmentInfo.duration,
+        isEncrypted,
+        isMediaInitialization
       };
       const previousSegment = segmentInfo.playlist.segments[segmentInfo.mediaIndex - 1];
       if (previousSegment && previousSegment.timeline === segment.timeline) {
@@ -51357,6 +59888,17 @@
         this.logger_(`Ignoring segment's bandwidth because its duration of ${duration}` + ` is less than the min to record ${MIN_SEGMENT_DURATION_TO_SAVE_STATS}`);
         return;
       }
+      const metadata = {
+        bandwidthInfo: {
+          from: this.bandwidth,
+          to: stats.bandwidth
+        }
+      }; // player event with payload
+
+      this.trigger({
+        type: 'bandwidthupdated',
+        metadata
+      });
       this.bandwidth = stats.bandwidth;
       this.roundTrip = stats.roundTripTime;
     }
@@ -51655,7 +60197,16 @@
     handleAppendsDone_() {
       // appendsdone can cause an abort
       if (this.pendingSegment_) {
-        this.trigger('appendsdone');
+        const metadata = {
+          segmentInfo: segmentInfoPayload({
+            type: this.loaderType_,
+            segment: this.pendingSegment_
+          })
+        };
+        this.trigger({
+          type: 'appendsdone',
+          metadata
+        });
       }
       if (!this.pendingSegment_) {
         this.state = 'READY'; // TODO should this move into this.checkForAbort to speed up requests post abort in
@@ -51666,7 +60217,14 @@
         }
         return;
       }
-      const segmentInfo = this.pendingSegment_; // Now that the end of the segment has been reached, we can set the end time. It's
+      const segmentInfo = this.pendingSegment_;
+      if (segmentInfo.part && segmentInfo.part.syncInfo) {
+        // low-latency flow
+        segmentInfo.part.syncInfo.markAppended();
+      } else if (segmentInfo.segment.syncInfo) {
+        // normal flow
+        segmentInfo.segment.syncInfo.markAppended();
+      } // Now that the end of the segment has been reached, we can set the end time. It's
       // best to wait until all appends are done so we're sure that the primary media is
       // finished (and we have its end time).
 
@@ -51831,6 +60389,7 @@
         custom: segment.custom,
         dateTimeObject: segment.dateTimeObject,
         dateTimeString: segment.dateTimeString,
+        programDateTime: segment.programDateTime,
         bandwidth: segmentInfo.playlist.attributes.BANDWIDTH,
         resolution: segmentInfo.playlist.attributes.RESOLUTION,
         codecs: segmentInfo.playlist.attributes.CODECS,
@@ -52068,13 +60627,38 @@
       if (!inSourceBuffers(sourceUpdater.mediaSource, sourceBuffer)) {
         return;
       } // do not update codec if we don't need to.
+      // Only update if we change the codec base.
+      // For example, going from avc1.640028 to avc1.64001f does not require a changeType call.
 
-      if (sourceUpdater.codecs[type] === codec) {
+      const newCodecBase = codec.substring(0, codec.indexOf('.'));
+      const oldCodec = sourceUpdater.codecs[type];
+      const oldCodecBase = oldCodec.substring(0, oldCodec.indexOf('.'));
+      if (oldCodecBase === newCodecBase) {
         return;
       }
-      sourceUpdater.logger_(`changing ${type}Buffer codec from ${sourceUpdater.codecs[type]} to ${codec}`);
-      sourceBuffer.changeType(mime);
-      sourceUpdater.codecs[type] = codec;
+      const metadata = {
+        codecsChangeInfo: {
+          from: oldCodec,
+          to: codec
+        }
+      };
+      sourceUpdater.trigger({
+        type: 'codecschange',
+        metadata
+      });
+      sourceUpdater.logger_(`changing ${type}Buffer codec from ${oldCodec} to ${codec}`); // check if change to the provided type is supported
+
+      try {
+        sourceBuffer.changeType(mime);
+        sourceUpdater.codecs[type] = codec;
+      } catch (e) {
+        metadata.errorType = videojs.Error.StreamingCodecsChangeError;
+        metadata.error = e;
+        e.metadata = metadata;
+        sourceUpdater.error_ = e;
+        sourceUpdater.trigger('error');
+        videojs.log.warn(`Failed to changeType on ${type}Buffer`, e);
+      }
     }
   };
   const pushQueue = ({
@@ -52099,6 +60683,9 @@
     // updateend events on source buffers. This does not appear to be in the spec. As such,
     // if we encounter an updateend without a corresponding pending action from our queue
     // for that source buffer type, process the next action.
+    const bufferedRangesForType = sourceUpdater[`${type}Buffered`]();
+    const descriptiveString = bufferedRangesToString(bufferedRangesForType);
+    sourceUpdater.logger_(`received "updateend" event for ${type} Source Buffer: `, descriptiveString);
     if (sourceUpdater.queuePending[type]) {
       const doneFn = sourceUpdater.queuePending[type].doneFn;
       sourceUpdater.queuePending[type] = null;
@@ -52253,11 +60840,9 @@
      */
 
     canRemoveSourceBuffer() {
-      // IE reports that it supports removeSourceBuffer, but often throws
-      // errors when attempting to use the function. So we report that it
-      // does not support removeSourceBuffer. As of Firefox 83 removeSourceBuffer
-      // throws errors, so we report that it does not support this as well.
-      return !videojs.browser.IE_VERSION && !videojs.browser.IS_FIREFOX && window.MediaSource && window.MediaSource.prototype && typeof window.MediaSource.prototype.removeSourceBuffer === 'function';
+      // As of Firefox 83 removeSourceBuffer
+      // throws errors, so we report that it does not support this.
+      return !videojs.browser.IS_FIREFOX && window.MediaSource && window.MediaSource.prototype && typeof window.MediaSource.prototype.removeSourceBuffer === 'function';
     }
     /**
      * Whether or not the changeType function is supported
@@ -52558,7 +61143,7 @@
     videoTimestampOffset(offset) {
       if (typeof offset !== 'undefined' && this.videoBuffer &&
       // no point in updating if it's the same
-      this.videoTimestampOffset !== offset) {
+      this.videoTimestampOffset_ !== offset) {
         pushQueue({
           type: 'video',
           sourceUpdater: this,
@@ -52630,6 +61215,10 @@
     }
   }
   const uint8ToUtf8 = uintArray => decodeURIComponent(escape(String.fromCharCode.apply(null, uintArray)));
+  const bufferToHexString = buffer => {
+    const uInt8Buffer = new Uint8Array(buffer);
+    return Array.from(uInt8Buffer).map(byte => byte.toString(16).padStart(2, '0')).join('');
+  };
 
   /**
    * @file vtt-segment-loader.js
@@ -52655,16 +61244,11 @@
 
       this.mediaSource_ = null;
       this.subtitlesTrack_ = null;
-      this.loaderType_ = 'subtitle';
       this.featuresNativeTextTracks_ = settings.featuresNativeTextTracks;
       this.loadVttJs = settings.loadVttJs; // The VTT segment will have its own time mappings. Saving VTT segment timing info in
       // the sync controller leads to improper behavior.
 
       this.shouldSaveSegmentTimingInfo_ = false;
-    }
-    createTransmuxer_() {
-      // don't need to transmux any subtitles
-      return null;
     }
     /**
      * Indicates which time ranges are buffered
@@ -52872,7 +61456,11 @@
         this.stopForError(error);
         return;
       }
-      const segmentInfo = this.pendingSegment_; // although the VTT segment loader bandwidth isn't really used, it's good to
+      const segmentInfo = this.pendingSegment_;
+      const isMp4WebVttSegmentWithCues = result.mp4VttCues && result.mp4VttCues.length;
+      if (isMp4WebVttSegmentWithCues) {
+        segmentInfo.mp4VttCues = result.mp4VttCues;
+      } // although the VTT segment loader bandwidth isn't really used, it's good to
       // maintain functionality between segment loaders
 
       this.saveBandwidthRelatedStats_(segmentInfo.duration, simpleSegment.stats); // if this request included a segment key, save that data in the cache
@@ -52903,11 +61491,17 @@
         this.parseVTTCues_(segmentInfo);
       } catch (e) {
         this.stopForError({
-          message: e.message
+          message: e.message,
+          metadata: {
+            errorType: videojs.Error.StreamingVttParserError,
+            error: e
+          }
         });
         return;
       }
-      this.updateTimeMapping_(segmentInfo, this.syncController_.timelines[segmentInfo.timeline], this.playlist_);
+      if (!isMp4WebVttSegmentWithCues) {
+        this.updateTimeMapping_(segmentInfo, this.syncController_.timelines[segmentInfo.timeline], this.playlist_);
+      }
       if (segmentInfo.cues.length) {
         segmentInfo.timingInfo = {
           start: segmentInfo.cues[0].startTime,
@@ -52939,10 +61533,39 @@
       removeDuplicateCuesFromTrack(this.subtitlesTrack_);
       this.handleAppendsDone_();
     }
-    handleData_() {// noop as we shouldn't be getting video/audio data captions
-      // that we do not support here.
+    handleData_(simpleSegment, result) {
+      const isVttType = simpleSegment && simpleSegment.type === 'vtt';
+      const isTextResult = result && result.type === 'text';
+      const isFmp4VttSegment = isVttType && isTextResult; // handle segment data for fmp4 encapsulated webvtt
+
+      if (isFmp4VttSegment) {
+        super.handleData_(simpleSegment, result);
+      }
     }
     updateTimingInfoEnd_() {// noop
+    }
+    /**
+     * Utility function for converting mp4 webvtt cue objects into VTTCues.
+     *
+     * @param {Object} segmentInfo with mp4 webvtt cues for parsing into VTTCue objecs
+     */
+
+    parseMp4VttCues_(segmentInfo) {
+      const timestampOffset = this.sourceUpdater_.videoTimestampOffset() === null ? this.sourceUpdater_.audioTimestampOffset() : this.sourceUpdater_.videoTimestampOffset();
+      segmentInfo.mp4VttCues.forEach(cue => {
+        const start = cue.start + timestampOffset;
+        const end = cue.end + timestampOffset;
+        const vttCue = new window.VTTCue(start, end, cue.cueText);
+        if (cue.settings) {
+          cue.settings.split(' ').forEach(cueSetting => {
+            const keyValString = cueSetting.split(':');
+            const key = keyValString[0];
+            const value = keyValString[1];
+            vttCue[key] = isNaN(value) ? value : Number(value);
+          });
+        }
+        segmentInfo.cues.push(vttCue);
+      });
     }
     /**
      * Uses the WebVTT parser to parse the segment response
@@ -52961,6 +61584,15 @@
         // caller is responsible for exception handling.
         throw new NoVttJsError();
       }
+      segmentInfo.cues = [];
+      segmentInfo.timestampmap = {
+        MPEGTS: 0,
+        LOCAL: 0
+      };
+      if (segmentInfo.mp4VttCues) {
+        this.parseMp4VttCues_(segmentInfo);
+        return;
+      }
       if (typeof window.TextDecoder === 'function') {
         decoder = new window.TextDecoder('utf8');
       } else {
@@ -52968,11 +61600,6 @@
         decodeBytesToString = true;
       }
       const parser = new window.WebVTT.Parser(window, window.vttjs, decoder);
-      segmentInfo.cues = [];
-      segmentInfo.timestampmap = {
-        MPEGTS: 0,
-        LOCAL: 0
-      };
       parser.oncue = segmentInfo.cues.push.bind(segmentInfo.cues);
       parser.ontimestampmap = map => {
         segmentInfo.timestampmap = map;
@@ -53023,12 +61650,23 @@
         segment.empty = true;
         return;
       }
-      const timestampmap = segmentInfo.timestampmap;
-      const diff = timestampmap.MPEGTS / clock_1 - timestampmap.LOCAL + mappingObj.mapping;
+      const {
+        MPEGTS,
+        LOCAL
+      } = segmentInfo.timestampmap;
+      /**
+       * From the spec:
+       * The MPEGTS media timestamp MUST use a 90KHz timescale,
+       * even when non-WebVTT Media Segments use a different timescale.
+       */
+
+      const mpegTsInSeconds = MPEGTS / clock_1;
+      const diff = mpegTsInSeconds - LOCAL + mappingObj.mapping;
       segmentInfo.cues.forEach(cue => {
-        // First convert cue time to TS time using the timestamp-map provided within the vtt
-        cue.startTime += diff;
-        cue.endTime += diff;
+        const duration = cue.endTime - cue.startTime;
+        const startTime = this.handleRollover_(cue.startTime + diff, mappingObj.time);
+        cue.startTime = Math.max(startTime, 0);
+        cue.endTime = Math.max(startTime + duration, 0);
       });
       if (!playlist.syncInfo) {
         const firstStart = segmentInfo.cues[0].startTime;
@@ -53038,6 +61676,45 @@
           time: Math.min(firstStart, lastStart - segment.duration)
         };
       }
+    }
+    /**
+     * MPEG-TS PES timestamps are limited to 2^33.
+     * Once they reach 2^33, they roll over to 0.
+     * mux.js handles PES timestamp rollover for the following scenarios:
+     * [forward rollover(right)] ->
+     *    PES timestamps monotonically increase, and once they reach 2^33, they roll over to 0
+     * [backward rollover(left)] -->
+     *    we seek back to position before rollover.
+     *
+     * According to the HLS SPEC:
+     * When synchronizing WebVTT with PES timestamps, clients SHOULD account
+     * for cases where the 33-bit PES timestamps have wrapped and the WebVTT
+     * cue times have not.  When the PES timestamp wraps, the WebVTT Segment
+     * SHOULD have a X-TIMESTAMP-MAP header that maps the current WebVTT
+     * time to the new (low valued) PES timestamp.
+     *
+     * So we want to handle rollover here and align VTT Cue start/end time to the player's time.
+     */
+
+    handleRollover_(value, reference) {
+      if (reference === null) {
+        return value;
+      }
+      let valueIn90khz = value * clock_1;
+      const referenceIn90khz = reference * clock_1;
+      let offset;
+      if (referenceIn90khz < valueIn90khz) {
+        // - 2^33
+        offset = -8589934592;
+      } else {
+        // + 2^33
+        offset = 8589934592;
+      } // distance(value - reference) > 2^32
+
+      while (Math.abs(valueIn90khz - referenceIn90khz) > 4294967296) {
+        valueIn90khz += offset;
+      }
+      return valueIn90khz / clock_1;
     }
   }
 
@@ -53121,6 +61798,242 @@
       mediaTime += segment.duration;
     }
   };
+  class SyncInfo {
+    /**
+     * @param {number} start - media sequence start
+     * @param {number} end - media sequence end
+     * @param {number} segmentIndex - index for associated segment
+     * @param {number|null} [partIndex] - index for associated part
+     * @param {boolean} [appended] - appended indicator
+     *
+     */
+    constructor({
+      start,
+      end,
+      segmentIndex,
+      partIndex = null,
+      appended = false
+    }) {
+      this.start_ = start;
+      this.end_ = end;
+      this.segmentIndex_ = segmentIndex;
+      this.partIndex_ = partIndex;
+      this.appended_ = appended;
+    }
+    isInRange(targetTime) {
+      return targetTime >= this.start && targetTime < this.end;
+    }
+    markAppended() {
+      this.appended_ = true;
+    }
+    resetAppendedStatus() {
+      this.appended_ = false;
+    }
+    get isAppended() {
+      return this.appended_;
+    }
+    get start() {
+      return this.start_;
+    }
+    get end() {
+      return this.end_;
+    }
+    get segmentIndex() {
+      return this.segmentIndex_;
+    }
+    get partIndex() {
+      return this.partIndex_;
+    }
+  }
+  class SyncInfoData {
+    /**
+     *
+     * @param {SyncInfo} segmentSyncInfo - sync info for a given segment
+     * @param {Array<SyncInfo>} [partsSyncInfo] - sync infos for a list of parts for a given segment
+     */
+    constructor(segmentSyncInfo, partsSyncInfo = []) {
+      this.segmentSyncInfo_ = segmentSyncInfo;
+      this.partsSyncInfo_ = partsSyncInfo;
+    }
+    get segmentSyncInfo() {
+      return this.segmentSyncInfo_;
+    }
+    get partsSyncInfo() {
+      return this.partsSyncInfo_;
+    }
+    get hasPartsSyncInfo() {
+      return this.partsSyncInfo_.length > 0;
+    }
+    resetAppendStatus() {
+      this.segmentSyncInfo_.resetAppendedStatus();
+      this.partsSyncInfo_.forEach(partSyncInfo => partSyncInfo.resetAppendedStatus());
+    }
+  }
+  class MediaSequenceSync {
+    constructor() {
+      /**
+       * @type {Map<number, SyncInfoData>}
+       * @protected
+       */
+      this.storage_ = new Map();
+      this.diagnostics_ = '';
+      this.isReliable_ = false;
+      this.start_ = -Infinity;
+      this.end_ = Infinity;
+    }
+    get start() {
+      return this.start_;
+    }
+    get end() {
+      return this.end_;
+    }
+    get diagnostics() {
+      return this.diagnostics_;
+    }
+    get isReliable() {
+      return this.isReliable_;
+    }
+    resetAppendedStatus() {
+      this.storage_.forEach(syncInfoData => syncInfoData.resetAppendStatus());
+    }
+    /**
+     * update sync storage
+     *
+     * @param {Object} playlist
+     * @param {number} currentTime
+     *
+     * @return {void}
+     */
+
+    update(playlist, currentTime) {
+      const {
+        mediaSequence,
+        segments
+      } = playlist;
+      this.isReliable_ = this.isReliablePlaylist_(mediaSequence, segments);
+      if (!this.isReliable_) {
+        return;
+      }
+      return this.updateStorage_(segments, mediaSequence, this.calculateBaseTime_(mediaSequence, segments, currentTime));
+    }
+    /**
+     * @param {number} targetTime
+     * @return {SyncInfo|null}
+     */
+
+    getSyncInfoForTime(targetTime) {
+      for (const {
+        segmentSyncInfo,
+        partsSyncInfo
+      } of this.storage_.values()) {
+        // Normal segment flow:
+        if (!partsSyncInfo.length) {
+          if (segmentSyncInfo.isInRange(targetTime)) {
+            return segmentSyncInfo;
+          }
+        } else {
+          // Low latency flow:
+          for (const partSyncInfo of partsSyncInfo) {
+            if (partSyncInfo.isInRange(targetTime)) {
+              return partSyncInfo;
+            }
+          }
+        }
+      }
+      return null;
+    }
+    getSyncInfoForMediaSequence(mediaSequence) {
+      return this.storage_.get(mediaSequence);
+    }
+    updateStorage_(segments, startingMediaSequence, startingTime) {
+      const newStorage = new Map();
+      let newDiagnostics = '\n';
+      let currentStart = startingTime;
+      let currentMediaSequence = startingMediaSequence;
+      this.start_ = currentStart;
+      segments.forEach((segment, segmentIndex) => {
+        const prevSyncInfoData = this.storage_.get(currentMediaSequence);
+        const segmentStart = currentStart;
+        const segmentEnd = segmentStart + segment.duration;
+        const segmentIsAppended = Boolean(prevSyncInfoData && prevSyncInfoData.segmentSyncInfo && prevSyncInfoData.segmentSyncInfo.isAppended);
+        const segmentSyncInfo = new SyncInfo({
+          start: segmentStart,
+          end: segmentEnd,
+          appended: segmentIsAppended,
+          segmentIndex
+        });
+        segment.syncInfo = segmentSyncInfo;
+        let currentPartStart = currentStart;
+        const partsSyncInfo = (segment.parts || []).map((part, partIndex) => {
+          const partStart = currentPartStart;
+          const partEnd = currentPartStart + part.duration;
+          const partIsAppended = Boolean(prevSyncInfoData && prevSyncInfoData.partsSyncInfo && prevSyncInfoData.partsSyncInfo[partIndex] && prevSyncInfoData.partsSyncInfo[partIndex].isAppended);
+          const partSyncInfo = new SyncInfo({
+            start: partStart,
+            end: partEnd,
+            appended: partIsAppended,
+            segmentIndex,
+            partIndex
+          });
+          currentPartStart = partEnd;
+          newDiagnostics += `Media Sequence: ${currentMediaSequence}.${partIndex} | Range: ${partStart} --> ${partEnd} | Appended: ${partIsAppended}\n`;
+          part.syncInfo = partSyncInfo;
+          return partSyncInfo;
+        });
+        newStorage.set(currentMediaSequence, new SyncInfoData(segmentSyncInfo, partsSyncInfo));
+        newDiagnostics += `${compactSegmentUrlDescription(segment.resolvedUri)} | Media Sequence: ${currentMediaSequence} | Range: ${segmentStart} --> ${segmentEnd} | Appended: ${segmentIsAppended}\n`;
+        currentMediaSequence++;
+        currentStart = segmentEnd;
+      });
+      this.end_ = currentStart;
+      this.storage_ = newStorage;
+      this.diagnostics_ = newDiagnostics;
+    }
+    calculateBaseTime_(mediaSequence, segments, fallback) {
+      if (!this.storage_.size) {
+        // Initial setup flow.
+        return 0;
+      }
+      if (this.storage_.has(mediaSequence)) {
+        // Normal flow.
+        return this.storage_.get(mediaSequence).segmentSyncInfo.start;
+      }
+      const minMediaSequenceFromStorage = Math.min(...this.storage_.keys()); // This case captures a race condition that can occur if we switch to a new media playlist that is out of date
+      // and still has an older Media Sequence. If this occurs, we extrapolate backwards to get the base time.
+
+      if (mediaSequence < minMediaSequenceFromStorage) {
+        const mediaSequenceDiff = minMediaSequenceFromStorage - mediaSequence;
+        let baseTime = this.storage_.get(minMediaSequenceFromStorage).segmentSyncInfo.start;
+        for (let i = 0; i < mediaSequenceDiff; i++) {
+          const segment = segments[i];
+          baseTime -= segment.duration;
+        }
+        return baseTime;
+      } // Fallback flow.
+      // There is a gap between last recorded playlist and a new one received.
+
+      return fallback;
+    }
+    isReliablePlaylist_(mediaSequence, segments) {
+      return mediaSequence !== undefined && mediaSequence !== null && Array.isArray(segments) && segments.length;
+    }
+  }
+  class DependantMediaSequenceSync extends MediaSequenceSync {
+    constructor(parent) {
+      super();
+      this.parent_ = parent;
+    }
+    calculateBaseTime_(mediaSequence, segments, fallback) {
+      if (!this.storage_.size) {
+        const info = this.parent_.getSyncInfoForMediaSequence(mediaSequence);
+        if (info) {
+          return info.segmentSyncInfo.start;
+        }
+        return 0;
+      }
+      return super.calculateBaseTime_(mediaSequence, segments, fallback);
+    }
+  }
 
   /**
    * @file sync-controller.js
@@ -53146,6 +62059,36 @@
         return syncPoint;
       }
       return null;
+    }
+  }, {
+    name: 'MediaSequence',
+    /**
+     * run media sequence strategy
+     *
+     * @param {SyncController} syncController
+     * @param {Object} playlist
+     * @param {number} duration
+     * @param {number} currentTimeline
+     * @param {number} currentTime
+     * @param {string} type
+     */
+    run: (syncController, playlist, duration, currentTimeline, currentTime, type) => {
+      const mediaSequenceSync = syncController.getMediaSequenceSync(type);
+      if (!mediaSequenceSync) {
+        return null;
+      }
+      if (!mediaSequenceSync.isReliable) {
+        return null;
+      }
+      const syncInfo = mediaSequenceSync.getSyncInfoForTime(currentTime);
+      if (!syncInfo) {
+        return null;
+      }
+      return {
+        time: syncInfo.start,
+        partIndex: syncInfo.partIndex,
+        segmentIndex: syncInfo.segmentIndex
+      };
     }
   },
   // Stategy "ProgramDateTime": We have a program-date-time tag in this playlist
@@ -53285,8 +62228,29 @@
 
       this.timelines = [];
       this.discontinuities = [];
-      this.timelineToDatetimeMappings = {};
+      this.timelineToDatetimeMappings = {}; // TODO: this map should be only available for HLS. Since only HLS has MediaSequence.
+      //  For some reason this map helps with syncing between quality switch for MPEG-DASH as well.
+      //  Moreover if we disable this map for MPEG-DASH - quality switch will be broken.
+      //  MPEG-DASH should have its own separate sync strategy
+
+      const main = new MediaSequenceSync();
+      const audio = new DependantMediaSequenceSync(main);
+      const vtt = new DependantMediaSequenceSync(main);
+      this.mediaSequenceStorage_ = {
+        main,
+        audio,
+        vtt
+      };
       this.logger_ = logger('SyncController');
+    }
+    /**
+     *
+     * @param {string} loaderType
+     * @return {MediaSequenceSync|null}
+     */
+
+    getMediaSequenceSync(loaderType) {
+      return this.mediaSequenceStorage_[loaderType] || null;
     }
     /**
      * Find a sync-point for the playlist specified
@@ -53300,17 +62264,50 @@
      *        Duration of the MediaSource (Infinite if playing a live source)
      * @param {number} currentTimeline
      *        The last timeline from which a segment was loaded
+     * @param {number} currentTime
+     *        Current player's time
+     * @param {string} type
+     *        Segment loader type
      * @return {Object}
      *          A sync-point object
      */
 
-    getSyncPoint(playlist, duration, currentTimeline, currentTime) {
-      const syncPoints = this.runStrategies_(playlist, duration, currentTimeline, currentTime);
+    getSyncPoint(playlist, duration, currentTimeline, currentTime, type) {
+      // Always use VOD sync point for VOD
+      if (duration !== Infinity) {
+        const vodSyncPointStrategy = syncPointStrategies.find(({
+          name
+        }) => name === 'VOD');
+        return vodSyncPointStrategy.run(this, playlist, duration);
+      }
+      const syncPoints = this.runStrategies_(playlist, duration, currentTimeline, currentTime, type);
       if (!syncPoints.length) {
         // Signal that we need to attempt to get a sync-point manually
         // by fetching a segment in the playlist and constructing
         // a sync-point from that information
         return null;
+      } // If we have exact match just return it instead of finding the nearest distance
+
+      for (const syncPointInfo of syncPoints) {
+        const {
+          syncPoint,
+          strategy
+        } = syncPointInfo;
+        const {
+          segmentIndex,
+          time
+        } = syncPoint;
+        if (segmentIndex < 0) {
+          continue;
+        }
+        const selectedSegment = playlist.segments[segmentIndex];
+        const start = time;
+        const end = start + selectedSegment.duration;
+        this.logger_(`Strategy: ${strategy}. Current time: ${currentTime}. selected segment: ${segmentIndex}. Time: [${start} -> ${end}]}`);
+        if (currentTime >= start && currentTime < end) {
+          this.logger_('Found sync point with exact match: ', syncPoint);
+          return syncPoint;
+        }
       } // Now find the sync-point that is closest to the currentTime because
       // that should result in the most accurate guess about which segment
       // to fetch
@@ -53368,16 +62365,20 @@
      *        Duration of the MediaSource (Infinity if playing a live source)
      * @param {number} currentTimeline
      *        The last timeline from which a segment was loaded
+     * @param {number} currentTime
+     *        Current player's time
+     * @param {string} type
+     *        Segment loader type
      * @return {Array}
      *          A list of sync-point objects
      */
 
-    runStrategies_(playlist, duration, currentTimeline, currentTime) {
+    runStrategies_(playlist, duration, currentTimeline, currentTime, type) {
       const syncPoints = []; // Try to find a sync-point in by utilizing various strategies...
 
       for (let i = 0; i < syncPointStrategies.length; i++) {
         const strategy = syncPointStrategies[i];
-        const syncPoint = strategy.run(this, playlist, duration, currentTimeline, currentTime);
+        const syncPoint = strategy.run(this, playlist, duration, currentTimeline, currentTime, type);
         if (syncPoint) {
           syncPoint.strategy = strategy.name;
           syncPoints.push({
@@ -53678,7 +62679,16 @@
           to
         };
         delete this.pendingTimelineChanges_[type];
-        this.trigger('timelinechange');
+        const metadata = {
+          timelineChangeInfo: {
+            from,
+            to
+          }
+        };
+        this.trigger({
+          type: 'timelinechange',
+          metadata
+        });
       }
       return this.lastTimelineChanges_[type];
     }
@@ -53690,7 +62700,7 @@
     }
   }
 
-  /* rollup-plugin-worker-factory start for worker!/Users/ddashkevich/projects/http-streaming/src/decrypter-worker.js */
+  /* rollup-plugin-worker-factory start for worker!/home/runner/work/http-streaming/http-streaming/src/decrypter-worker.js */
   const workerCode = transform(getWorkerString(function () {
     /**
      * @file stream.js
@@ -53729,7 +62739,6 @@
        * type of event through `on`
        * @return {boolean} if we could turn it off or not
        */;
-
       _proto.off = function off(type, listener) {
         if (!this.listeners[type]) {
           return false;
@@ -53753,7 +62762,6 @@
        *
        * @param {string} type the event name
        */;
-
       _proto.trigger = function trigger(type) {
         var callbacks = this.listeners[type];
         if (!callbacks) {
@@ -53779,7 +62787,6 @@
       /**
        * Destroys the stream and cleans up.
        */;
-
       _proto.dispose = function dispose() {
         this.listeners = {};
       }
@@ -53791,7 +62798,6 @@
        * @param {Stream} destination the stream that will receive all `data` events
        * @see http://nodejs.org/api/stream.html#stream_readable_pipe_destination_options
        */;
-
       _proto.pipe = function pipe(destination) {
         this.on('data', function (data) {
           destination.push(data);
@@ -53812,7 +62818,7 @@
     function unpad(padded) {
       return padded.subarray(0, padded.byteLength - padded[padded.byteLength - 1]);
     }
-    /*! @name aes-decrypter @version 4.0.1 @license Apache-2.0 */
+    /*! @name aes-decrypter @version 4.0.2 @license Apache-2.0 */
 
     /**
      * @file aes.js
@@ -54285,9 +63291,8 @@
       /* eslint-enable */
     };
   }));
-
   var Decrypter = factory(workerCode);
-  /* rollup-plugin-worker-factory end for worker!/Users/ddashkevich/projects/http-streaming/src/decrypter-worker.js */
+  /* rollup-plugin-worker-factory end for worker!/home/runner/work/http-streaming/http-streaming/src/decrypter-worker.js */
 
   /**
    * Convert the properties of an HLS track into an audioTrackKind.
@@ -54510,15 +63515,11 @@
      */
     AUDIO: (type, settings) => () => {
       const {
-        segmentLoaders: {
-          [type]: segmentLoader
-        },
         mediaTypes: {
           [type]: mediaType
         },
         excludePlaylist
-      } = settings;
-      stopLoaders(segmentLoader, mediaType); // switch back to default audio track
+      } = settings; // switch back to default audio track
 
       const activeTrack = mediaType.activeTrack();
       const activeGroup = mediaType.activeGroup();
@@ -54554,15 +63555,11 @@
      */
     SUBTITLES: (type, settings) => () => {
       const {
-        segmentLoaders: {
-          [type]: segmentLoader
-        },
         mediaTypes: {
           [type]: mediaType
         }
       } = settings;
       videojs.log.warn('Problem encountered loading the subtitle track.' + 'Disabling subtitle track.');
-      stopLoaders(segmentLoader, mediaType);
       const track = mediaType.activeTrack();
       if (track) {
         track.mode = 'disabled';
@@ -54778,7 +63775,7 @@
           groups[groupId] = [];
         }
         for (const variantLabel in mediaGroups[type][groupId]) {
-          if (mediaGroups[type][groupId][variantLabel].forced) {
+          if (!vhs.options_.useForcedSubtitles && mediaGroups[type][groupId][variantLabel].forced) {
             // Subtitle playlists with the forced attribute are not selectable in Safari.
             // According to Apple's HLS Authoring Specification:
             //   If content has forced subtitles and regular subtitles in a given language,
@@ -55150,9 +64147,462 @@
   };
 
   /**
-   * @file playlist-controller.js
+   * A utility class for setting properties and maintaining the state of the content steering manifest.
+   *
+   * Content Steering manifest format:
+   * VERSION: number (required) currently only version 1 is supported.
+   * TTL: number in seconds (optional) until the next content steering manifest reload.
+   * RELOAD-URI: string (optional) uri to fetch the next content steering manifest.
+   * SERVICE-LOCATION-PRIORITY or PATHWAY-PRIORITY a non empty array of unique string values.
+   * PATHWAY-CLONES: array (optional) (HLS only) pathway clone objects to copy from other playlists.
    */
-  const ABORT_EARLY_EXCLUSION_SECONDS = 60 * 2;
+
+  class SteeringManifest {
+    constructor() {
+      this.priority_ = [];
+      this.pathwayClones_ = new Map();
+    }
+    set version(number) {
+      // Only version 1 is currently supported for both DASH and HLS.
+      if (number === 1) {
+        this.version_ = number;
+      }
+    }
+    set ttl(seconds) {
+      // TTL = time-to-live, default = 300 seconds.
+      this.ttl_ = seconds || 300;
+    }
+    set reloadUri(uri) {
+      if (uri) {
+        // reload URI can be relative to the previous reloadUri.
+        this.reloadUri_ = resolveUrl(this.reloadUri_, uri);
+      }
+    }
+    set priority(array) {
+      // priority must be non-empty and unique values.
+      if (array && array.length) {
+        this.priority_ = array;
+      }
+    }
+    set pathwayClones(array) {
+      // pathwayClones must be non-empty.
+      if (array && array.length) {
+        this.pathwayClones_ = new Map(array.map(clone => [clone.ID, clone]));
+      }
+    }
+    get version() {
+      return this.version_;
+    }
+    get ttl() {
+      return this.ttl_;
+    }
+    get reloadUri() {
+      return this.reloadUri_;
+    }
+    get priority() {
+      return this.priority_;
+    }
+    get pathwayClones() {
+      return this.pathwayClones_;
+    }
+  }
+  /**
+   * This class represents a content steering manifest and associated state. See both HLS and DASH specifications.
+   * HLS: https://developer.apple.com/streaming/HLSContentSteeringSpecification.pdf and
+   * https://datatracker.ietf.org/doc/draft-pantos-hls-rfc8216bis/ section 4.4.6.6.
+   * DASH: https://dashif.org/docs/DASH-IF-CTS-00XX-Content-Steering-Community-Review.pdf
+   *
+   * @param {function} xhr for making a network request from the browser.
+   * @param {function} bandwidth for fetching the current bandwidth from the main segment loader.
+   */
+
+  class ContentSteeringController extends videojs.EventTarget {
+    constructor(xhr, bandwidth) {
+      super();
+      this.currentPathway = null;
+      this.defaultPathway = null;
+      this.queryBeforeStart = false;
+      this.availablePathways_ = new Set();
+      this.steeringManifest = new SteeringManifest();
+      this.proxyServerUrl_ = null;
+      this.manifestType_ = null;
+      this.ttlTimeout_ = null;
+      this.request_ = null;
+      this.currentPathwayClones = new Map();
+      this.nextPathwayClones = new Map();
+      this.excludedSteeringManifestURLs = new Set();
+      this.logger_ = logger('Content Steering');
+      this.xhr_ = xhr;
+      this.getBandwidth_ = bandwidth;
+    }
+    /**
+     * Assigns the content steering tag properties to the steering controller
+     *
+     * @param {string} baseUrl the baseURL from the main manifest for resolving the steering manifest url
+     * @param {Object} steeringTag the content steering tag from the main manifest
+     */
+
+    assignTagProperties(baseUrl, steeringTag) {
+      this.manifestType_ = steeringTag.serverUri ? 'HLS' : 'DASH'; // serverUri is HLS serverURL is DASH
+
+      const steeringUri = steeringTag.serverUri || steeringTag.serverURL;
+      if (!steeringUri) {
+        this.logger_(`steering manifest URL is ${steeringUri}, cannot request steering manifest.`);
+        this.trigger('error');
+        return;
+      } // Content steering manifests can be encoded as a data URI. We can decode, parse and return early if that's the case.
+
+      if (steeringUri.startsWith('data:')) {
+        this.decodeDataUriManifest_(steeringUri.substring(steeringUri.indexOf(',') + 1));
+        return;
+      } // reloadUri is the resolution of the main manifest URL and steering URL.
+
+      this.steeringManifest.reloadUri = resolveUrl(baseUrl, steeringUri); // pathwayId is HLS defaultServiceLocation is DASH
+
+      this.defaultPathway = steeringTag.pathwayId || steeringTag.defaultServiceLocation; // currently only DASH supports the following properties on <ContentSteering> tags.
+
+      this.queryBeforeStart = steeringTag.queryBeforeStart;
+      this.proxyServerUrl_ = steeringTag.proxyServerURL; // trigger a steering event if we have a pathway from the content steering tag.
+      // this tells VHS which segment pathway to start with.
+      // If queryBeforeStart is true we need to wait for the steering manifest response.
+
+      if (this.defaultPathway && !this.queryBeforeStart) {
+        this.trigger('content-steering');
+      }
+    }
+    /**
+     * Requests the content steering manifest and parse the response. This should only be called after
+     * assignTagProperties was called with a content steering tag.
+     *
+     * @param {string} initialUri The optional uri to make the request with.
+     *    If set, the request should be made with exactly what is passed in this variable.
+     *    This scenario should only happen once on initalization.
+     */
+
+    requestSteeringManifest(initial) {
+      const reloadUri = this.steeringManifest.reloadUri;
+      if (!reloadUri) {
+        return;
+      } // We currently don't support passing MPD query parameters directly to the content steering URL as this requires
+      // ExtUrlQueryInfo tag support. See the DASH content steering spec section 8.1.
+      // This request URI accounts for manifest URIs that have been excluded.
+
+      const uri = initial ? reloadUri : this.getRequestURI(reloadUri); // If there are no valid manifest URIs, we should stop content steering.
+
+      if (!uri) {
+        this.logger_('No valid content steering manifest URIs. Stopping content steering.');
+        this.trigger('error');
+        this.dispose();
+        return;
+      }
+      const metadata = {
+        contentSteeringInfo: {
+          uri
+        }
+      };
+      this.trigger({
+        type: 'contentsteeringloadstart',
+        metadata
+      });
+      this.request_ = this.xhr_({
+        uri,
+        requestType: 'content-steering-manifest'
+      }, (error, errorInfo) => {
+        if (error) {
+          // If the client receives HTTP 410 Gone in response to a manifest request,
+          // it MUST NOT issue another request for that URI for the remainder of the
+          // playback session. It MAY continue to use the most-recently obtained set
+          // of Pathways.
+          if (errorInfo.status === 410) {
+            this.logger_(`manifest request 410 ${error}.`);
+            this.logger_(`There will be no more content steering requests to ${uri} this session.`);
+            this.excludedSteeringManifestURLs.add(uri);
+            return;
+          } // If the client receives HTTP 429 Too Many Requests with a Retry-After
+          // header in response to a manifest request, it SHOULD wait until the time
+          // specified by the Retry-After header to reissue the request.
+
+          if (errorInfo.status === 429) {
+            const retrySeconds = errorInfo.responseHeaders['retry-after'];
+            this.logger_(`manifest request 429 ${error}.`);
+            this.logger_(`content steering will retry in ${retrySeconds} seconds.`);
+            this.startTTLTimeout_(parseInt(retrySeconds, 10));
+            return;
+          } // If the Steering Manifest cannot be loaded and parsed correctly, the
+          // client SHOULD continue to use the previous values and attempt to reload
+          // it after waiting for the previously-specified TTL (or 5 minutes if
+          // none).
+
+          this.logger_(`manifest failed to load ${error}.`);
+          this.startTTLTimeout_();
+          return;
+        }
+        this.trigger({
+          type: 'contentsteeringloadcomplete',
+          metadata
+        });
+        let steeringManifestJson;
+        try {
+          steeringManifestJson = JSON.parse(this.request_.responseText);
+        } catch (parseError) {
+          const errorMetadata = {
+            errorType: videojs.Error.StreamingContentSteeringParserError,
+            error: parseError
+          };
+          this.trigger({
+            type: 'error',
+            metadata: errorMetadata
+          });
+        }
+        this.assignSteeringProperties_(steeringManifestJson);
+        const parsedMetadata = {
+          contentSteeringInfo: metadata.contentSteeringInfo,
+          contentSteeringManifest: {
+            version: this.steeringManifest.version,
+            reloadUri: this.steeringManifest.reloadUri,
+            priority: this.steeringManifest.priority
+          }
+        };
+        this.trigger({
+          type: 'contentsteeringparsed',
+          metadata: parsedMetadata
+        });
+        this.startTTLTimeout_();
+      });
+    }
+    /**
+     * Set the proxy server URL and add the steering manifest url as a URI encoded parameter.
+     *
+     * @param {string} steeringUrl the steering manifest url
+     * @return the steering manifest url to a proxy server with all parameters set
+     */
+
+    setProxyServerUrl_(steeringUrl) {
+      const steeringUrlObject = new window.URL(steeringUrl);
+      const proxyServerUrlObject = new window.URL(this.proxyServerUrl_);
+      proxyServerUrlObject.searchParams.set('url', encodeURI(steeringUrlObject.toString()));
+      return this.setSteeringParams_(proxyServerUrlObject.toString());
+    }
+    /**
+     * Decodes and parses the data uri encoded steering manifest
+     *
+     * @param {string} dataUri the data uri to be decoded and parsed.
+     */
+
+    decodeDataUriManifest_(dataUri) {
+      const steeringManifestJson = JSON.parse(window.atob(dataUri));
+      this.assignSteeringProperties_(steeringManifestJson);
+    }
+    /**
+     * Set the HLS or DASH content steering manifest request query parameters. For example:
+     * _HLS_pathway="<CURRENT-PATHWAY-ID>" and _HLS_throughput=<THROUGHPUT>
+     * _DASH_pathway and _DASH_throughput
+     *
+     * @param {string} uri to add content steering server parameters to.
+     * @return a new uri as a string with the added steering query parameters.
+     */
+
+    setSteeringParams_(url) {
+      const urlObject = new window.URL(url);
+      const path = this.getPathway();
+      const networkThroughput = this.getBandwidth_();
+      if (path) {
+        const pathwayKey = `_${this.manifestType_}_pathway`;
+        urlObject.searchParams.set(pathwayKey, path);
+      }
+      if (networkThroughput) {
+        const throughputKey = `_${this.manifestType_}_throughput`;
+        urlObject.searchParams.set(throughputKey, networkThroughput);
+      }
+      return urlObject.toString();
+    }
+    /**
+     * Assigns the current steering manifest properties and to the SteeringManifest object
+     *
+     * @param {Object} steeringJson the raw JSON steering manifest
+     */
+
+    assignSteeringProperties_(steeringJson) {
+      this.steeringManifest.version = steeringJson.VERSION;
+      if (!this.steeringManifest.version) {
+        this.logger_(`manifest version is ${steeringJson.VERSION}, which is not supported.`);
+        this.trigger('error');
+        return;
+      }
+      this.steeringManifest.ttl = steeringJson.TTL;
+      this.steeringManifest.reloadUri = steeringJson['RELOAD-URI']; // HLS = PATHWAY-PRIORITY required. DASH = SERVICE-LOCATION-PRIORITY optional
+
+      this.steeringManifest.priority = steeringJson['PATHWAY-PRIORITY'] || steeringJson['SERVICE-LOCATION-PRIORITY']; // Pathway clones to be created/updated in HLS.
+      // See section 7.2 https://datatracker.ietf.org/doc/draft-pantos-hls-rfc8216bis/
+
+      this.steeringManifest.pathwayClones = steeringJson['PATHWAY-CLONES'];
+      this.nextPathwayClones = this.steeringManifest.pathwayClones; // 1. apply first pathway from the array.
+      // 2. if first pathway doesn't exist in manifest, try next pathway.
+      //    a. if all pathways are exhausted, ignore the steering manifest priority.
+      // 3. if segments fail from an established pathway, try all variants/renditions, then exclude the failed pathway.
+      //    a. exclude a pathway for a minimum of the last TTL duration. Meaning, from the next steering response,
+      //       the excluded pathway will be ignored.
+      //       See excludePathway usage in excludePlaylist().
+      // If there are no available pathways, we need to stop content steering.
+
+      if (!this.availablePathways_.size) {
+        this.logger_('There are no available pathways for content steering. Ending content steering.');
+        this.trigger('error');
+        this.dispose();
+      }
+      const chooseNextPathway = pathwaysByPriority => {
+        for (const path of pathwaysByPriority) {
+          if (this.availablePathways_.has(path)) {
+            return path;
+          }
+        } // If no pathway matches, ignore the manifest and choose the first available.
+
+        return [...this.availablePathways_][0];
+      };
+      const nextPathway = chooseNextPathway(this.steeringManifest.priority);
+      if (this.currentPathway !== nextPathway) {
+        this.currentPathway = nextPathway;
+        this.trigger('content-steering');
+      }
+    }
+    /**
+     * Returns the pathway to use for steering decisions
+     *
+     * @return {string} returns the current pathway or the default
+     */
+
+    getPathway() {
+      return this.currentPathway || this.defaultPathway;
+    }
+    /**
+     * Chooses the manifest request URI based on proxy URIs and server URLs.
+     * Also accounts for exclusion on certain manifest URIs.
+     *
+     * @param {string} reloadUri the base uri before parameters
+     *
+     * @return {string} the final URI for the request to the manifest server.
+     */
+
+    getRequestURI(reloadUri) {
+      if (!reloadUri) {
+        return null;
+      }
+      const isExcluded = uri => this.excludedSteeringManifestURLs.has(uri);
+      if (this.proxyServerUrl_) {
+        const proxyURI = this.setProxyServerUrl_(reloadUri);
+        if (!isExcluded(proxyURI)) {
+          return proxyURI;
+        }
+      }
+      const steeringURI = this.setSteeringParams_(reloadUri);
+      if (!isExcluded(steeringURI)) {
+        return steeringURI;
+      } // Return nothing if all valid manifest URIs are excluded.
+
+      return null;
+    }
+    /**
+     * Start the timeout for re-requesting the steering manifest at the TTL interval.
+     *
+     * @param {number} ttl time in seconds of the timeout. Defaults to the
+     *        ttl interval in the steering manifest
+     */
+
+    startTTLTimeout_(ttl = this.steeringManifest.ttl) {
+      // 300 (5 minutes) is the default value.
+      const ttlMS = ttl * 1000;
+      this.ttlTimeout_ = window.setTimeout(() => {
+        this.requestSteeringManifest();
+      }, ttlMS);
+    }
+    /**
+     * Clear the TTL timeout if necessary.
+     */
+
+    clearTTLTimeout_() {
+      window.clearTimeout(this.ttlTimeout_);
+      this.ttlTimeout_ = null;
+    }
+    /**
+     * aborts any current steering xhr and sets the current request object to null
+     */
+
+    abort() {
+      if (this.request_) {
+        this.request_.abort();
+      }
+      this.request_ = null;
+    }
+    /**
+     * aborts steering requests clears the ttl timeout and resets all properties.
+     */
+
+    dispose() {
+      this.off('content-steering');
+      this.off('error');
+      this.abort();
+      this.clearTTLTimeout_();
+      this.currentPathway = null;
+      this.defaultPathway = null;
+      this.queryBeforeStart = null;
+      this.proxyServerUrl_ = null;
+      this.manifestType_ = null;
+      this.ttlTimeout_ = null;
+      this.request_ = null;
+      this.excludedSteeringManifestURLs = new Set();
+      this.availablePathways_ = new Set();
+      this.steeringManifest = new SteeringManifest();
+    }
+    /**
+     * adds a pathway to the available pathways set
+     *
+     * @param {string} pathway the pathway string to add
+     */
+
+    addAvailablePathway(pathway) {
+      if (pathway) {
+        this.availablePathways_.add(pathway);
+      }
+    }
+    /**
+     * Clears all pathways from the available pathways set
+     */
+
+    clearAvailablePathways() {
+      this.availablePathways_.clear();
+    }
+    /**
+     * Removes a pathway from the available pathways set.
+     */
+
+    excludePathway(pathway) {
+      return this.availablePathways_.delete(pathway);
+    }
+    /**
+     * Checks the refreshed DASH manifest content steering tag for changes.
+     *
+     * @param {string} baseURL new steering tag on DASH manifest refresh
+     * @param {Object} newTag the new tag to check for changes
+     * @return a true or false whether the new tag has different values
+     */
+
+    didDASHTagChange(baseURL, newTag) {
+      return !newTag && this.steeringManifest.reloadUri || newTag && (resolveUrl(baseURL, newTag.serverURL) !== this.steeringManifest.reloadUri || newTag.defaultServiceLocation !== this.defaultPathway || newTag.queryBeforeStart !== this.queryBeforeStart || newTag.proxyServerURL !== this.proxyServerUrl_);
+    }
+    getAvailablePathways() {
+      return this.availablePathways_;
+    }
+  }
+  const debounce = (callback, wait) => {
+    let timeoutId = null;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        callback.apply(null, args);
+      }, wait);
+    };
+  };
+  const ABORT_EARLY_EXCLUSION_SECONDS = 10;
   let Vhs$1; // SegmentLoader stats that need to have each loader's
   // values summed to calculate the final value
 
@@ -55246,7 +64696,11 @@
 
   class PlaylistController extends videojs.EventTarget {
     constructor(options) {
-      super();
+      super(); // Adding a slight debounce to avoid duplicate calls during rapid quality changes, for example:
+      // When selecting quality from the quality list,
+      // where we may have multiple bandwidth profiles for the same vertical resolution.
+
+      this.fastQualityChange_ = debounce(this.fastQualityChange_.bind(this), 100);
       const {
         src,
         withCredentials,
@@ -55260,7 +64714,8 @@
         cacheEncryptionKeys,
         bufferBasedABR,
         leastPixelDiffSelector,
-        captionServices
+        captionServices,
+        experimentalUseMMS
       } = options;
       if (!src) {
         throw new Error('A non-empty playlist URL or JSON manifest string is required');
@@ -55277,11 +64732,13 @@
       this.withCredentials = withCredentials;
       this.tech_ = tech;
       this.vhs_ = tech.vhs;
+      this.player_ = options.player_;
       this.sourceType_ = sourceType;
       this.useCueTags_ = useCueTags;
       this.playlistExclusionDuration = playlistExclusionDuration;
       this.maxPlaylistRetries = maxPlaylistRetries;
       this.enableLowInitialPlaylist = enableLowInitialPlaylist;
+      this.usingManagedMediaSource_ = false;
       if (this.useCueTags_) {
         this.cueTagsTrack_ = this.tech_.addTextTrack('metadata', 'ad-cues');
         this.cueTagsTrack_.inBandMetadataTrackDispatchType = '';
@@ -55293,14 +64750,26 @@
       };
       this.on('error', this.pauseLoading);
       this.mediaTypes_ = createMediaTypes();
-      this.mediaSource = new window.MediaSource();
+      if (experimentalUseMMS && window.ManagedMediaSource) {
+        // Airplay source not yet implemented. Remote playback must be disabled.
+        this.tech_.el_.disableRemotePlayback = true;
+        this.mediaSource = new window.ManagedMediaSource();
+        this.usingManagedMediaSource_ = true;
+        videojs.log('Using ManagedMediaSource');
+      } else if (window.MediaSource) {
+        this.mediaSource = new window.MediaSource();
+      }
       this.handleDurationChange_ = this.handleDurationChange_.bind(this);
       this.handleSourceOpen_ = this.handleSourceOpen_.bind(this);
       this.handleSourceEnded_ = this.handleSourceEnded_.bind(this);
+      this.load = this.load.bind(this);
+      this.pause = this.pause.bind(this);
       this.mediaSource.addEventListener('durationchange', this.handleDurationChange_); // load the media source into the player
 
       this.mediaSource.addEventListener('sourceopen', this.handleSourceOpen_);
-      this.mediaSource.addEventListener('sourceended', this.handleSourceEnded_); // we don't have to handle sourceclose since dispose will handle termination of
+      this.mediaSource.addEventListener('sourceended', this.handleSourceEnded_);
+      this.mediaSource.addEventListener('startstreaming', this.load);
+      this.mediaSource.addEventListener('endstreaming', this.pause); // we don't have to handle sourceclose since dispose will handle termination of
       // everything, and the MediaSource should not be detached without a proper disposal
 
       this.seekable_ = createTimeRanges();
@@ -55310,10 +64779,12 @@
         kind: 'metadata',
         label: 'segment-metadata'
       }, false).track;
+      this.segmentMetadataTrack_.mode = 'hidden';
       this.decrypter_ = new Decrypter();
       this.sourceUpdater_ = new SourceUpdater(this.mediaSource);
       this.inbandTextTracks_ = {};
       this.timelineChangeController_ = new TimelineChangeController();
+      this.keyStatusMap_ = new Map();
       const segmentLoaderSettings = {
         vhs: this.vhs_,
         parse708captions: options.parse708captions,
@@ -55334,13 +64805,18 @@
         cacheEncryptionKeys,
         sourceUpdater: this.sourceUpdater_,
         timelineChangeController: this.timelineChangeController_,
-        exactManifestTimings: options.exactManifestTimings
+        exactManifestTimings: options.exactManifestTimings,
+        addMetadataToTextTrack: this.addMetadataToTextTrack.bind(this)
       }; // The source type check not only determines whether a special DASH playlist loader
       // should be used, but also covers the case where the provided src is a vhs-json
       // manifest object (instead of a URL). In the case of vhs-json, the default
       // PlaylistLoader should be used.
 
-      this.mainPlaylistLoader_ = this.sourceType_ === 'dash' ? new DashPlaylistLoader(src, this.vhs_, this.requestOptions_) : new PlaylistLoader(src, this.vhs_, this.requestOptions_);
+      this.mainPlaylistLoader_ = this.sourceType_ === 'dash' ? new DashPlaylistLoader(src, this.vhs_, merge(this.requestOptions_, {
+        addMetadataToTextTrack: this.addMetadataToTextTrack.bind(this)
+      })) : new PlaylistLoader(src, this.vhs_, merge(this.requestOptions_, {
+        addDateRangesToTextTrack: this.addDateRangesToTextTrack_.bind(this)
+      }));
       this.setupMainPlaylistLoaderListeners_(); // setup segment loaders
       // combined audio/video or just video when alternate audio track is selected
 
@@ -55370,6 +64846,10 @@
           tech.addWebVttScript_();
         })
       }), options);
+      const getBandwidth = () => {
+        return this.mainSegmentLoader_.bandwidth;
+      };
+      this.contentSteeringController_ = new ContentSteeringController(this.vhs_.xhr, getBandwidth);
       this.setupSegmentLoaderListeners_();
       if (this.bufferBasedABR) {
         this.mainPlaylistLoader_.one('loadedplaylist', () => this.startABRTimer_());
@@ -55445,15 +64925,54 @@
     switchMedia_(playlist, cause, delay) {
       const oldMedia = this.media();
       const oldId = oldMedia && (oldMedia.id || oldMedia.uri);
-      const newId = playlist.id || playlist.uri;
+      const newId = playlist && (playlist.id || playlist.uri);
       if (oldId && oldId !== newId) {
         this.logger_(`switch media ${oldId} -> ${newId} from ${cause}`);
+        const metadata = {
+          renditionInfo: {
+            id: newId,
+            bandwidth: playlist.attributes.BANDWIDTH,
+            resolution: playlist.attributes.RESOLUTION,
+            codecs: playlist.attributes.CODECS
+          },
+          cause
+        };
+        this.trigger({
+          type: 'renditionselected',
+          metadata
+        });
         this.tech_.trigger({
           type: 'usage',
           name: `vhs-rendition-change-${cause}`
         });
       }
       this.mainPlaylistLoader_.media(playlist, delay);
+    }
+    /**
+     * A function that ensures we switch our playlists inside of `mediaTypes`
+     * to match the current `serviceLocation` provided by the contentSteering controller.
+     * We want to check media types of `AUDIO`, `SUBTITLES`, and `CLOSED-CAPTIONS`.
+     *
+     * This should only be called on a DASH playback scenario while using content steering.
+     * This is necessary due to differences in how media in HLS manifests are generally tied to
+     * a video playlist, where in DASH that is not always the case.
+     */
+
+    switchMediaForDASHContentSteering_() {
+      ['AUDIO', 'SUBTITLES', 'CLOSED-CAPTIONS'].forEach(type => {
+        const mediaType = this.mediaTypes_[type];
+        const activeGroup = mediaType ? mediaType.activeGroup() : null;
+        const pathway = this.contentSteeringController_.getPathway();
+        if (activeGroup && pathway) {
+          // activeGroup can be an array or a single group
+          const mediaPlaylists = activeGroup.length ? activeGroup[0].playlists : activeGroup.playlists;
+          const dashMediaPlaylists = mediaPlaylists.filter(p => p.attributes.serviceLocation === pathway); // Switch the current active playlist to the correct CDN
+
+          if (dashMediaPlaylists.length) {
+            this.mediaTypes_[type].activePlaylistLoader.media(dashMediaPlaylists[0]);
+          }
+        }
+      });
     }
     /**
      * Start a timer that periodically calls checkABR_
@@ -55603,8 +65122,11 @@
         }
         let updatedPlaylist = this.mainPlaylistLoader_.media();
         if (!updatedPlaylist) {
-          // exclude any variants that are not supported by the browser before selecting
+          // Add content steering listeners on first load and init.
+          this.attachContentSteeringListeners_();
+          this.initContentSteeringController_(); // exclude any variants that are not supported by the browser before selecting
           // an initial media as the playlist selectors do not consider browser support
+
           this.excludeUnsupportedVariants_();
           let selectedMedia;
           if (this.enableLowInitialPlaylist) {
@@ -55653,13 +65175,29 @@
         } else {
           this.requestOptions_.timeout = requestTimeout;
         }
-        this.mainPlaylistLoader_.load(); // TODO: Create a new event on the PlaylistLoader that signals
+        if (this.sourceType_ === 'dash') {
+          // we don't want to re-request the same hls playlist right after it was changed
+          // Initially it was implemented as workaround to restart playlist loader for live
+          // when playlist loader is paused because of playlist exclusions:
+          // see: https://github.com/videojs/http-streaming/pull/1339
+          // but this introduces duplicate "loadedplaylist" event.
+          // Ideally we want to re-think playlist loader life-cycle events,
+          // but simply checking "paused" state should help a lot
+          if (this.mainPlaylistLoader_.isPaused) {
+            this.mainPlaylistLoader_.load();
+          }
+        } // TODO: Create a new event on the PlaylistLoader that signals
         // that the segments have changed in some way and use that to
         // update the SegmentLoader instead of doing it twice here and
         // on `loadedplaylist`
 
+        this.mainSegmentLoader_.pause();
         this.mainSegmentLoader_.playlist(media, this.requestOptions_);
-        this.mainSegmentLoader_.load();
+        if (this.waitingForFastQualityPlaylistReceived_) {
+          this.runFastQualitySwitch_();
+        } else {
+          this.mainSegmentLoader_.load();
+        }
         this.tech_.trigger({
           type: 'mediachange',
           bubbles: true
@@ -55701,6 +65239,13 @@
           name: 'vhs-rendition-enabled'
         });
       });
+      const playlistLoaderEvents = ['manifestrequeststart', 'manifestrequestcomplete', 'manifestparsestart', 'manifestparsecomplete', 'playlistrequeststart', 'playlistrequestcomplete', 'playlistparsestart', 'playlistparsecomplete', 'renditiondisabled', 'renditionenabled'];
+      playlistLoaderEvents.forEach(eventName => {
+        this.mainPlaylistLoader_.on(eventName, metadata => {
+          // trigger directly on the player to ensure early events are fired.
+          this.player_.trigger(_extends$1({}, metadata));
+        });
+      });
     }
     /**
      * Given an updated media playlist (whether it was loaded for the first time, or
@@ -55720,7 +65265,11 @@
       // update the SegmentLoader instead of doing it twice here and
       // on `mediachange`
 
+      this.mainSegmentLoader_.pause();
       this.mainSegmentLoader_.playlist(updatedPlaylist, this.requestOptions_);
+      if (this.waitingForFastQualityPlaylistReceived_) {
+        this.runFastQualitySwitch_();
+      }
       this.updateDuration(!updatedPlaylist.endList); // If the player isn't paused, ensure that the segment loader is running,
       // as it is possible that it was temporarily stopped while waiting for
       // a playlist (e.g., in case the playlist errored and we re-requested it).
@@ -55859,6 +65408,38 @@
       this.mainSegmentLoader_.on('ended', () => {
         this.logger_('main segment loader ended');
         this.onEndOfStream();
+      }); // There is the possibility of the video segment and the audio segment
+      // at a current time to be on different timelines. When this occurs, the player
+      // forwards playback to a point where these two segment types are back on the same
+      // timeline. This time will be just after the end of the audio segment that is on
+      // a previous timeline.
+
+      this.timelineChangeController_.on('audioTimelineBehind', () => {
+        const segmentInfo = this.audioSegmentLoader_.pendingSegment_;
+        if (!segmentInfo || !segmentInfo.segment || !segmentInfo.segment.syncInfo) {
+          return;
+        } // Update the current time to just after the faulty audio segment.
+        // This moves playback to a spot where both audio and video segments
+        // are on the same timeline.
+
+        const newTime = segmentInfo.segment.syncInfo.end + 0.01;
+        this.tech_.setCurrentTime(newTime);
+      });
+      this.timelineChangeController_.on('fixBadTimelineChange', () => {
+        // pause, reset-everything and load for all segment-loaders
+        this.logger_('Fix bad timeline change. Restarting al segment loaders...');
+        this.mainSegmentLoader_.pause();
+        this.mainSegmentLoader_.resetEverything();
+        if (this.mediaTypes_.AUDIO.activePlaylistLoader) {
+          this.audioSegmentLoader_.pause();
+          this.audioSegmentLoader_.resetEverything();
+        }
+        if (this.mediaTypes_.SUBTITLES.activePlaylistLoader) {
+          this.subtitleSegmentLoader_.pause();
+          this.subtitleSegmentLoader_.resetEverything();
+        } // start segment loader loading in case they are paused
+
+        this.load();
       });
       this.mainSegmentLoader_.on('earlyabort', event => {
         // never try to early abort with the new ABR algorithm
@@ -55908,6 +65489,18 @@
         this.logger_('audioSegmentLoader ended');
         this.onEndOfStream();
       });
+      const segmentLoaderEvents = ['segmentselected', 'segmentloadstart', 'segmentloaded', 'segmentkeyloadstart', 'segmentkeyloadcomplete', 'segmentdecryptionstart', 'segmentdecryptioncomplete', 'segmenttransmuxingstart', 'segmenttransmuxingcomplete', 'segmenttransmuxingtrackinfoavailable', 'segmenttransmuxingtiminginfoavailable', 'segmentappendstart', 'appendsdone', 'bandwidthupdated', 'timelinechange', 'codecschange'];
+      segmentLoaderEvents.forEach(eventName => {
+        this.mainSegmentLoader_.on(eventName, metadata => {
+          this.player_.trigger(_extends$1({}, metadata));
+        });
+        this.audioSegmentLoader_.on(eventName, metadata => {
+          this.player_.trigger(_extends$1({}, metadata));
+        });
+        this.subtitleSegmentLoader_.on(eventName, metadata => {
+          this.player_.trigger(_extends$1({}, metadata));
+        });
+      });
     }
     mediaSecondsLoaded_() {
       return Math.max(this.audioSegmentLoader_.mediaSecondsLoaded + this.mainSegmentLoader_.mediaSecondsLoaded);
@@ -55926,6 +65519,19 @@
       }
     }
     /**
+     * Call pause on our SegmentLoaders
+     */
+
+    pause() {
+      this.mainSegmentLoader_.pause();
+      if (this.mediaTypes_.AUDIO.activePlaylistLoader) {
+        this.audioSegmentLoader_.pause();
+      }
+      if (this.mediaTypes_.SUBTITLES.activePlaylistLoader) {
+        this.subtitleSegmentLoader_.pause();
+      }
+    }
+    /**
      * Re-tune playback quality level for the current player
      * conditions. This method will perform destructive actions like removing
      * already buffered content in order to readjust the currently active
@@ -55935,26 +65541,29 @@
      */
 
     fastQualityChange_(media = this.selectPlaylist()) {
-      if (media === this.mainPlaylistLoader_.media()) {
+      if (media && media === this.mainPlaylistLoader_.media()) {
         this.logger_('skipping fastQualityChange because new media is same as old');
         return;
       }
-      this.switchMedia_(media, 'fast-quality'); // Delete all buffered data to allow an immediate quality switch, then seek to give
-      // the browser a kick to remove any cached frames from the previous rendtion (.04 seconds
-      // ahead is roughly the minimum that will accomplish this across a variety of content
-      // in IE and Edge, but seeking in place is sufficient on all other browsers)
-      // Edge/IE bug: https://developer.microsoft.com/en-us/microsoft-edge/platform/issues/14600375/
-      // Chrome bug: https://bugs.chromium.org/p/chromium/issues/detail?id=651904
+      this.switchMedia_(media, 'fast-quality'); // we would like to avoid race condition when we call fastQuality,
+      // reset everything and start loading segments from prev segments instead of new because new playlist is not received yet
 
-      this.mainSegmentLoader_.resetEverything(() => {
-        // Since this is not a typical seek, we avoid the seekTo method which can cause segments
-        // from the previously enabled rendition to load before the new playlist has finished loading
-        if (videojs.browser.IE_VERSION || videojs.browser.IS_EDGE) {
-          this.tech_.setCurrentTime(this.tech_.currentTime() + 0.04);
-        } else {
-          this.tech_.setCurrentTime(this.tech_.currentTime());
-        }
-      }); // don't need to reset audio as it is reset when media changes
+      this.waitingForFastQualityPlaylistReceived_ = true;
+    }
+    runFastQualitySwitch_() {
+      this.waitingForFastQualityPlaylistReceived_ = false;
+      this.mainSegmentLoader_.pause();
+      this.mainSegmentLoader_.resetEverything();
+      if (this.mediaTypes_.AUDIO.activePlaylistLoader) {
+        this.audioSegmentLoader_.pause();
+        this.audioSegmentLoader_.resetEverything();
+      }
+      if (this.mediaTypes_.SUBTITLES.activePlaylistLoader) {
+        this.subtitleSegmentLoader_.pause();
+        this.subtitleSegmentLoader_.resetEverything();
+      } // start segment loader loading in case they are paused
+
+      this.load();
     }
     /**
      * Begin playback.
@@ -55993,29 +65602,29 @@
 
       if (!media || this.tech_.paused() || this.hasPlayed_) {
         return false;
-      } // when the video is a live stream
+      } // when the video is a live stream and/or has a start time
 
-      if (!media.endList) {
+      if (!media.endList || media.start) {
         const seekable = this.seekable();
         if (!seekable.length) {
-          // without a seekable range, the player cannot seek to begin buffering at the live
-          // point
+          // without a seekable range, the player cannot seek to begin buffering at the
+          // live or start point
           return false;
         }
-        if (videojs.browser.IE_VERSION && this.tech_.readyState() === 0) {
-          // IE11 throws an InvalidStateError if you try to set currentTime while the
-          // readyState is 0, so it must be delayed until the tech fires loadedmetadata.
-          this.tech_.one('loadedmetadata', () => {
-            this.trigger('firstplay');
-            this.tech_.setCurrentTime(seekable.end(0));
-            this.hasPlayed_ = true;
-          });
-          return false;
+        const seekableEnd = seekable.end(0);
+        let startPoint = seekableEnd;
+        if (media.start) {
+          const offset = media.start.timeOffset;
+          if (offset < 0) {
+            startPoint = Math.max(seekableEnd + offset, seekable.start(0));
+          } else {
+            startPoint = Math.min(seekableEnd, offset);
+          }
         } // trigger firstplay to inform the source handler to ignore the next seek event
 
         this.trigger('firstplay'); // seek to the live point
 
-        this.tech_.setCurrentTime(seekable.end(0));
+        this.tech_.setCurrentTime(startPoint);
       }
       this.hasPlayed_ = true; // we can begin loading now that everything is ready
 
@@ -56180,10 +65789,22 @@
         return this.mainPlaylistLoader_.load(isFinalRendition);
       }
       if (isFinalRendition) {
-        // Since we're on the final non-excluded playlist, and we're about to exclude
+        // If we're content steering, try other pathways.
+        if (this.main().contentSteering) {
+          const pathway = this.pathwayAttribute_(playlistToExclude); // Ignore at least 1 steering manifest refresh.
+
+          const reIncludeDelay = this.contentSteeringController_.steeringManifest.ttl * 1000;
+          this.contentSteeringController_.excludePathway(pathway);
+          this.excludeThenChangePathway_();
+          setTimeout(() => {
+            this.contentSteeringController_.addAvailablePathway(pathway);
+          }, reIncludeDelay);
+          return;
+        } // Since we're on the final non-excluded playlist, and we're about to exclude
         // it, instead of erring the player or retrying this playlist, clear out the current
         // exclusion list. This allows other playlists to be attempted in case any have been
         // fixed.
+
         let reincluded = false;
         playlists.forEach(playlist => {
           // skip current playlist which is about to be excluded
@@ -56327,15 +65948,15 @@
       } // cancel outstanding requests so we begin buffering at the new
       // location
 
+      this.mainSegmentLoader_.pause();
       this.mainSegmentLoader_.resetEverything();
-      this.mainSegmentLoader_.abort();
       if (this.mediaTypes_.AUDIO.activePlaylistLoader) {
+        this.audioSegmentLoader_.pause();
         this.audioSegmentLoader_.resetEverything();
-        this.audioSegmentLoader_.abort();
       }
       if (this.mediaTypes_.SUBTITLES.activePlaylistLoader) {
+        this.subtitleSegmentLoader_.pause();
         this.subtitleSegmentLoader_.resetEverything();
-        this.subtitleSegmentLoader_.abort();
       } // start segment loader loading in case they are paused
 
       this.load();
@@ -56384,8 +66005,47 @@
     seekable() {
       return this.seekable_;
     }
+    getSeekableRange_(playlistLoader, mediaType) {
+      const media = playlistLoader.media();
+      if (!media) {
+        return null;
+      }
+      const mediaSequenceSync = this.syncController_.getMediaSequenceSync(mediaType);
+      if (mediaSequenceSync && mediaSequenceSync.isReliable) {
+        const start = mediaSequenceSync.start;
+        const end = mediaSequenceSync.end;
+        if (!isFinite(start) || !isFinite(end)) {
+          return null;
+        }
+        const liveEdgeDelay = Vhs$1.Playlist.liveEdgeDelay(this.mainPlaylistLoader_.main, media); // Make sure our seekable end is not less than the seekable start
+
+        const calculatedEnd = Math.max(start, end - liveEdgeDelay);
+        return createTimeRanges([[start, calculatedEnd]]);
+      }
+      const expired = this.syncController_.getExpiredTime(media, this.duration());
+      if (expired === null) {
+        return null;
+      }
+      const seekable = Vhs$1.Playlist.seekable(media, expired, Vhs$1.Playlist.liveEdgeDelay(this.mainPlaylistLoader_.main, media));
+      return seekable.length ? seekable : null;
+    }
+    computeFinalSeekable_(mainSeekable, audioSeekable) {
+      if (!audioSeekable) {
+        return mainSeekable;
+      }
+      const mainStart = mainSeekable.start(0);
+      const mainEnd = mainSeekable.end(0);
+      const audioStart = audioSeekable.start(0);
+      const audioEnd = audioSeekable.end(0);
+      if (audioStart > mainEnd || mainStart > audioEnd) {
+        // Seekables are far apart, rely on main
+        return mainSeekable;
+      } // Return the overlapping seekable range
+
+      return createTimeRanges([[Math.max(mainStart, audioStart), Math.min(mainEnd, audioEnd)]]);
+    }
     onSyncInfoUpdate_() {
-      let audioSeekable; // TODO check for creation of both source buffers before updating seekable
+      // TODO check for creation of both source buffers before updating seekable
       //
       // A fix was made to this function where a check for
       // this.sourceUpdater_.hasCreatedSourceBuffers
@@ -56404,58 +66064,39 @@
       //
       // For now, fall back to the older behavior, with the understanding that the seekable
       // range may not be completely correct, leading to a suboptimal initial live point.
-
       if (!this.mainPlaylistLoader_) {
         return;
       }
-      let media = this.mainPlaylistLoader_.media();
-      if (!media) {
+      const mainSeekable = this.getSeekableRange_(this.mainPlaylistLoader_, 'main');
+      if (!mainSeekable) {
         return;
       }
-      let expired = this.syncController_.getExpiredTime(media, this.duration());
-      if (expired === null) {
-        // not enough information to update seekable
-        return;
-      }
-      const main = this.mainPlaylistLoader_.main;
-      const mainSeekable = Vhs$1.Playlist.seekable(media, expired, Vhs$1.Playlist.liveEdgeDelay(main, media));
-      if (mainSeekable.length === 0) {
-        return;
-      }
+      let audioSeekable;
       if (this.mediaTypes_.AUDIO.activePlaylistLoader) {
-        media = this.mediaTypes_.AUDIO.activePlaylistLoader.media();
-        expired = this.syncController_.getExpiredTime(media, this.duration());
-        if (expired === null) {
-          return;
-        }
-        audioSeekable = Vhs$1.Playlist.seekable(media, expired, Vhs$1.Playlist.liveEdgeDelay(main, media));
-        if (audioSeekable.length === 0) {
+        audioSeekable = this.getSeekableRange_(this.mediaTypes_.AUDIO.activePlaylistLoader, 'audio');
+        if (!audioSeekable) {
           return;
         }
       }
-      let oldEnd;
-      let oldStart;
-      if (this.seekable_ && this.seekable_.length) {
-        oldEnd = this.seekable_.end(0);
-        oldStart = this.seekable_.start(0);
+      const oldSeekable = this.seekable_;
+      this.seekable_ = this.computeFinalSeekable_(mainSeekable, audioSeekable);
+      if (!this.seekable_) {
+        return;
       }
-      if (!audioSeekable) {
-        // seekable has been calculated based on buffering video data so it
-        // can be returned directly
-        this.seekable_ = mainSeekable;
-      } else if (audioSeekable.start(0) > mainSeekable.end(0) || mainSeekable.start(0) > audioSeekable.end(0)) {
-        // seekables are pretty far off, rely on main
-        this.seekable_ = mainSeekable;
-      } else {
-        this.seekable_ = createTimeRanges([[audioSeekable.start(0) > mainSeekable.start(0) ? audioSeekable.start(0) : mainSeekable.start(0), audioSeekable.end(0) < mainSeekable.end(0) ? audioSeekable.end(0) : mainSeekable.end(0)]]);
-      } // seekable is the same as last time
-
-      if (this.seekable_ && this.seekable_.length) {
-        if (this.seekable_.end(0) === oldEnd && this.seekable_.start(0) === oldStart) {
+      if (oldSeekable && oldSeekable.length && this.seekable_.length) {
+        if (oldSeekable.start(0) === this.seekable_.start(0) && oldSeekable.end(0) === this.seekable_.end(0)) {
+          // Seekable range hasn't changed
           return;
         }
       }
       this.logger_(`seekable updated [${printableRange(this.seekable_)}]`);
+      const metadata = {
+        seekableRanges: this.seekable_
+      };
+      this.trigger({
+        type: 'seekablerangeschanged',
+        metadata
+      });
       this.tech_.trigger('seekablechanged');
     }
     /**
@@ -56524,6 +66165,8 @@
       this.decrypter_.terminate();
       this.mainPlaylistLoader_.dispose();
       this.mainSegmentLoader_.dispose();
+      this.contentSteeringController_.dispose();
+      this.keyStatusMap_.clear();
       if (this.loadOnPlay_) {
         this.tech_.off('play', this.loadOnPlay_);
       }
@@ -56581,7 +66224,8 @@
         return false;
       }
       return true;
-    }
+    } // find from and to for codec switch event
+
     getCodecsOrExclude_() {
       const media = {
         main: this.mainSegmentLoader_.getCurrentMediaInfo_() || {},
@@ -56616,7 +66260,7 @@
         return;
       } // fmp4 relies on browser support, while ts relies on muxer support
 
-      const supportFunction = (isFmp4, codec) => isFmp4 ? browserSupportsCodec(codec) : muxerSupportsCodec(codec);
+      const supportFunction = (isFmp4, codec) => isFmp4 ? browserSupportsCodec(codec, this.usingManagedMediaSource_) : muxerSupportsCodec(codec);
       const unsupportedCodecs = {};
       let unsupportedAudio;
       ['video', 'audio'].forEach(function (type) {
@@ -56726,10 +66370,10 @@
         ids.push(variant.id);
         const codecs = codecsForPlaylist(this.main, variant);
         const unsupported = [];
-        if (codecs.audio && !muxerSupportsCodec(codecs.audio) && !browserSupportsCodec(codecs.audio)) {
+        if (codecs.audio && !muxerSupportsCodec(codecs.audio) && !browserSupportsCodec(codecs.audio, this.usingManagedMediaSource_)) {
           unsupported.push(`audio codec ${codecs.audio}`);
         }
-        if (codecs.video && !muxerSupportsCodec(codecs.video) && !browserSupportsCodec(codecs.video)) {
+        if (codecs.video && !muxerSupportsCodec(codecs.video) && !browserSupportsCodec(codecs.video, this.usingManagedMediaSource_)) {
           unsupported.push(`video codec ${codecs.video}`);
         }
         if (codecs.text && codecs.text === 'stpp.ttml.im1t') {
@@ -56844,6 +66488,341 @@
     bufferHighWaterLine() {
       return Config.BUFFER_HIGH_WATER_LINE;
     }
+    addDateRangesToTextTrack_(dateRanges) {
+      createMetadataTrackIfNotExists(this.inbandTextTracks_, 'com.apple.streaming', this.tech_);
+      addDateRangeMetadata({
+        inbandTextTracks: this.inbandTextTracks_,
+        dateRanges
+      });
+    }
+    addMetadataToTextTrack(dispatchType, metadataArray, videoDuration) {
+      const timestampOffset = this.sourceUpdater_.videoBuffer ? this.sourceUpdater_.videoTimestampOffset() : this.sourceUpdater_.audioTimestampOffset(); // There's potentially an issue where we could double add metadata if there's a muxed
+      // audio/video source with a metadata track, and an alt audio with a metadata track.
+      // However, this probably won't happen, and if it does it can be handled then.
+
+      createMetadataTrackIfNotExists(this.inbandTextTracks_, dispatchType, this.tech_);
+      addMetadata({
+        inbandTextTracks: this.inbandTextTracks_,
+        metadataArray,
+        timestampOffset,
+        videoDuration
+      });
+    }
+    /**
+     * Utility for getting the pathway or service location from an HLS or DASH playlist.
+     *
+     * @param {Object} playlist for getting pathway from.
+     * @return the pathway attribute of a playlist
+     */
+
+    pathwayAttribute_(playlist) {
+      return playlist.attributes['PATHWAY-ID'] || playlist.attributes.serviceLocation;
+    }
+    /**
+     * Initialize available pathways and apply the tag properties.
+     */
+
+    initContentSteeringController_() {
+      const main = this.main();
+      if (!main.contentSteering) {
+        return;
+      }
+      for (const playlist of main.playlists) {
+        this.contentSteeringController_.addAvailablePathway(this.pathwayAttribute_(playlist));
+      }
+      this.contentSteeringController_.assignTagProperties(main.uri, main.contentSteering); // request the steering manifest immediately if queryBeforeStart is set.
+
+      if (this.contentSteeringController_.queryBeforeStart) {
+        // When queryBeforeStart is true, initial request should omit steering parameters.
+        this.contentSteeringController_.requestSteeringManifest(true);
+        return;
+      } // otherwise start content steering after playback starts
+
+      this.tech_.one('canplay', () => {
+        this.contentSteeringController_.requestSteeringManifest();
+      });
+    }
+    /**
+     * Reset the content steering controller and re-init.
+     */
+
+    resetContentSteeringController_() {
+      this.contentSteeringController_.clearAvailablePathways();
+      this.contentSteeringController_.dispose();
+      this.initContentSteeringController_();
+    }
+    /**
+     * Attaches the listeners for content steering.
+     */
+
+    attachContentSteeringListeners_() {
+      this.contentSteeringController_.on('content-steering', this.excludeThenChangePathway_.bind(this));
+      const contentSteeringEvents = ['contentsteeringloadstart', 'contentsteeringloadcomplete', 'contentsteeringparsed'];
+      contentSteeringEvents.forEach(eventName => {
+        this.contentSteeringController_.on(eventName, metadata => {
+          this.trigger(_extends$1({}, metadata));
+        });
+      });
+      if (this.sourceType_ === 'dash') {
+        this.mainPlaylistLoader_.on('loadedplaylist', () => {
+          const main = this.main(); // check if steering tag or pathways changed.
+
+          const didDashTagChange = this.contentSteeringController_.didDASHTagChange(main.uri, main.contentSteering);
+          const didPathwaysChange = () => {
+            const availablePathways = this.contentSteeringController_.getAvailablePathways();
+            const newPathways = [];
+            for (const playlist of main.playlists) {
+              const serviceLocation = playlist.attributes.serviceLocation;
+              if (serviceLocation) {
+                newPathways.push(serviceLocation);
+                if (!availablePathways.has(serviceLocation)) {
+                  return true;
+                }
+              }
+            } // If we have no new serviceLocations and previously had availablePathways
+
+            if (!newPathways.length && availablePathways.size) {
+              return true;
+            }
+            return false;
+          };
+          if (didDashTagChange || didPathwaysChange()) {
+            this.resetContentSteeringController_();
+          }
+        });
+      }
+    }
+    /**
+     * Simple exclude and change playlist logic for content steering.
+     */
+
+    excludeThenChangePathway_() {
+      const currentPathway = this.contentSteeringController_.getPathway();
+      if (!currentPathway) {
+        return;
+      }
+      this.handlePathwayClones_();
+      const main = this.main();
+      const playlists = main.playlists;
+      const ids = new Set();
+      let didEnablePlaylists = false;
+      Object.keys(playlists).forEach(key => {
+        const variant = playlists[key];
+        const pathwayId = this.pathwayAttribute_(variant);
+        const differentPathwayId = pathwayId && currentPathway !== pathwayId;
+        const steeringExclusion = variant.excludeUntil === Infinity && variant.lastExcludeReason_ === 'content-steering';
+        if (steeringExclusion && !differentPathwayId) {
+          delete variant.excludeUntil;
+          delete variant.lastExcludeReason_;
+          didEnablePlaylists = true;
+        }
+        const noExcludeUntil = !variant.excludeUntil && variant.excludeUntil !== Infinity;
+        const shouldExclude = !ids.has(variant.id) && differentPathwayId && noExcludeUntil;
+        if (!shouldExclude) {
+          return;
+        }
+        ids.add(variant.id);
+        variant.excludeUntil = Infinity;
+        variant.lastExcludeReason_ = 'content-steering'; // TODO: kind of spammy, maybe move this.
+
+        this.logger_(`excluding ${variant.id} for ${variant.lastExcludeReason_}`);
+      });
+      if (this.contentSteeringController_.manifestType_ === 'DASH') {
+        Object.keys(this.mediaTypes_).forEach(key => {
+          const type = this.mediaTypes_[key];
+          if (type.activePlaylistLoader) {
+            const currentPlaylist = type.activePlaylistLoader.media_; // Check if the current media playlist matches the current CDN
+
+            if (currentPlaylist && currentPlaylist.attributes.serviceLocation !== currentPathway) {
+              didEnablePlaylists = true;
+            }
+          }
+        });
+      }
+      if (didEnablePlaylists) {
+        this.changeSegmentPathway_();
+      }
+    }
+    /**
+     * Add, update, or delete playlists and media groups for
+     * the pathway clones for HLS Content Steering.
+     *
+     * See https://datatracker.ietf.org/doc/draft-pantos-hls-rfc8216bis/
+     *
+     * NOTE: Pathway cloning does not currently support the `PER_VARIANT_URIS` and
+     * `PER_RENDITION_URIS` as we do not handle `STABLE-VARIANT-ID` or
+     * `STABLE-RENDITION-ID` values.
+     */
+
+    handlePathwayClones_() {
+      const main = this.main();
+      const playlists = main.playlists;
+      const currentPathwayClones = this.contentSteeringController_.currentPathwayClones;
+      const nextPathwayClones = this.contentSteeringController_.nextPathwayClones;
+      const hasClones = currentPathwayClones && currentPathwayClones.size || nextPathwayClones && nextPathwayClones.size;
+      if (!hasClones) {
+        return;
+      }
+      for (const [id, clone] of currentPathwayClones.entries()) {
+        const newClone = nextPathwayClones.get(id); // Delete the old pathway clone.
+
+        if (!newClone) {
+          this.mainPlaylistLoader_.updateOrDeleteClone(clone);
+          this.contentSteeringController_.excludePathway(id);
+        }
+      }
+      for (const [id, clone] of nextPathwayClones.entries()) {
+        const oldClone = currentPathwayClones.get(id); // Create a new pathway if it is a new pathway clone object.
+
+        if (!oldClone) {
+          const playlistsToClone = playlists.filter(p => {
+            return p.attributes['PATHWAY-ID'] === clone['BASE-ID'];
+          });
+          playlistsToClone.forEach(p => {
+            this.mainPlaylistLoader_.addClonePathway(clone, p);
+          });
+          this.contentSteeringController_.addAvailablePathway(id);
+          continue;
+        } // There have not been changes to the pathway clone object, so skip.
+
+        if (this.equalPathwayClones_(oldClone, clone)) {
+          continue;
+        } // Update a preexisting cloned pathway.
+        // True is set for the update flag.
+
+        this.mainPlaylistLoader_.updateOrDeleteClone(clone, true);
+        this.contentSteeringController_.addAvailablePathway(id);
+      } // Deep copy contents of next to current pathways.
+
+      this.contentSteeringController_.currentPathwayClones = new Map(JSON.parse(JSON.stringify([...nextPathwayClones])));
+    }
+    /**
+     * Determines whether two pathway clone objects are equivalent.
+     *
+     * @param {Object} a The first pathway clone object.
+     * @param {Object} b The second pathway clone object.
+     * @return {boolean} True if the pathway clone objects are equal, false otherwise.
+     */
+
+    equalPathwayClones_(a, b) {
+      if (a['BASE-ID'] !== b['BASE-ID'] || a.ID !== b.ID || a['URI-REPLACEMENT'].HOST !== b['URI-REPLACEMENT'].HOST) {
+        return false;
+      }
+      const aParams = a['URI-REPLACEMENT'].PARAMS;
+      const bParams = b['URI-REPLACEMENT'].PARAMS; // We need to iterate through both lists of params because one could be
+      // missing a parameter that the other has.
+
+      for (const p in aParams) {
+        if (aParams[p] !== bParams[p]) {
+          return false;
+        }
+      }
+      for (const p in bParams) {
+        if (aParams[p] !== bParams[p]) {
+          return false;
+        }
+      }
+      return true;
+    }
+    /**
+     * Changes the current playlists for audio, video and subtitles after a new pathway
+     * is chosen from content steering.
+     */
+
+    changeSegmentPathway_() {
+      const nextPlaylist = this.selectPlaylist();
+      this.pauseLoading(); // Switch audio and text track playlists if necessary in DASH
+
+      if (this.contentSteeringController_.manifestType_ === 'DASH') {
+        this.switchMediaForDASHContentSteering_();
+      }
+      this.switchMedia_(nextPlaylist, 'content-steering');
+    }
+    /**
+     * Iterates through playlists and check their keyId set and compare with the
+     * keyStatusMap, only enable playlists that have a usable key. If the playlist
+     * has no keyId leave it enabled by default.
+     */
+
+    excludeNonUsablePlaylistsByKeyId_() {
+      if (!this.mainPlaylistLoader_ || !this.mainPlaylistLoader_.main) {
+        return;
+      }
+      let nonUsableKeyStatusCount = 0;
+      const NON_USABLE = 'non-usable';
+      this.mainPlaylistLoader_.main.playlists.forEach(playlist => {
+        const keyIdSet = this.mainPlaylistLoader_.getKeyIdSet(playlist); // If the playlist doesn't have keyIDs lets not exclude it.
+
+        if (!keyIdSet || !keyIdSet.size) {
+          return;
+        }
+        keyIdSet.forEach(key => {
+          const USABLE = 'usable';
+          const hasUsableKeyStatus = this.keyStatusMap_.has(key) && this.keyStatusMap_.get(key) === USABLE;
+          const nonUsableExclusion = playlist.lastExcludeReason_ === NON_USABLE && playlist.excludeUntil === Infinity;
+          if (!hasUsableKeyStatus) {
+            // Only exclude playlists that haven't already been excluded as non-usable.
+            if (playlist.excludeUntil !== Infinity && playlist.lastExcludeReason_ !== NON_USABLE) {
+              playlist.excludeUntil = Infinity;
+              playlist.lastExcludeReason_ = NON_USABLE;
+              this.logger_(`excluding playlist ${playlist.id} because the key ID ${key} doesn't exist in the keyStatusMap or is not ${USABLE}`);
+            } // count all nonUsableKeyStatus
+
+            nonUsableKeyStatusCount++;
+          } else if (hasUsableKeyStatus && nonUsableExclusion) {
+            delete playlist.excludeUntil;
+            delete playlist.lastExcludeReason_;
+            this.logger_(`enabling playlist ${playlist.id} because key ID ${key} is ${USABLE}`);
+          }
+        });
+      }); // If for whatever reason every playlist has a non usable key status. Lets try re-including the SD renditions as a failsafe.
+
+      if (nonUsableKeyStatusCount >= this.mainPlaylistLoader_.main.playlists.length) {
+        this.mainPlaylistLoader_.main.playlists.forEach(playlist => {
+          const isNonHD = playlist && playlist.attributes && playlist.attributes.RESOLUTION && playlist.attributes.RESOLUTION.height < 720;
+          const excludedForNonUsableKey = playlist.excludeUntil === Infinity && playlist.lastExcludeReason_ === NON_USABLE;
+          if (isNonHD && excludedForNonUsableKey) {
+            // Only delete the excludeUntil so we don't try and re-exclude these playlists.
+            delete playlist.excludeUntil;
+            videojs.log.warn(`enabling non-HD playlist ${playlist.id} because all playlists were excluded due to ${NON_USABLE} key IDs`);
+          }
+        });
+      }
+    }
+    /**
+     * Adds a keystatus to the keystatus map, tries to convert to string if necessary.
+     *
+     * @param {any} keyId the keyId to add a status for
+     * @param {string} status the status of the keyId
+     */
+
+    addKeyStatus_(keyId, status) {
+      const isString = typeof keyId === 'string';
+      const keyIdHexString = isString ? keyId : bufferToHexString(keyId);
+      const formattedKeyIdString = keyIdHexString.slice(0, 32).toLowerCase();
+      this.logger_(`KeyStatus '${status}' with key ID ${formattedKeyIdString} added to the keyStatusMap`);
+      this.keyStatusMap_.set(formattedKeyIdString, status);
+    }
+    /**
+     * Utility function for adding key status to the keyStatusMap and filtering usable encrypted playlists.
+     *
+     * @param {any} keyId the keyId from the keystatuschange event
+     * @param {string} status the key status string
+     */
+
+    updatePlaylistByKeyStatus(keyId, status) {
+      this.addKeyStatus_(keyId, status);
+      if (!this.waitingForFastQualityPlaylistReceived_) {
+        this.excludeNonUsableThenChangePlaylist_();
+      } // Listen to loadedplaylist with a single listener and check for new contentProtection elements when a playlist is updated.
+
+      this.mainPlaylistLoader_.off('loadedplaylist', this.excludeNonUsableThenChangePlaylist_.bind(this));
+      this.mainPlaylistLoader_.on('loadedplaylist', this.excludeNonUsableThenChangePlaylist_.bind(this));
+    }
+    excludeNonUsableThenChangePlaylist_() {
+      this.excludeNonUsablePlaylistsByKeyId_();
+      this.fastQualityChange_();
+    }
   }
 
   /**
@@ -56871,13 +66850,29 @@
     } else {
       playlist.disabled = true;
     }
+    const metadata = {
+      renditionInfo: {
+        id: playlistID,
+        bandwidth: playlist.attributes.BANDWIDTH,
+        resolution: playlist.attributes.RESOLUTION,
+        codecs: playlist.attributes.CODECS
+      },
+      cause: 'fast-quality'
+    };
     if (enable !== currentlyEnabled && !incompatible) {
       // Ensure the outside world knows about our changes
-      changePlaylistFn();
       if (enable) {
-        loader.trigger('renditionenabled');
+        // call fast quality change only when the playlist is enabled
+        changePlaylistFn(playlist);
+        loader.trigger({
+          type: 'renditionenabled',
+          metadata
+        });
       } else {
-        loader.trigger('renditiondisabled');
+        loader.trigger({
+          type: 'renditiondisabled',
+          metadata
+        });
       }
     }
     return enable;
@@ -56949,7 +66944,7 @@
    * @class PlaybackWatcher
    */
 
-  class PlaybackWatcher {
+  class PlaybackWatcher extends videojs.EventTarget {
     /**
      * Represents an PlaybackWatcher object.
      *
@@ -56957,12 +66952,14 @@
      * @param {Object} options an object that includes the tech and settings
      */
     constructor(options) {
+      super();
       this.playlistController_ = options.playlistController;
       this.tech_ = options.tech;
       this.seekable = options.seekable;
       this.allowSeeksWithinUnsafeLiveWindow = options.allowSeeksWithinUnsafeLiveWindow;
       this.liveRangeSafeTimeDelta = options.liveRangeSafeTimeDelta;
       this.media = options.media;
+      this.playedRanges_ = [];
       this.consecutiveUpdates = 0;
       this.lastRecordedTime = null;
       this.checkCurrentTimeTimeout_ = null;
@@ -57109,6 +67106,13 @@
       // appends are working
 
       if (isBufferedDifferent) {
+        const metadata = {
+          bufferedRanges: buffered
+        };
+        pc.trigger({
+          type: 'bufferedrangeschanged',
+          metadata
+        });
         this.resetSegmentDownloads_(type);
         return;
       }
@@ -57167,6 +67171,14 @@
       } else if (currentTime === this.lastRecordedTime) {
         this.consecutiveUpdates++;
       } else {
+        this.playedRanges_.push(createTimeRanges([this.lastRecordedTime, currentTime]));
+        const metadata = {
+          playedRanges: this.playedRanges_
+        };
+        this.playlistController_.trigger({
+          type: 'playedrangeschanged',
+          metadata
+        });
         this.consecutiveUpdates = 0;
         this.lastRecordedTime = currentTime;
       }
@@ -57354,7 +67366,8 @@
       }
       let allowedEnd = seekable.end(seekable.length - 1) + SAFE_TIME_DELTA;
       const isLive = !playlist.endList;
-      if (isLive && allowSeeksWithinUnsafeLiveWindow) {
+      const isLLHLS = typeof playlist.partTargetDuration === 'number';
+      if (isLive && (isLLHLS || allowSeeksWithinUnsafeLiveWindow)) {
         allowedEnd = seekable.end(seekable.length - 1) + playlist.targetDuration * 3;
       }
       if (currentTime > allowedEnd) {
@@ -57426,6 +67439,16 @@
       this.logger_('skipTheGap_:', 'currentTime:', currentTime, 'scheduled currentTime:', scheduledCurrentTime, 'nextRange start:', nextRange.start(0)); // only seek if we still have not played
 
       this.tech_.setCurrentTime(nextRange.start(0) + TIME_FUDGE_FACTOR);
+      const metadata = {
+        gapInfo: {
+          from: currentTime,
+          to: nextRange.start(0)
+        }
+      };
+      this.playlistController_.trigger({
+        type: 'gapjumped',
+        metadata
+      });
       this.tech_.trigger({
         type: 'usage',
         name: 'vhs-gap-skip'
@@ -57591,18 +67614,11 @@
   const reloadSourceOnError = function (options) {
     initPlugin(this, options);
   };
-  var version$4 = "3.0.2";
-  var version$3 = "6.3.0";
-  var version$2 = "1.0.1";
-  var version$1 = "6.0.0";
-  var version = "4.0.1";
-
-  /**
-   * @file videojs-http-streaming.js
-   *
-   * The main file for the VHS project.
-   * License: https://github.com/videojs/videojs-http-streaming/blob/main/LICENSE
-   */
+  var version$4 = "3.17.0";
+  var version$3 = "7.1.0";
+  var version$2 = "1.3.1";
+  var version$1 = "7.2.0";
+  var version = "4.0.2";
   const Vhs = {
     PlaylistLoader,
     Playlist,
@@ -57805,8 +67821,8 @@
     const keySystemsOptionsArr = getAllPsshKeySystemsOptions(playlists, Object.keys(sourceKeySystems));
     const initializationFinishedPromises = [];
     const keySessionCreatedPromises = []; // Since PSSH values are interpreted as initData, EME will dedupe any duplicates. The
-    // only place where it should not be deduped is for ms-prefixed APIs, but the early
-    // return for IE11 above, and the existence of modern EME APIs in addition to
+    // only place where it should not be deduped is for ms-prefixed APIs, but
+    // the existence of modern EME APIs in addition to
     // ms-prefixed APIs on Edge should prevent this from being a concern.
     // initializeMediaKeys also won't use the webkit-prefixed APIs.
 
@@ -57930,6 +67946,64 @@
     return dataUri;
   };
   /**
+   * Adds a request hook to an xhr object
+   *
+   * @param {Object} xhr object to add the onRequest hook to
+   * @param {function} callback hook function for an xhr request
+   */
+
+  const addOnRequestHook = (xhr, callback) => {
+    if (!xhr._requestCallbackSet) {
+      xhr._requestCallbackSet = new Set();
+    }
+    xhr._requestCallbackSet.add(callback);
+  };
+  /**
+   * Adds a response hook to an xhr object
+   *
+   * @param {Object} xhr object to add the onResponse hook to
+   * @param {function} callback hook function for an xhr response
+   */
+
+  const addOnResponseHook = (xhr, callback) => {
+    if (!xhr._responseCallbackSet) {
+      xhr._responseCallbackSet = new Set();
+    }
+    xhr._responseCallbackSet.add(callback);
+  };
+  /**
+   * Removes a request hook on an xhr object, deletes the onRequest set if empty.
+   *
+   * @param {Object} xhr object to remove the onRequest hook from
+   * @param {function} callback hook function to remove
+   */
+
+  const removeOnRequestHook = (xhr, callback) => {
+    if (!xhr._requestCallbackSet) {
+      return;
+    }
+    xhr._requestCallbackSet.delete(callback);
+    if (!xhr._requestCallbackSet.size) {
+      delete xhr._requestCallbackSet;
+    }
+  };
+  /**
+   * Removes a response hook on an xhr object, deletes the onResponse set if empty.
+   *
+   * @param {Object} xhr object to remove the onResponse hook from
+   * @param {function} callback hook function to remove
+   */
+
+  const removeOnResponseHook = (xhr, callback) => {
+    if (!xhr._responseCallbackSet) {
+      return;
+    }
+    xhr._responseCallbackSet.delete(callback);
+    if (!xhr._responseCallbackSet.size) {
+      delete xhr._responseCallbackSet;
+    }
+  };
+  /**
    * Whether the browser has built-in HLS support.
    */
 
@@ -57980,6 +68054,42 @@
 
   Vhs.isSupported = function () {
     return videojs.log.warn('VHS is no longer a tech. Please remove it from ' + 'your player\'s techOrder.');
+  };
+  /**
+   * A global function for setting an onRequest hook
+   *
+   * @param {function} callback for request modifiction
+   */
+
+  Vhs.xhr.onRequest = function (callback) {
+    addOnRequestHook(Vhs.xhr, callback);
+  };
+  /**
+   * A global function for setting an onResponse hook
+   *
+   * @param {callback} callback for response data retrieval
+   */
+
+  Vhs.xhr.onResponse = function (callback) {
+    addOnResponseHook(Vhs.xhr, callback);
+  };
+  /**
+   * Deletes a global onRequest callback if it exists
+   *
+   * @param {function} callback to delete from the global set
+   */
+
+  Vhs.xhr.offRequest = function (callback) {
+    removeOnRequestHook(Vhs.xhr, callback);
+  };
+  /**
+   * Deletes a global onResponse callback if it exists
+   *
+   * @param {function} callback to delete from the global set
+   */
+
+  Vhs.xhr.offResponse = function (callback) {
+    removeOnResponseHook(Vhs.xhr, callback);
   };
   const Component = videojs.getComponent('Component');
   /**
@@ -58050,13 +68160,23 @@
       });
       this.on(this.tech_, 'play', this.play);
     }
-    setOptions_() {
-      // defaults
+    /**
+     * Set VHS options based on options from configuration, as well as partial
+     * options to be passed at a later time.
+     *
+     * @param {Object} options A partial chunk of config options
+     */
+
+    setOptions_(options = {}) {
+      this.options_ = merge(this.options_, options); // defaults
+
       this.options_.withCredentials = this.options_.withCredentials || false;
       this.options_.limitRenditionByPlayerDimensions = this.options_.limitRenditionByPlayerDimensions === false ? false : true;
       this.options_.useDevicePixelRatio = this.options_.useDevicePixelRatio || false;
+      this.options_.usePlayerObjectFit = this.options_.usePlayerObjectFit || false;
       this.options_.useBandwidthFromLocalStorage = typeof this.source_.useBandwidthFromLocalStorage !== 'undefined' ? this.source_.useBandwidthFromLocalStorage : this.options_.useBandwidthFromLocalStorage || false;
-      this.options_.useNetworkInformationApi = this.options_.useNetworkInformationApi || false;
+      this.options_.useForcedSubtitles = this.options_.useForcedSubtitles || false;
+      this.options_.useNetworkInformationApi = typeof this.options_.useNetworkInformationApi !== 'undefined' ? this.options_.useNetworkInformationApi : true;
       this.options_.useDtsForTimestampOffset = this.options_.useDtsForTimestampOffset || false;
       this.options_.customTagParsers = this.options_.customTagParsers || [];
       this.options_.customTagMappers = this.options_.customTagMappers || [];
@@ -58064,7 +68184,7 @@
       this.options_.llhls = this.options_.llhls === false ? false : true;
       this.options_.bufferBasedABR = this.options_.bufferBasedABR || false;
       if (typeof this.options_.playlistExclusionDuration !== 'number') {
-        this.options_.playlistExclusionDuration = 5 * 60;
+        this.options_.playlistExclusionDuration = 60;
       }
       if (typeof this.options_.bandwidth !== 'number') {
         if (this.options_.useBandwidthFromLocalStorage) {
@@ -58094,13 +68214,23 @@
 
       this.options_.enableLowInitialPlaylist = this.options_.enableLowInitialPlaylist && this.options_.bandwidth === Config.INITIAL_BANDWIDTH; // grab options passed to player.src
 
-      ['withCredentials', 'useDevicePixelRatio', 'limitRenditionByPlayerDimensions', 'bandwidth', 'customTagParsers', 'customTagMappers', 'cacheEncryptionKeys', 'playlistSelector', 'initialPlaylistSelector', 'bufferBasedABR', 'liveRangeSafeTimeDelta', 'llhls', 'useNetworkInformationApi', 'useDtsForTimestampOffset', 'exactManifestTimings', 'leastPixelDiffSelector'].forEach(option => {
+      ['withCredentials', 'useDevicePixelRatio', 'usePlayerObjectFit', 'customPixelRatio', 'limitRenditionByPlayerDimensions', 'bandwidth', 'customTagParsers', 'customTagMappers', 'cacheEncryptionKeys', 'playlistSelector', 'initialPlaylistSelector', 'bufferBasedABR', 'liveRangeSafeTimeDelta', 'llhls', 'useForcedSubtitles', 'useNetworkInformationApi', 'useDtsForTimestampOffset', 'exactManifestTimings', 'leastPixelDiffSelector'].forEach(option => {
         if (typeof this.source_[option] !== 'undefined') {
           this.options_[option] = this.source_[option];
         }
       });
       this.limitRenditionByPlayerDimensions = this.options_.limitRenditionByPlayerDimensions;
       this.useDevicePixelRatio = this.options_.useDevicePixelRatio;
+      this.usePlayerObjectFit = this.options_.usePlayerObjectFit;
+      const customPixelRatio = this.options_.customPixelRatio; // Ensure the custom pixel ratio is a number greater than or equal to 0
+
+      if (typeof customPixelRatio === 'number' && customPixelRatio >= 0) {
+        this.customPixelRatio = customPixelRatio;
+      }
+    } // alias for public method to set options
+
+    setOptions(options = {}) {
+      this.setOptions_(options);
     }
     /**
      * called when player.src gets called, handle a new source
@@ -58122,7 +68252,9 @@
 
       this.options_.seekTo = time => {
         this.tech_.setCurrentTime(time);
-      };
+      }; // pass player to allow for player level eventing on construction.
+
+      this.options_.player_ = this.player_;
       this.playlistController_ = new PlaylistController(this.options_);
       const playbackWatcherOptions = merge({
         liveRangeSafeTimeDelta: SAFE_TIME_DELTA
@@ -58132,6 +68264,7 @@
         playlistController: this.playlistController_
       });
       this.playbackWatcher_ = new PlaybackWatcher(playbackWatcherOptions);
+      this.attachStreamingEventListeners_();
       this.playlistController_.on('error', () => {
         const player = videojs.players[this.tech_.options_.playerId];
         let error = this.playlistController_.error;
@@ -58365,8 +68498,15 @@
       if (!this.tech_.el()) {
         return;
       }
-      this.mediaSourceUrl_ = window.URL.createObjectURL(this.playlistController_.mediaSource);
-      this.tech_.src(this.mediaSourceUrl_);
+      this.mediaSourceUrl_ = window.URL.createObjectURL(this.playlistController_.mediaSource); // If we are playing HLS with MSE in Safari, add source elements for both the blob and manifest URLs.
+      // The latter will enable Airplay playback on receiver devices.
+
+      if ((videojs.browser.IS_ANY_SAFARI || videojs.browser.IS_IOS) && this.options_.overrideNative && this.options_.sourceType === 'hls' && typeof this.tech_.addSourceElement === 'function') {
+        this.tech_.addSourceElement(this.mediaSourceUrl_);
+        this.tech_.addSourceElement(this.source_.src);
+      } else {
+        this.tech_.src(this.mediaSourceUrl_);
+      }
     }
     createKeySessions_() {
       const audioPlaylistLoader = this.playlistController_.mediaTypes_.AUDIO.activePlaylistLoader;
@@ -58417,34 +68557,11 @@
         audioMedia: audioPlaylistLoader && audioPlaylistLoader.media()
       });
       this.player_.tech_.on('keystatuschange', e => {
-        if (e.status !== 'output-restricted') {
-          return;
-        }
-        const mainPlaylist = this.playlistController_.main();
-        if (!mainPlaylist || !mainPlaylist.playlists) {
-          return;
-        }
-        const excludedHDPlaylists = []; // Assume all HD streams are unplayable and exclude them from ABR selection
-
-        mainPlaylist.playlists.forEach(playlist => {
-          if (playlist && playlist.attributes && playlist.attributes.RESOLUTION && playlist.attributes.RESOLUTION.height >= 720) {
-            if (!playlist.excludeUntil || playlist.excludeUntil < Infinity) {
-              playlist.excludeUntil = Infinity;
-              excludedHDPlaylists.push(playlist);
-            }
-          }
-        });
-        if (excludedHDPlaylists.length) {
-          videojs.log.warn('DRM keystatus changed to "output-restricted." Removing the following HD playlists ' + 'that will most likely fail to play and clearing the buffer. ' + 'This may be due to HDCP restrictions on the stream and the capabilities of the current device.', ...excludedHDPlaylists); // Clear the buffer before switching playlists, since it may already contain unplayable segments
-
-          this.playlistController_.fastQualityChange_();
-        }
+        this.playlistController_.updatePlaylistByKeyStatus(e.keyId, e.status);
       });
       this.handleWaitingForKey_ = this.handleWaitingForKey_.bind(this);
-      this.player_.tech_.on('waitingforkey', this.handleWaitingForKey_); // In IE11 this is too early to initialize media keys, and IE11 does not support
-      // promises.
-
-      if (videojs.browser.IE_VERSION === 11 || !didSetupEmeOptions) {
+      this.player_.tech_.on('waitingforkey', this.handleWaitingForKey_);
+      if (!didSetupEmeOptions) {
         // If EME options were not set up, we've done all we could to initialize EME.
         this.playlistController_.sourceUpdater_.initializedEme();
         return;
@@ -58569,6 +68686,66 @@
         callback
       });
     }
+    /**
+     * Adds the onRequest, onResponse, offRequest and offResponse functions
+     * to the VhsHandler xhr Object.
+     */
+
+    setupXhrHooks_() {
+      /**
+       * A player function for setting an onRequest hook
+       *
+       * @param {function} callback for request modifiction
+       */
+      this.xhr.onRequest = callback => {
+        addOnRequestHook(this.xhr, callback);
+      };
+      /**
+       * A player function for setting an onResponse hook
+       *
+       * @param {callback} callback for response data retrieval
+       */
+
+      this.xhr.onResponse = callback => {
+        addOnResponseHook(this.xhr, callback);
+      };
+      /**
+       * Deletes a player onRequest callback if it exists
+       *
+       * @param {function} callback to delete from the player set
+       */
+
+      this.xhr.offRequest = callback => {
+        removeOnRequestHook(this.xhr, callback);
+      };
+      /**
+       * Deletes a player onResponse callback if it exists
+       *
+       * @param {function} callback to delete from the player set
+       */
+
+      this.xhr.offResponse = callback => {
+        removeOnResponseHook(this.xhr, callback);
+      }; // Trigger an event on the player to notify the user that vhs is ready to set xhr hooks.
+      // This allows hooks to be set before the source is set to vhs when handleSource is called.
+
+      this.player_.trigger('xhr-hooks-ready');
+    }
+    attachStreamingEventListeners_() {
+      const playlistControllerEvents = ['seekablerangeschanged', 'bufferedrangeschanged', 'contentsteeringloadstart', 'contentsteeringloadcomplete', 'contentsteeringparsed'];
+      const playbackWatcher = ['gapjumped', 'playedrangeschanged']; // re-emit streaming events and payloads on the player.
+
+      playlistControllerEvents.forEach(eventName => {
+        this.playlistController_.on(eventName, metadata => {
+          this.player_.trigger(_extends$1({}, metadata));
+        });
+      });
+      playbackWatcher.forEach(eventName => {
+        this.playbackWatcher_.on(eventName, metadata => {
+          this.player_.trigger(_extends$1({}, metadata));
+        });
+      });
+    }
   }
   /**
    * The Source Handler object, which informs video.js what additional
@@ -58582,13 +68759,18 @@
     name: 'videojs-http-streaming',
     VERSION: version$4,
     canHandleSource(srcObj, options = {}) {
-      const localOptions = merge(videojs.options, options);
+      const localOptions = merge(videojs.options, options); // If not opting to experimentalUseMMS, and playback is only supported with MediaSource, cannot handle source
+
+      if (!localOptions.vhs.experimentalUseMMS && !browserSupportsCodec('avc1.4d400d,mp4a.40.2', false)) {
+        return false;
+      }
       return VhsSourceHandler.canPlayType(srcObj.type, localOptions);
     },
     handleSource(source, tech, options = {}) {
       const localOptions = merge(videojs.options, options);
       tech.vhs = new VhsHandler(source, tech, localOptions);
       tech.vhs.xhr = xhrFactory();
+      tech.vhs.setupXhrHooks_();
       tech.vhs.src(source.src, source.type);
       return tech.vhs;
     },
@@ -58614,14 +68796,15 @@
     }
   };
   /**
-   * Check to see if the native MediaSource object exists and supports
-   * an MP4 container with both H.264 video and AAC-LC audio.
+   * Check to see if either the native MediaSource or ManagedMediaSource
+   * objectx exist and support an MP4 container with both H.264 video
+   * and AAC-LC audio.
    *
    * @return {boolean} if  native media sources are supported
    */
 
   const supportsNativeMediaSources = () => {
-    return browserSupportsCodec('avc1.4d400d,mp4a.40.2');
+    return browserSupportsCodec('avc1.4d400d,mp4a.40.2', true);
   }; // register source handlers with the appropriate techs
 
   if (supportsNativeMediaSources()) {
