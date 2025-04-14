@@ -1,12 +1,12 @@
 #!/bin/ash
 
 # Includes
-. ./constants
-. ./utils
+. /tmp/www/cgi-bin/constants
+. /tmp/www/cgi-bin/utils
 
 # Handlers
 on_live_stop() {
-    killall ffmpeg 2>&1 > /dev/null
+    killall ffmpeg > /dev/null 2> /dev/null
     sleep 1
     rm -rf ${HDZ_LIVE_PATH}/stream* 2>&1 > /dev/null
     rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
@@ -16,23 +16,24 @@ on_live_stop() {
 }
 
 on_live_play() {
-    killall ffmpeg 2>&1 > /dev/null
+    killall ffmpeg > /dev/null 2> /dev/null
     sleep 1
     rm -rf ${HDZ_LIVE_PATH}/stream* 2>&1 > /dev/null
     rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
     rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
     rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
 
-    ffmpeg -loglevel fatal -i "rtsp://127.0.0.1:8554/hdzero" -c copy -start_number 0 -f hls -hls_time 2 -hls_list_size 5 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_LIVE_PATH}/stream.m3u8 &
+    ffmpeg -hide_banner -loglevel fatal -i "rtsp://127.0.0.1:8554/hdzero" -c copy -start_number 0 -f hls -hls_time 1 -hls_list_size 3 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_LIVE_PATH}/stream.m3u8 &
 
     until [ -f ${HDZ_LIVE_PATH}/stream.m3u8 ]; do
         sleep 0.1
-    done;
+    done
 
-    echo "Content-Type: text/html"
+    echo "content-type: text/html":
+    echo "content-length: $(wc -c <${HDZ_LIVE_M3U8})"
     echo ""
+
     cat ${HDZ_LIVE_M3U8}
-    echo "Status: 200 OK"
 }
 
 # Parse Request

@@ -94,7 +94,6 @@ typedef struct {
     root_pw_t root_pw;
     button_t ssh;
     button_t www;
-    button_t h265;
     lv_obj_t *apply_settings;
     lv_obj_t *note;
     int row_count;
@@ -124,6 +123,7 @@ static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 40, LV_GRID_TEMPL
 static page_options_t page_wifi = {0};
 static lv_timer_t *page_wifi_apply_settings_timer = NULL;
 static lv_timer_t *page_wifi_apply_settings_pending_timer = NULL;
+static bool page_wifi_pending = true;
 
 /**
  * Refresh WiFi service configuration parameters.
@@ -192,11 +192,11 @@ static void page_wifi_update_services() {
         fprintf(fp, "ssid=%s\n", g_setting.wifi.ssid[WIFI_MODE_AP]);
         fprintf(fp, "channel=%d\n", g_setting.wifi.rf_channel);
         fprintf(fp, "hw_mode=g\n");
-        fprintf(fp, "ieee80211n=1\n");
         fprintf(fp, "wmm_enabled=1\n");
+        fprintf(fp, "ieee80211n=1\n");
         fprintf(fp, "ignore_broadcast_ssid=0\n");
         fprintf(fp, "auth_algs=1\n");
-        fprintf(fp, "wpa=3\n");
+        fprintf(fp, "wpa=2\n");
         fprintf(fp, "wpa_passphrase=%s\n", g_setting.wifi.passwd[WIFI_MODE_AP]);
         fprintf(fp, "wpa_key_mgmt=WPA-PSK\n");
         fprintf(fp, "wpa_pairwise=TKIP\n");
@@ -286,7 +286,6 @@ static void page_wifi_update_settings() {
     g_setting.wifi.dhcp = btn_group_get_sel(&page_wifi.page_2.dhcp.button) == 0;
     g_setting.wifi.ssh = btn_group_get_sel(&page_wifi.page_3.ssh.button) == 0;
     g_setting.wifi.www = btn_group_get_sel(&page_wifi.page_3.www.button) == 0;
-    g_setting.wifi.h265 = btn_group_get_sel(&page_wifi.page_3.h265.button);
 
     snprintf(g_setting.wifi.ssid[g_setting.wifi.mode], WIFI_SSID_MAX, "%s", page_wifi.page_1.ssid.text[g_setting.wifi.mode]);
     snprintf(g_setting.wifi.passwd[g_setting.wifi.mode], WIFI_PASSWD_MAX, "%s", page_wifi.page_1.passwd.text[g_setting.wifi.mode]);
@@ -318,7 +317,6 @@ static void page_wifi_update_settings() {
     ini_puts("wifi", "root_pw", g_setting.wifi.root_pw, SETTING_INI);
     settings_put_bool("wifi", "ssh", g_setting.wifi.ssh);
     settings_put_bool("wifi", "www", g_setting.wifi.www);
-    ini_putl("venc_live", "h265", g_setting.wifi.h265, REC_CONF);
 
     // Prepare WiFi interfaces
     system_script(WIFI_OFF);
@@ -471,7 +469,6 @@ static void page_wifi_update_current_page(int which) {
     lv_obj_add_flag(page_wifi.page_3.root_pw.status, LV_OBJ_FLAG_HIDDEN);
     btn_group_show(&page_wifi.page_3.ssh.button, false);
     btn_group_show(&page_wifi.page_3.www.button, false);
-    btn_group_show(&page_wifi.page_3.h265.button, false);
     lv_obj_add_flag(page_wifi.page_3.note, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(page_wifi.page_3.apply_settings, LV_OBJ_FLAG_HIDDEN);
 
@@ -549,7 +546,6 @@ static void page_wifi_update_current_page(int which) {
         lv_obj_clear_flag(page_wifi.page_3.root_pw.status, LV_OBJ_FLAG_HIDDEN);
         btn_group_show(&page_wifi.page_3.ssh.button, true);
         btn_group_show(&page_wifi.page_3.www.button, true);
-        btn_group_show(&page_wifi.page_3.h265.button, true);
         lv_obj_clear_flag(page_wifi.page_3.apply_settings, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(page_wifi.page_3.note, LV_OBJ_FLAG_HIDDEN);
         page_wifi_update_page_3_notes();
@@ -584,8 +580,7 @@ static void page_wifi_dirty_flag_reset() {
                                             page_wifi.page_2.rf_channel.dirty =
                                                 page_wifi.page_3.root_pw.dirty =
                                                     page_wifi.page_3.ssh.dirty =
-                                                        page_wifi.page_3.www.dirty =
-                                                            page_wifi.page_3.h265.dirty = false;
+                                                        page_wifi.page_3.www.dirty = false;
 }
 
 /**
@@ -645,8 +640,7 @@ static void page_wifi_update_dirty_flag() {
         page_wifi.page_2.rf_channel.dirty ||
         page_wifi.page_3.root_pw.dirty ||
         page_wifi.page_3.ssh.dirty ||
-        page_wifi.page_3.www.dirty ||
-        page_wifi.page_3.h265.dirty;
+        page_wifi.page_3.www.dirty;
 
     if (page_wifi.dirty) {
         if (!page_wifi_apply_settings_pending_timer) {
@@ -733,10 +727,7 @@ static void page_wifi_create_page_3(lv_obj_t *parent) {
     create_btn_group_item(&page_wifi.page_3.www.button, parent, 2, "Web", "On", "Off", "", "", 3);
     btn_group_set_sel(&page_wifi.page_3.www.button, !g_setting.wifi.www);
 
-    create_btn_group_item(&page_wifi.page_3.h265.button, parent, 2, "Live Video", "H264", "H265", "", "", 4);
-    btn_group_set_sel(&page_wifi.page_3.h265.button, g_setting.wifi.h265);
-
-    page_wifi.page_3.apply_settings = create_label_item(parent, "Apply Settings", 1, 5, 3);
+    page_wifi.page_3.apply_settings = create_label_item(parent, "Apply Settings", 1, 4, 3);
 
     page_wifi.page_3.note = lv_label_create(parent);
     lv_obj_set_style_text_font(page_wifi.page_3.note, &lv_font_montserrat_16, 0);
@@ -747,7 +738,7 @@ static void page_wifi_create_page_3(lv_obj_t *parent) {
     lv_obj_set_grid_cell(page_wifi.page_3.note, LV_GRID_ALIGN_START, 1, 4, LV_GRID_ALIGN_START, 7, 2);
     page_wifi_update_page_3_notes();
 
-    page_wifi.page_3.row_count = 6;
+    page_wifi.page_3.row_count = 5;
 }
 
 /**
@@ -1018,10 +1009,8 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
-        case 2: // Page System: Live Video
-            btn_group_toggle_sel(&page_wifi.page_3.h265.button);
-            page_wifi.page_3.h265.dirty =
-                (btn_group_get_sel(&page_wifi.page_3.h265.button) != g_setting.wifi.h265);
+        case 2: // Page System: Apply Settings
+            page_wifi_handle_apply_button(page_wifi.page_3.apply_settings);
             break;
         }
         break;
@@ -1037,9 +1026,6 @@ static void page_wifi_on_click(uint8_t key, int sel) {
             } else {
                 keyboard_press();
             }
-            break;
-        case 2: // Page System: Apply Settings
-            page_wifi_handle_apply_button(page_wifi.page_3.apply_settings);
             break;
         }
         break;
@@ -1201,6 +1187,7 @@ void page_wifi_post_bootup_action(void (*complete_callback)()) {
     page_wifi_update_settings();
 
     if (complete_callback != NULL) {
+        page_wifi_pending = false;
         complete_callback();
     }
 }
@@ -1231,20 +1218,24 @@ page_pack_t pp_wifi = {
  * Provides the WiFi status string referenced by ui_statusbar.
  */
 void page_wifi_get_statusbar_text(char *buffer, int size) {
-    if (g_setting.wifi.enable) {
-        switch (g_setting.wifi.mode) {
-        case WIFI_MODE_AP:
-            snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_AP]);
-            break;
-        case WIFI_MODE_STA:
-            if (page_wifi_get_real_address()) {
-                snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_STA]);
-            } else {
-                snprintf(buffer, size, "WiFi: %s", _lang("Searching"));
+    if (!page_wifi_pending) {
+        if (g_setting.wifi.enable) {
+            switch (g_setting.wifi.mode) {
+            case WIFI_MODE_AP:
+                snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_AP]);
+                break;
+            case WIFI_MODE_STA:
+                if (page_wifi_get_real_address()) {
+                    snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_STA]);
+                } else {
+                    snprintf(buffer, size, "WiFi: %s", _lang("Searching"));
+                }
+                break;
             }
-            break;
+        } else {
+            snprintf(buffer, size, "WiFi: %s", _lang("Off"));
         }
     } else {
-        snprintf(buffer, size, "WiFi: %s", _lang("Off"));
+        snprintf(buffer, size, "WiFi: %s", _lang("Pending"));
     }
 }

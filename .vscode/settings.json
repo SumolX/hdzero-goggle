@@ -1,3 +1,18 @@
 {
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "files.associations": {
+        "ui_main_menu.h": "c",
+        "typeindex": "c",
+        "typeinfo": "c",
+        "page_wifi.h": "c",
+        "record_definitions.h": "c",
+        "sdcard.h": "c",
+        "system.h": "c",
+        "page_storage.h": "c",
+        "chrono": "c",
+        "self_test.h": "c",
+        "page_common.h": "c",
+        "stdatomic.h": "c",
+        "common.hh": "c"
+    }
 }

@@ -1,7 +1,8 @@
 #!/bin/ash
 
 # Includes
-. ./utils
+. /tmp/www/cgi-bin/constants
+. /tmp/www/cgi-bin/utils
 
 # Handlers
 on_status() {

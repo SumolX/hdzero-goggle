@@ -1,8 +1,8 @@
 #!/bin/sh
 /mnt/app/app/record/gogglecmd -live quit
 sleep 1
+killall ffmpeg
 killall httpd
-killall hlsProxy
 killall rtspLive
 killall hostapd
 killall udhcpd
