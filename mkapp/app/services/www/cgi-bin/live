@@ -23,7 +23,7 @@ on_live_play() {
     rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
     rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
 
-    ffmpeg -hide_banner -loglevel fatal -i "rtsp://127.0.0.1:8554/hdzero" -c copy -start_number 0 -f hls -hls_time 1 -hls_list_size 3 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_LIVE_PATH}/stream.m3u8 &
+    ffmpeg -hide_banner -loglevel fatal -i "rtsp://127.0.0.1:8554/hdzero" -c copy -start_number 0 -f hls -hls_time 2 -hls_list_size 1 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_LIVE_PATH}/stream.m3u8 &
 
     until [ -f ${HDZ_LIVE_PATH}/stream.m3u8 ]; do
         sleep 0.1
