@@ -78,15 +78,15 @@ aww 0x050967c0 0x110e6100
 #external services
 if [ ! -z $(ls -1 /mnt/extsd/hdzgoggle-services-* 2> /dev/null) ]; then
 	if [ -e /mnt/extsd/SERVICES.log ]; then
-		/mnt/app/services/install.sh > /mnt/extsd/SERVICES.log 2>&1 &
+		/mnt/app/services/install.sh > /mnt/extsd/SERVICES.log 2>&1
 	else
-		/mnt/app/services/install.sh &
+		/mnt/app/services/install.sh
 	fi
 elif [ -e /mnt/app/services/startup.sh ]; then
 	if [ -e /mnt/extsd/SERVICES.log ]; then
-		/mnt/app/services/startup.sh > /mnt/extsd/SERVICES.log 2>&1 &
+		/mnt/app/services/startup.sh > /mnt/extsd/SERVICES.log 2>&1
 	else
-		/mnt/app/services/startup.sh &
+		/mnt/app/services/startup.sh
 	fi
 fi
 
