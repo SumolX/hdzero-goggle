@@ -47,7 +47,7 @@ if (( ${FILESIZE} > ${APP_SIZE})); then
     exit 1
 fi
 
-echo -e "\npacking app:"
+echo -e "\napp partition size: ${FILESIZE}\npacking app:"
 cd $IMG_DIR
 tar cvf $IMG_DIR/hdzgoggle_app_ota-${APP_VERSION}.tar *
 
