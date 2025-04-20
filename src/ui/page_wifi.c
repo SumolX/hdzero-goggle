@@ -123,7 +123,7 @@ static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 40, LV_GRID_TEMPL
 static page_options_t page_wifi = {0};
 static lv_timer_t *page_wifi_apply_settings_timer = NULL;
 static lv_timer_t *page_wifi_apply_settings_pending_timer = NULL;
-static bool page_wifi_pending = true;
+static bool page_bootup_pending = true;
 
 /**
  * Refresh WiFi service configuration parameters.
@@ -131,17 +131,19 @@ static bool page_wifi_pending = true;
 static void page_wifi_update_services() {
     FILE *fp = NULL;
 
-    /**
-     *  Host <-> Client switching
-     *  must wipe previous settings.
-     */
-    unlink(WIFI_AP_ON);
-    unlink(WIFI_STA_ON);
-    unlink(WIFI_AP_CFG);
-    unlink(WIFI_DHCP_CFG);
-    unlink(WIFI_STA_CFG);
-    unlink(WIFI_DNS_CFG);
-    unlink(ROOT_PW_SET);
+    if (!page_bootup_pending) {
+        /**
+         *  Host <-> Client switching
+         *  must wipe previous settings.
+         */
+        unlink(WIFI_AP_ON);
+        unlink(WIFI_STA_ON);
+        unlink(WIFI_AP_CFG);
+        unlink(WIFI_DHCP_CFG);
+        unlink(WIFI_STA_CFG);
+        unlink(WIFI_DNS_CFG);
+        unlink(ROOT_PW_SET);
+    }
 
     if ((fp = fopen(WIFI_AP_ON, "w"))) {
         fprintf(fp, "#!/bin/sh\n");
@@ -216,7 +218,6 @@ static void page_wifi_update_services() {
         fprintf(fp, "opt\twins\t0.0.0.0\n");
         fprintf(fp, "option\tdomain\tlocal\n");
         fprintf(fp, "option\tlease\t864000\n");
-
         fclose(fp);
     }
 
@@ -319,7 +320,9 @@ static void page_wifi_update_settings() {
     settings_put_bool("wifi", "www", g_setting.wifi.www);
 
     // Prepare WiFi interfaces
-    system_script(WIFI_OFF);
+    if (!page_bootup_pending) {
+        system_script(WIFI_OFF);
+    }
     page_wifi_update_services();
 
     // Activate WiFi services
@@ -1187,7 +1190,7 @@ void page_wifi_post_bootup_action(void (*complete_callback)()) {
     page_wifi_update_settings();
 
     if (complete_callback != NULL) {
-        page_wifi_pending = false;
+        page_bootup_pending = false;
         complete_callback();
     }
 }
@@ -1218,24 +1221,22 @@ page_pack_t pp_wifi = {
  * Provides the WiFi status string referenced by ui_statusbar.
  */
 void page_wifi_get_statusbar_text(char *buffer, int size) {
-    if (!page_wifi_pending) {
-        if (g_setting.wifi.enable) {
-            switch (g_setting.wifi.mode) {
-            case WIFI_MODE_AP:
-                snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_AP]);
-                break;
-            case WIFI_MODE_STA:
-                if (page_wifi_get_real_address()) {
-                    snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_STA]);
-                } else {
-                    snprintf(buffer, size, "WiFi: %s", _lang("Searching"));
-                }
-                break;
-            }
-        } else {
-            snprintf(buffer, size, "WiFi: %s", _lang("Off"));
-        }
-    } else {
+    if (!g_setting.wifi.enable) {
+        snprintf(buffer, size, "WiFi: %s", _lang("Off"));
+    } else if (page_bootup_pending) {
         snprintf(buffer, size, "WiFi: %s", _lang("Pending"));
+    } else {
+        switch (g_setting.wifi.mode) {
+        case WIFI_MODE_AP:
+            snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_AP]);
+            break;
+        case WIFI_MODE_STA:
+            if (page_wifi_get_real_address()) {
+                snprintf(buffer, size, "WiFi: %s", g_setting.wifi.ssid[WIFI_MODE_STA]);
+            } else {
+                snprintf(buffer, size, "WiFi: %s", _lang("Searching"));
+            }
+            break;
+        }
     }
 }
