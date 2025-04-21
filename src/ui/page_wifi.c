@@ -123,7 +123,7 @@ static lv_coord_t row_dsc[] = {60, 60, 60, 60, 60, 60, 60, 60, 40, LV_GRID_TEMPL
 static page_options_t page_wifi = {0};
 static lv_timer_t *page_wifi_apply_settings_timer = NULL;
 static lv_timer_t *page_wifi_apply_settings_pending_timer = NULL;
-static bool page_bootup_pending = true;
+static bool page_wifi_bootup_pending = true;
 
 /**
  * Refresh WiFi service configuration parameters.
@@ -131,7 +131,7 @@ static bool page_bootup_pending = true;
 static void page_wifi_update_services() {
     FILE *fp = NULL;
 
-    if (!page_bootup_pending) {
+    if (!page_wifi_bootup_pending) {
         /**
          *  Host <-> Client switching
          *  must wipe previous settings.
@@ -320,7 +320,7 @@ static void page_wifi_update_settings() {
     settings_put_bool("wifi", "www", g_setting.wifi.www);
 
     // Prepare WiFi interfaces
-    if (!page_bootup_pending) {
+    if (!page_wifi_bootup_pending) {
         system_script(WIFI_OFF);
     }
     page_wifi_update_services();
@@ -1190,7 +1190,7 @@ void page_wifi_post_bootup_action(void (*complete_callback)()) {
     page_wifi_update_settings();
 
     if (complete_callback != NULL) {
-        page_bootup_pending = false;
+        page_wifi_bootup_pending = false;
         complete_callback();
     }
 }
@@ -1223,7 +1223,7 @@ page_pack_t pp_wifi = {
 void page_wifi_get_statusbar_text(char *buffer, int size) {
     if (!g_setting.wifi.enable) {
         snprintf(buffer, size, "WiFi: %s", _lang("Off"));
-    } else if (page_bootup_pending) {
+    } else if (page_wifi_bootup_pending) {
         snprintf(buffer, size, "WiFi: %s", _lang("Pending"));
     } else {
         switch (g_setting.wifi.mode) {
