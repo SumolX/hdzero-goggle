@@ -131,27 +131,24 @@ void osd_llock_show(bool bShow) {
 }
 
 void osd_rec_show(bool bShow) {
-    // Update SD Card status once postbootup has finalized.
-    if (-1 == g_bootup_sdcard_state) {
-        char buf[128];
+    char buf[128];
 
-        if (!bShow || !g_setting.osd.element[OSD_GOGGLE_SD_REC].show) {
-            lv_obj_add_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
-            return;
-        }
+    if (!bShow || !g_setting.osd.element[OSD_GOGGLE_SD_REC].show) {
+        lv_obj_add_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
 
-        if (!g_sdcard_enable) {
-            osd_resource_path(buf, "%s", is_fhd, noSdcard_bmp);
+    if (!g_sdcard_enable) {
+        osd_resource_path(buf, "%s", is_fhd, noSdcard_bmp);
+        lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
+        lv_obj_clear_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
+    } else {
+        if (dvr_is_recording) {
+            osd_resource_path(buf, "%s", is_fhd, recording_bmp);
             lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
             lv_obj_clear_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
-        } else {
-            if (dvr_is_recording) {
-                osd_resource_path(buf, "%s", is_fhd, recording_bmp);
-                lv_img_set_src(g_osd_hdzero.sd_rec[is_fhd], buf);
-                lv_obj_clear_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
-            } else
-                lv_obj_add_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
-        }
+        } else
+            lv_obj_add_flag(g_osd_hdzero.sd_rec[is_fhd], LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -720,10 +717,8 @@ static void embedded_osd_init(uint8_t fhd) {
     lv_obj_set_style_radius(g_osd_hdzero.channel[fhd], 50, 0);
     channel_osd_mode = 0;
 
-    // Reserve but do not display until sdcard postbootup action has finalized.
     osd_resource_path(buf, "%s", is_fhd, noSdcard_bmp);
     osd_object_create_img(fhd, &g_osd_hdzero.sd_rec[fhd], buf, &g_setting.osd.element[OSD_GOGGLE_SD_REC].position, so);
-    lv_obj_add_flag(g_osd_hdzero.sd_rec[fhd], LV_OBJ_FLAG_HIDDEN);
 
     osd_resource_path(buf, "%s", is_fhd, VLQ1_bmp);
     osd_object_create_img(fhd, &g_osd_hdzero.vlq[fhd], buf, &g_setting.osd.element[OSD_GOGGLE_VLQ].position, so);
