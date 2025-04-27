@@ -1,3 +1,6 @@
+# Includes
+. /tmp/www/cgi-bin/constants
+
 # Returns success on substring match 
 utils_has_string() {
     ret=1
@@ -98,4 +101,13 @@ utils_is_action_authorized() {
         ret=0
     fi
     echo $ret
+}
+
+# Stop and cleanup streaming
+utils_stop_streaming() {
+    killall ffmpeg > /dev/null 2> /dev/null
+    rm -rf ${HDZ_LIVE_PATH}/stream* 2>&1 > /dev/null
+    rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
+    rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
+    rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
 }

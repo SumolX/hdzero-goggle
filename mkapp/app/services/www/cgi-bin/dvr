@@ -1,11 +1,10 @@
 #!/bin/ash
 
 # Includes
-. /tmp/www/cgi-bin/constants
 . /tmp/www/cgi-bin/utils
 
-# Handlers
-on_dvr() {
+# /cgi-bin/dvr
+dvr_on_list() {
     echo "Content-Type: text/html"
     echo ""
     body=""
@@ -21,7 +20,8 @@ on_dvr() {
     echo "{ \"dvr\":[ $body ] }"
 }
 
-on_dvr_download() {
+# /cgi-bin/dvr?download=filename
+dvr_on_download() {
     utils_is_action_authorized "${HTTP_COOKIE#token=}"
     if test "$?" -eq 0 -a -f ${MOVIE_PATH}/$1; then
         utils_send_binary_file "${MOVIE_PATH}" "$1"
@@ -31,7 +31,8 @@ on_dvr_download() {
     fi
 }
 
-on_dvr_rename() {
+# /cgi-bin/dvr?rename=&fr=filename&to=filename
+dvr_on_rename() {
     utils_is_action_authorized "${HTTP_COOKIE#token=}"
     if test "$?" -eq 0 -a -f ${MOVIE_PATH}/$1; then
         mv ${MOVIE_PATH}/${1%.*}.jpg ${MOVIE_PATH}/${2%.*}.jpg
@@ -42,7 +43,8 @@ on_dvr_rename() {
     fi
 }
 
-on_dvr_delete() {
+# /cgi-bin/dvr?delete=filename
+dvr_on_delete() {
     utils_is_action_authorized "${HTTP_COOKIE#token=}"
     if test "$?" -eq 0 -a -f ${MOVIE_PATH}/$1; then
         rm -rf ${MOVIE_PATH}/${1%.*}.*
@@ -52,25 +54,17 @@ on_dvr_delete() {
     fi
 }
 
-on_dvr_stop() {
-    killall ffmpeg > /dev/null 2> /dev/null
-    sleep 1
-    rm -rf ${HDZ_LIVE_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
+# /cgi-bin/dvr?stop
+dvr_on_stop() {
+    utils_stop_streaming
     echo "Status: 200 OK"
 }
 
-on_dvr_play() {
-    killall ffmpeg > /dev/null 2> /dev/null
-    sleep 1
-    rm -rf ${HDZ_LIVE_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
+# /cgi-bin/dvr?play=filename
+dvr_on_play() {
+    utils_stop_streaming
 
-    nice -n 20 ffmpeg -hide_banner -loglevel fatal -threads 1 -i ${MEDIA_PATH}/$1 -c copy -bsf:a aac_adtstoasc -start_number 0 -f hls -hls_time 2 -hls_list_size 30 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_DVR_PATH}/stream.m3u8 &
+    nice -n 20 ffmpeg -hide_banner -loglevel fatal -threads 1 -i ${MOVIE_PATH}/$1 -c copy -bsf:a aac_adtstoasc -start_number 0 -f hls -hls_time 2 -hls_list_size 30 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_DVR_PATH}/stream.m3u8 &
 
     until [ -f ${HDZ_DVR_PATH}/stream.m3u8 ]; do
         sleep 0.1
@@ -83,28 +77,29 @@ on_dvr_play() {
     cat ${HDZ_DVR_M3U8}
 }
 
-on_dvr_image() {
+# /cgi-bin/dvr?image=filename
+dvr_on_image() {
     utils_send_image_file "${MOVIE_PATH}" "$1"
 }
 
 # Parse Request
 if [ -z $QUERY_STRING ]; then
-    on_dvr
+    dvr_on_list
 else
     IFS="&"
     set -- $QUERY_STRING
     key="${1%=*}"
     if [ ${key} == "download" ]; then
-        on_dvr_download "${1#*=}"
+        dvr_on_download "${1#*=}"
     elif [ ${key} == "rename" ]; then
-        on_dvr_rename "${2#*=}" "${3#*=}"
+        dvr_on_rename "${2#*=}" "${3#*=}"
     elif [ ${key} == "delete" ]; then
-        on_dvr_delete "${1#*=}"
-    elif [ ${key} == "play" ]; then
-        on_dvr_play "${1#*=}"
+        dvr_on_delete "${1#*=}"
     elif [ ${key} == "stop" ]; then
-        on_dvr_stop
+        dvr_on_stop
+    elif [ ${key} == "play" ]; then
+        dvr_on_play "${1#*=}"
     elif [ ${key} == "image" ]; then
-        on_dvr_image "${1#*=}"
+        dvr_on_image "${1#*=}"
     fi
 fi

@@ -10,11 +10,31 @@ function checkEnter(event) {
     }
 }
 
-function get_ip() {
+function populate_rtsp_url() {
     (async () => {
         const res = await fetch('/cgi-bin/status?ip', {});
         const text = await res.text();
         document.getElementById("rtsp").innerHTML = "rtsp://" + text + ":8554/hdzero";
+    })();
+}
+
+function request_live_stream(play) {
+    document.getElementById("videodvr").disabled = true;
+
+    (async () => {
+        const res = await fetch("/cgi-bin/live?play");
+        videoJsPlayer.src({ type: "application/x-mpegURL", src: "live/hdz.m3u8" });
+        if (play) {
+            videoJsPlayer.play();
+        }
+    })();
+}
+
+function request_dvr_stream(file) {
+    (async () => {
+        const res = await fetch("/cgi-bin/dvr?play=" + file);
+        videoJsPlayer.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
+        videoJsPlayer.play();
     })();
 }
 
@@ -38,7 +58,6 @@ function init_page() {
     const au = document.cookie.split("=")[1];
     const login = document.getElementById("login");
     const logout = document.getElementById("logout");
-    get_ip();
 
     if (au) {
         const console = document.getElementById("console");
@@ -55,6 +74,9 @@ function init_page() {
         logout.style.display = "none";
         player.style.gridColumn = "span 3";
     }
+
+    populate_rtsp_url();
+    request_live_stream(false);
 }
 
 // Login Functionality
@@ -96,15 +118,16 @@ function getAuthorization() {
         }
     };
 
-    fetch('/cgi-bin/status?authenticate=' + pswd, settings).then(res => {
-        if (!res.ok) {
-            let err = new Error("http status code: " + res.status);
-            err.response = res;
-            err.status = res.status;
-            throw err
-        }
-        returnFromLogin();
-    })
+    fetch('/cgi-bin/status?authenticate=' + pswd, settings)
+        .then(res => {
+            if (!res.ok) {
+                let err = new Error("http status code: " + res.status);
+                err.response = res;
+                err.status = res.status;
+                throw err
+            }
+            returnFromLogin();
+        })
         .catch((err) => {
             displayError(err.message);
         });
@@ -120,21 +143,26 @@ function changeVideoMode(source) {
     }
 
     if (source === "stream") {
-        (async () => {
-            const res = await fetch("/cgi-bin/live?play");
-            videoJsPlayer.src({ type: "application/x-mpegURL", src: "live/hdz.m3u8" });
-            videoJsPlayer.play();
-        })();
-    } else if (source === "dvr" && gSelectedDvrFile !== "") {
-        (async () => {
-            const res = await fetch("/cgi-bin/dvr?play=" + gSelectedDvrFile);
-            videoJsPlayer.src({ type: "application/x-mpegURL", src: "dvr/hdz.m3u8" });
-            videoJsPlayer.play();
-        })();
+        request_live_stream(true);
+        document.getElementById("lbl_videodvr").innerHTML = '<b>Select DVR File</b>';
+        document.getElementById("videodvr").disabled = true;
+    } else if (source === "dvr") {
+        document.getElementById("videodvr").disabled = false;
+        if (gSelectedDvrFile === "") {
+            document.getElementById("lbl_videodvr").innerHTML = '<b>Select DVR File</b>';
+        } else {
+            document.getElementById("lbl_videodvr").innerHTML = '<b>Play</b>';
+            request_dvr_stream(gSelectedDvrFile);
+        }
     }
 }
 
 function selectVideo() {
+    document.getElementById("lbl_videodvr").innerHTML = '<b>Play</b>';
+    let dvr = document.getElementById("videodvr");
+    dvr.disabled = false;
+    dvr.checked = true;
+
     gSelectedDvrFile = this.getElementsByTagName("td")[0].innerHTML;
     const ipFileName = document.getElementById("videoname");
     const fName = gSelectedDvrFile.split('.')[0];
@@ -143,10 +171,15 @@ function selectVideo() {
     toggleSelection(fName);
 
     videoJsPlayer.reset();
-    videoJsPlayer.poster("movies/" + fName + '.jpg');
     videoJsPlayer.hasStarted(false);
     videoJsPlayer.currentTime(0);
     videoJsPlayer.bigPlayButton.hide();
+
+    // Ensure backend stops then load poster
+    (async () => {
+        const res = await fetch("/cgi-bin/dvr?stop");
+        videoJsPlayer.poster("movies/" + fName + '.jpg');
+    })();
 }
 
 // File Listing Functionality

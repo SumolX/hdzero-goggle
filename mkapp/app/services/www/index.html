@@ -54,13 +54,13 @@
         <article id="console">
             <div class="video-mode">
                 <input type="radio" id="videostream" name="videomode" onclick="changeVideoMode('stream')" checked />
-                <label for="videostream"><b>Stream</b></label>
+                <label id="lbl_videostream" for="videostream"><b>Stream</b></label>
                 <input type="radio" id="videodvr" name="videomode" onclick="changeVideoMode('dvr')" />
-                <label for="videodvr"><b>DVR</b></label>
+                <label id="lbl_videodvr" for="videodvr"><b>Select DVR File</b></label>
             </div>
             <div class="editcontainer">
                 <div>
-                    <input id="videoname" type="text" placeholder="Select DVR Video" maxlength="20">
+                    <input id="videoname" type="text" placeholder="No Video Selected" maxlength="20">
                 </div>
                 <div>
                     <button type="button" onclick="modifyFile()">Rename</button>

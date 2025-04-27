@@ -6,8 +6,4 @@ rm -rf /tmp/www
 cp -a /mnt/app/services/www /tmp/
 ln -sfn /mnt/extsd/DCIM/100HDZRO /tmp/www/movies
 
-# Non-blocking
-{
-    httpd -h /tmp/www
-    curl -X POST "http://127.0.0.1/cgi-bin/live?play"
-} &
+httpd -h /tmp/www

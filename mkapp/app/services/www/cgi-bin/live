@@ -1,39 +1,41 @@
 #!/bin/ash
 
 # Includes
-. /tmp/www/cgi-bin/constants
 . /tmp/www/cgi-bin/utils
 
-# Handlers
-on_live_stop() {
-    killall ffmpeg > /dev/null 2> /dev/null
-    sleep 1
-    rm -rf ${HDZ_LIVE_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
-    echo "Status: 200 OK"
-}
-
-on_live_play() {
-    killall ffmpeg > /dev/null 2> /dev/null
-    sleep 1
-    rm -rf ${HDZ_LIVE_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
-    rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
-
-    ffmpeg -hide_banner -loglevel fatal -i "rtsp://127.0.0.1:8554/hdzero" -c copy -start_number 0 -f hls -hls_time 2 -hls_list_size 1 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_LIVE_PATH}/stream.m3u8 &
-
-    until [ -f ${HDZ_LIVE_PATH}/stream.m3u8 ]; do
-        sleep 0.1
-    done
-
+# Share reference to existing stream
+live_stream_share() {
     echo "content-type: text/html":
     echo "content-length: $(wc -c <${HDZ_LIVE_M3U8})"
     echo ""
 
     cat ${HDZ_LIVE_M3U8}
+}
+
+# Start a new stream
+live_stream_start() {
+    nice -n -20 ffmpeg -hide_banner -loglevel fatal -i "rtsp://127.0.0.1:8554/hdzero" -c copy -start_number 0 -f hls -hls_time 1 -hls_list_size 1 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_LIVE_PATH}/stream.m3u8 &
+
+    until [ -f ${HDZ_LIVE_PATH}/stream.m3u8 ]; do
+        sleep 0.1
+    done
+
+    live_stream_share
+}
+
+# /cgi-bin/live?play
+live_on_play() {
+    if [ -f ${HDZ_DVR_PATH}/stream.m3u8 ]; then
+        # Switch from DVR to Live
+        utils_stop_streaming
+        live_stream_start
+    elif [ -z "$(ps | grep ffmpeg | grep -v grep)" ]; then
+        # Begin a new stream
+        live_stream_start
+    else
+        # Already streaming
+        live_stream_share
+    fi
 }
 
 # Parse Request
@@ -44,8 +46,6 @@ else
     set -- $QUERY_STRING
     key="${1%=*}"
     if [ ${key} == "play" ]; then
-        on_live_play
-    elif [ ${key} == "stop" ]; then
-        on_live_stop
+        live_on_play
     fi
 fi
