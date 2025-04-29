@@ -110,4 +110,5 @@ utils_stop_streaming() {
     rm -rf ${HDZ_LIVE_PATH}/init* 2>&1 > /dev/null
     rm -rf ${HDZ_DVR_PATH}/stream* 2>&1 > /dev/null
     rm -rf ${HDZ_DVR_PATH}/init* 2>&1 > /dev/null
+    rm -rf ${HDZ_DVR_PATH}/dvr* 2>&1 > /dev/null
 }

@@ -64,9 +64,31 @@ dvr_on_stop() {
 dvr_on_play() {
     utils_stop_streaming
 
-    nice -n 20 ffmpeg -hide_banner -loglevel fatal -threads 1 -i ${MOVIE_PATH}/$1 -c copy -bsf:a aac_adtstoasc -start_number 0 -f hls -hls_time 2 -hls_list_size 30 -hls_flags independent_segments+delete_segments -hls_segment_type fmp4 ${HDZ_DVR_PATH}/stream.m3u8 &
+    echo "#EXTM3U" > ${HDZ_DVR_PATH}/stream.m3u8
+    echo "#EXT-X-PLAYLIST-TYPE:VOD" >> ${HDZ_DVR_PATH}/stream.m3u8
+    echo "#EXT-X-VERSION:7" >> ${HDZ_DVR_PATH}/stream.m3u8
+    echo "#EXT-X-TARGETDURATION:2" >> ${HDZ_DVR_PATH}/stream.m3u8
+    echo "#EXT-X-MEDIA-SEQUENCE:0" >> ${HDZ_DVR_PATH}/stream.m3u8
+    echo "#EXT-X-INDEPENDENT-SEGMENTS" >> ${HDZ_DVR_PATH}/stream.m3u8
+    echo "#EXT-X-MAP:URI="init.mp4"" >> ${HDZ_DVR_PATH}/stream.m3u8
 
-    until [ -f ${HDZ_DVR_PATH}/stream.m3u8 ]; do
+    hls_time=2
+    duration=$(ffprobe -i ${MOVIE_PATH}/$1 -show_entries format=duration -v quiet -of csv="p=0")
+    n=$((${duration%.*}/${hls_time}))
+    i=0
+
+    while [ $i -le $n ];
+    do
+        echo "#EXTINF:2.000000,"
+        echo "dvr$i.m4s"
+        i=$(($i+1))
+    done >> ${HDZ_DVR_PATH}/stream.m3u8
+    
+    echo "#EXT-X-ENDLIST" >>  ${HDZ_DVR_PATH}/stream.m3u8
+
+    nice -n 20 ffmpeg -hide_banner -loglevel fatal -threads 1 -i ${MOVIE_PATH}/$1 -c copy -bsf:a aac_adtstoasc -start_number 0 -f hls -hls_time ${hls_time} -hls_list_size 30 -hls_flags independent_segments -hls_segment_type fmp4 ${HDZ_DVR_PATH}/dvr.m3u8 &
+
+    until [ -f ${HDZ_DVR_PATH}/dvr.m3u8 ]; do
         sleep 0.1
     done
 
