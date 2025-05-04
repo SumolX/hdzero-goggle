@@ -727,10 +727,14 @@ static void page_wifi_create_page_3(lv_obj_t *parent) {
     create_btn_group_item(&page_wifi.page_3.ssh.button, parent, 2, "SSH", _lang("On"), _lang("Off"), "", "", 2);
     btn_group_set_sel(&page_wifi.page_3.ssh.button, !g_setting.wifi.ssh);
 
+<<<<<<< HEAD
     create_btn_group_item(&page_wifi.page_3.www.button, parent, 2, "Web", "On", "Off", "", "", 3);
     btn_group_set_sel(&page_wifi.page_3.www.button, !g_setting.wifi.www);
 
     page_wifi.page_3.apply_settings = create_label_item(parent, "Apply Settings", 1, 4, 3);
+=======
+    page_wifi.page_3.apply_settings = create_label_item(parent, "Apply Settings", 1, 3, 3);
+>>>>>>> main
 
     page_wifi.page_3.note = lv_label_create(parent);
     lv_obj_set_style_text_font(page_wifi.page_3.note, &lv_font_montserrat_16, 0);
@@ -986,10 +990,15 @@ static void page_wifi_on_click(uint8_t key, int sel) {
                 keyboard_press();
             }
             break;
+<<<<<<< HEAD
         case 2: // Page System: Web
             btn_group_toggle_sel(&page_wifi.page_3.www.button);
             page_wifi.page_3.www.dirty =
                 (btn_group_get_sel(&page_wifi.page_3.www.button) != !g_setting.wifi.www);
+=======
+        case 2: // Page System: Apply Settings
+            page_wifi_handle_apply_button(page_wifi.page_3.apply_settings);
+>>>>>>> main
             break;
         }
         break;
