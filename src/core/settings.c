@@ -398,11 +398,8 @@ void settings_load(void) {
     // record
     g_setting.record.mode_manual = settings_get_bool("record", "mode_manual", g_setting_defaults.record.mode_manual);
     g_setting.record.format_ts = settings_get_bool("record", "format_ts", g_setting_defaults.record.format_ts);
-<<<<<<< HEAD
     g_setting.record.h265 = ini_getl("venc", "h265", g_setting_defaults.record.h265, REC_CONF);
-=======
     g_setting.record.bitrate_scale = ini_getl("record", "bitrate_scale", g_setting_defaults.record.bitrate_scale, SETTING_INI);
->>>>>>> main
     g_setting.record.osd = settings_get_bool("record", "osd", g_setting_defaults.record.osd);
     g_setting.record.audio = settings_get_bool("record", "audio", g_setting_defaults.record.audio);
     g_setting.record.audio_source = ini_getl("record", "audio_source", g_setting_defaults.record.audio_source, SETTING_INI);
